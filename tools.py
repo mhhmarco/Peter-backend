@@ -1,7 +1,9 @@
 import re
 import urllib.parse
 import httpx
-from duckduckgo_search import DDGS
+import tempfile
+import os
+import edge_tts
 from config import TELEGRAM_BOT_TOKEN
 from database import get_telegram_chat_id
 
@@ -15,7 +17,7 @@ def search_web(query: str, max_results: int = 4) -> str:
             return "\n---\n".join(results)
     except Exception as e:
         print(f"Errore ricerca web DDG: {e}")
-    return "Nessun risultato rilevante trovato sul web."
+    return "Nessun risultato rilevante trovato."
 
 def search_image(query: str) -> str:
     try:
@@ -28,28 +30,25 @@ def search_image(query: str) -> str:
     return ""
 
 def search_youtube(query: str) -> dict:
-    """Estrae l'ID esatto del video YouTube per evitare il blocco 'Video unavailable'."""
-    clean_query = query.replace("video", "").replace("gatti", "cats").strip()
+    """Estrae l'ID esatto e fornisce un player iframe sicuro senza blocchi d'origine."""
+    clean_query = query.replace("video", "").replace("gatti", "funny cats").strip()
     try:
         with DDGS() as ddgs:
             res = list(ddgs.videos(clean_query if clean_query else query, max_results=5))
             for v in res:
                 url = v.get("content", "") or v.get("href", "")
-                # Regex rigorosa per estrarre solo ID validi a 11 caratteri senza trattini iniziali spuri
                 match = re.search(r'(?:v=|\/embed\/|\/watch\?v=|\/youtu\.be\/)([a-zA-Z0-9_-]{11})', url)
                 if match:
                     video_id = match.group(1)
-                    if not video_id.startswith("-"):
-                        return {
-                            "title": v.get("title", query),
-                            "embed_url": f"https://www.youtube.com/embed/{video_id}?autoplay=1&rel=0",
-                            "watch_url": f"https://www.youtube.com/watch?v={video_id}",
-                            "source": "youtube"
-                        }
+                    return {
+                        "title": v.get("title", query),
+                        "embed_url": f"https://www.youtube.com/embed/{video_id}?autoplay=1&enablejsapi=1",
+                        "watch_url": f"https://www.youtube.com/watch?v={video_id}",
+                        "source": "youtube"
+                    }
     except Exception as e:
-        print(f"Errore ricerca YouTube DDG: {e}")
+        print(f"Errore ricerca YouTube: {e}")
     
-    # Fallback embed di ricerca se la ricerca diretta fallisce
     encoded = urllib.parse.quote(query)
     return {
         "title": f"Ricerca YouTube: {query}",
@@ -79,4 +78,29 @@ async def send_telegram_message(message_text: str) -> bool:
             return res.status_code == 200
     except Exception as e:
         print(f"Errore invio Telegram: {e}")
+        return False
+
+async def send_telegram_voice_note(message_text: str) -> bool:
+    """Genera una nota vocale e la invia su Telegram come audio."""
+    token = TELEGRAM_BOT_TOKEN.strip()
+    chat_id = get_telegram_chat_id()
+    if not token or not chat_id:
+        return False
+
+    try:
+        tts = edge_tts.Communicate(message_text, voice="it-IT-DiegoNeural")
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".ogg") as tmp:
+            await tts.save(tmp.name)
+            tmp_path = tmp.name
+
+        url = f"https://api.telegram.org/bot{token}/sendVoice"
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            with open(tmp_path, "rb") as f:
+                res = await client.post(url, data={"chat_id": chat_id}, files={"voice": ("voice.ogg", f, "audio/ogg")})
+            
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+        return res.status_code == 200
+    except Exception as e:
+        print(f"Errore invio nota vocale Telegram: {e}")
         return False
