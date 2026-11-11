@@ -34,23 +34,13 @@ def get_long_term_facts(limit: int = 20) -> str:
         pass
     return ""
 
-def get_all_facts():
-    if not supabase:
-        return []
-    try:
-        res = supabase.table("user_facts").select("*").order("created_at", desc=True).execute()
-        return res.data or []
-    except Exception:
-        return []
-
 def update_fact_by_id(fact_id: str, new_text: str) -> bool:
     if not supabase:
         return False
     try:
         supabase.table("user_facts").update({"fact": new_text}).eq("id", fact_id).execute()
         return True
-    except Exception as e:
-        print(f"Errore aggiornamento fatto: {e}")
+    except Exception:
         return False
 
 def delete_fact_by_id(fact_id: str) -> bool:
@@ -78,14 +68,6 @@ def save_fact(fact_text: str):
         return
     try:
         supabase.table("user_facts").insert([{"fact": fact_text}]).execute()
-    except Exception:
-        pass
-
-def save_telegram_chat_id(chat_id: int):
-    if not supabase:
-        return
-    try:
-        supabase.table("system_settings").upsert({"key": "last_telegram_chat_id", "value": str(chat_id)}).execute()
     except Exception:
         pass
 
@@ -117,7 +99,7 @@ def save_contact_entity(name: str, category: str = "amicizia", notes: str = "", 
             updated_notes = (existing.get("notes", "") + f" | {notes}").strip(" |")
             supabase.table("contacts").update({"notes": updated_notes}).eq("id", existing["id"]).execute()
     except Exception as e:
-        print(f"Errore salvataggio entità Nexus: {e}")
+        print(f"Errore entità Nexus: {e}")
 
 def get_nexus_graph_data() -> dict:
     nodes = [{"id": "user_self", "name": "Marco", "category": "self", "x": 0, "y": 0, "z": 0, "notes": "Admin Peter OS"}]
@@ -145,8 +127,8 @@ def get_nexus_graph_data() -> dict:
                 "events": [c.get("details")] if c.get("details") else []
             })
             edges.append({"source": "user_self", "target": node_id})
-    except Exception as e:
-        print(f"Errore Nexus Graph: {e}")
+    except Exception:
+        pass
 
     return {"nodes": nodes, "edges": edges}
 
