@@ -18,7 +18,7 @@ def search_web(query: str, max_results: int = 4) -> str:
     return ""
 
 def search_image(query: str) -> str:
-    """Cerca un'immagine rilevante per argomenti come Van Gogh o luoghi."""
+    """Cerca l'URL di un'immagine rilevante sul web."""
     try:
         with DDGS() as ddgs:
             results = list(ddgs.images(query, max_results=1))
