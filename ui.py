@@ -5,12 +5,12 @@ def get_dashboard_html() -> str:
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>PETER COMMAND CENTER v3.5</title>
+        <title>PETER COMMAND CENTER v4.0</title>
         <style>
             :root {
                 --bg-main: #030712;
-                --panel-bg: rgba(10, 20, 38, 0.75);
-                --panel-border: rgba(0, 240, 255, 0.18);
+                --panel-bg: rgba(10, 20, 38, 0.85);
+                --panel-border: rgba(0, 240, 255, 0.2);
                 --accent-cyan: #00f0ff;
                 --accent-blue: #1d4ed8;
                 --accent-green: #10b981;
@@ -29,7 +29,7 @@ def get_dashboard_html() -> str:
             .status-dot { width: 6px; height: 6px; background: var(--accent-green); border-radius: 50%; box-shadow: 0 0 8px var(--accent-green); }
             .clock-display { font-family: monospace; font-size: 15px; color: var(--accent-cyan); letter-spacing: 1px; }
 
-            .command-grid { flex: 1; display: grid; grid-template-columns: 240px 1fr 380px; gap: 14px; padding: 14px; height: calc(100vh - 114px); overflow: hidden; }
+            .command-grid { flex: 1; display: grid; grid-template-columns: 240px 1fr 340px; gap: 14px; padding: 14px; height: calc(100vh - 114px); overflow: hidden; }
 
             .sidebar-panel { background: var(--panel-bg); border: 1px solid var(--panel-border); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 16px; backdrop-filter: blur(10px); }
             .nav-menu { display: flex; flex-direction: column; gap: 6px; }
@@ -38,16 +38,15 @@ def get_dashboard_html() -> str:
             
             .voice-widget { margin-top: auto; background: rgba(0, 240, 255, 0.03); border: 1px solid var(--panel-border); border-radius: 12px; padding: 16px; text-align: center; }
             .mic-btn { width: 56px; height: 56px; border-radius: 50%; border: 2px solid var(--accent-cyan); background: rgba(0,240,255,0.1); color: var(--accent-cyan); font-size: 20px; display: flex; align-items: center; justify-content: center; margin: 10px auto; cursor: pointer; box-shadow: 0 0 20px rgba(0,240,255,0.2); transition: all 0.3s; }
-            .mic-btn.recording { background: #ef4444; border-color: #f87171; box-shadow: 0 0 30px #ef4444; animation: pulse 1.5s infinite; }
-            @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.08); } 100% { transform: scale(1); } }
+            .mic-btn.recording { background: #ef4444; border-color: #f87171; box-shadow: 0 0 30px #ef4444; }
 
-            .center-workspace { display: grid; grid-template-rows: 280px 1fr; gap: 14px; height: 100%; overflow: hidden; }
+            .center-workspace { display: grid; grid-template-rows: 320px 1fr; gap: 14px; height: 100%; overflow: hidden; }
             
             /* SCHERMO REATTIVO HUD */
             .hud-screen { background: var(--panel-bg); border: 1px solid var(--panel-border); border-radius: 14px; position: relative; overflow: hidden; display: flex; flex-direction: column; }
             .hud-screen-header { padding: 8px 16px; background: rgba(0,0,0,0.4); border-bottom: 1px solid var(--panel-border); font-size: 10px; font-family: monospace; color: var(--accent-cyan); display: flex; justify-content: space-between; }
             #hud-screen-content { flex: 1; padding: 14px; overflow-y: auto; display: flex; align-items: center; justify-content: center; position: relative; }
-            #core-canvas { width: 100%; height: 100%; position: absolute; top:0; left:0; pointer-events: none; opacity: 0.35; }
+            #core-canvas { width: 100%; height: 100%; position: absolute; top:0; left:0; pointer-events: none; opacity: 0.3; }
 
             .feed-panel { background: var(--panel-bg); border: 1px solid var(--panel-border); border-radius: 14px; display: flex; flex-direction: column; overflow: hidden; }
             .panel-header { padding: 12px 16px; border-bottom: 1px solid var(--panel-border); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--accent-cyan); display: flex; justify-content: space-between; align-items: center; }
@@ -60,13 +59,17 @@ def get_dashboard_html() -> str:
             .right-sidebar { display: flex; flex-direction: column; gap: 14px; height: 100%; overflow-y: auto; }
             .widget-card { background: var(--panel-bg); border: 1px solid var(--panel-border); border-radius: 14px; padding: 16px; backdrop-filter: blur(10px); }
             
-            .input-box { background: rgba(0,0,0,0.3); border: 1px solid var(--panel-border); border-radius: 6px; padding: 8px; color: #fff; font-size: 11px; width: 100%; outline: none; }
-            .action-btn { background: var(--accent-cyan); color: #000; border: none; padding: 6px 12px; border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer; margin-top: 6px; }
-
             .bottom-command-bar { height: 60px; border-top: 1px solid var(--panel-border); padding: 0 24px; display: flex; align-items: center; gap: 16px; background: rgba(3, 7, 18, 0.98); }
-            .cmd-input-container { flex: 1; display: flex; align-items: center; background: rgba(15, 25, 45, 0.8); border: 1px solid var(--panel-border); border-radius: 30px; padding: 4px 6px 4px 20px; }
+            .cmd-input-container { flex: 1; display: flex; align-items: center; background: rgba(15, 25, 45, 0.8); border: 1px solid var(--panel-border); border-radius: 30px; padding: 4px 6px 4px 16px; }
             .cmd-input { flex: 1; background: transparent; border: none; outline: none; color: #fff; font-size: 13px; }
             .cmd-btn { padding: 10px 24px; background: var(--accent-cyan); color: #000; border: none; border-radius: 24px; font-weight: 800; font-size: 12px; cursor: pointer; }
+            .upload-btn { background: transparent; border: none; color: var(--accent-cyan); font-size: 18px; cursor: pointer; margin-right: 10px; }
+
+            /* MODALE IMPOSTAZIONI */
+            .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 200; align-items: center; justify-content: center; }
+            .modal-box { background: var(--panel-bg); border: 1px solid var(--accent-cyan); border-radius: 14px; padding: 24px; width: 90%; max-width: 500px; }
+            .input-box { background: rgba(0,0,0,0.4); border: 1px solid var(--panel-border); border-radius: 6px; padding: 8px; color: #fff; font-size: 12px; width: 100%; outline: none; margin-bottom: 10px; }
+            .action-btn { background: var(--accent-cyan); color: #000; border: none; padding: 8px 16px; border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer; }
         </style>
     </head>
     <body>
@@ -87,9 +90,8 @@ def get_dashboard_html() -> str:
         <div class="command-grid">
             <aside class="sidebar-panel">
                 <div class="nav-menu">
-                    <div class="nav-item active" onclick="showPanel('center')">🌐 Command Center</div>
-                    <div class="nav-item" onclick="showPanel('personality')">🧠 Personalità & Core</div>
-                    <div class="nav-item" onclick="showPanel('imports')">📲 Contatti & iCal</div>
+                    <div class="nav-item active">🌐 Command Center</div>
+                    <div class="nav-item" onclick="openSettingsModal()">⚙️ Impostazioni & Core</div>
                 </div>
 
                 <div class="voice-widget">
@@ -100,7 +102,6 @@ def get_dashboard_html() -> str:
             </aside>
 
             <main class="center-workspace">
-                <!-- SCHERMO REATTIVO VISIVO HUD -->
                 <div class="hud-screen">
                     <div class="hud-screen-header">
                         <span>REACTIVE HUD DISPLAY</span>
@@ -121,43 +122,45 @@ def get_dashboard_html() -> str:
                         <span style="font-size: 10px; color: var(--accent-green);">● INTERACTION READY</span>
                     </div>
                     <div id="chat-feed">
-                        <div class="msg peter">Sistemi di bordo operativi. Lo Schermo Reattivo HUD si aggiornerà in base ai nostri argomenti.</div>
+                        <div class="msg peter">Sistemi di bordo operativi. Schermo Reattivo HUD visivo integrato. Carica immagini o invia un comando.</div>
                     </div>
                 </section>
             </main>
 
             <aside class="right-sidebar">
-                <!-- PERSONALITY MATRIX PANEL -->
-                <div id="personality-panel" class="widget-card">
-                    <div class="panel-header" style="padding: 0 0 10px 0; border: none;">PERSONALITY MATRIX</div>
-                    <label style="font-size: 10px; color: var(--text-dim);">Tono di Voce:</label>
-                    <input type="text" id="p-tone" class="input-box" value="Schietto, empatico, naturale, colto e ironico." />
-                    
-                    <label style="font-size: 10px; color: var(--text-dim); margin-top: 8px; display:block;">Iniziativa:</label>
-                    <input type="text" id="p-initiative" class="input-box" value="Alto (Suggerimenti proattivi)" />
-
-                    <button class="action-btn" onclick="savePersonality()">Salva Personalità</button>
-                </div>
-
-                <!-- IMPORT CONTATTI & ICAL -->
-                <div id="import-panel" class="widget-card">
-                    <div class="panel-header" style="padding: 0 0 10px 0; border: none;">IMPORT CONTATTI & ICAL</div>
-                    <label style="font-size: 10px; color: var(--text-dim);">Importa File Contatti (.vcf):</label>
-                    <input type="file" id="vcf-file" accept=".vcf" class="input-box" onchange="uploadVCF()" />
-
-                    <label style="font-size: 10px; color: var(--text-dim); margin-top: 10px; display:block;">Sincronizza Link iCal (.ics):</label>
-                    <input type="text" id="ical-url" class="input-box" placeholder="https://calendar.google.com/calendar/ical/.../public/basic.ics" />
-                    <button class="action-btn" onclick="importICal()">Sincronizza iCal</button>
+                <div class="widget-card">
+                    <div class="panel-header" style="padding: 0 0 10px 0; border: none;">MEMORIA A LUNGO TERMINE</div>
+                    <div id="facts-preview" style="font-size: 11px; color: var(--text-dim); max-height: 200px; overflow-y: auto;">Caricamento memorie...</div>
                 </div>
             </aside>
         </div>
 
         <footer class="bottom-command-bar">
             <div class="cmd-input-container">
-                <input type="text" id="cmd-input" class="cmd-input" placeholder="TALK TO PETER — Scrivi un comando o fai una domanda..." autocomplete="off" />
+                <button type="button" class="upload-btn" onclick="document.getElementById('image-upload-input').click()">📷</button>
+                <input type="file" id="image-upload-input" accept="image/*" style="display:none;" onchange="uploadImageChat()" />
+                <input type="text" id="cmd-input" class="cmd-input" placeholder="TALK TO PETER — Scrivi un comando, chiedi un video/opera o invia un messaggio..." autocomplete="off" />
                 <button type="button" id="send-cmd-btn" class="cmd-btn">EXECUTE</button>
             </div>
         </footer>
+
+        <!-- MODALE IMPOSTAZIONI -->
+        <div id="settings-modal" class="modal-overlay">
+            <div class="modal-box">
+                <h3 style="color:var(--accent-cyan); margin-bottom:12px;">Impostazioni & Personalità</h3>
+                <label style="font-size: 10px; color: var(--text-dim);">Tono di Voce:</label>
+                <input type="text" id="p-tone" class="input-box" value="Schietto, empatico, naturale, colto e ironico." />
+
+                <label style="font-size: 10px; color: var(--text-dim);">Importa File Contatti (.vcf):</label>
+                <input type="file" id="vcf-file" accept=".vcf" class="input-box" onchange="uploadVCF()" />
+
+                <label style="font-size: 10px; color: var(--text-dim);">Link iCal (.ics):</label>
+                <input type="text" id="ical-url" class="input-box" placeholder="https://..." />
+                <button class="action-btn" onclick="importICal()">Sincronizza iCal</button>
+                
+                <button class="action-btn" style="background:#ef4444; color:#fff; float:right;" onclick="closeSettingsModal()">Chiudi</button>
+            </div>
+        </div>
 
         <script>
             setInterval(() => {
@@ -165,7 +168,6 @@ def get_dashboard_html() -> str:
                 document.getElementById('live-clock').innerText = now.toTimeString().split(' ')[0];
             }, 1000);
 
-            // 3D Core Sphere Animation
             (function initCore3D() {
                 const canvas = document.getElementById('core-canvas');
                 const ctx = canvas.getContext('2d');
@@ -195,7 +197,6 @@ def get_dashboard_html() -> str:
                 animate();
             })();
 
-            // AGGIORNAMENTO SCHERMO REATTIVO HUD
             function updateHudScreen(screen) {
                 const container = document.getElementById('hud-screen-content');
                 const badge = document.getElementById('hud-status-badge');
@@ -204,27 +205,27 @@ def get_dashboard_html() -> str:
                 badge.innerText = `ACTIVE DISPLAY // ${screen.type}`;
 
                 if(screen.type === 'MEDIA_PLAYER' && screen.embed_url) {
-                    container.innerHTML = `<iframe src="${screen.embed_url}" style="width:100%; height:100%; border:none; border-radius:8px;" allow="autoplay"></iframe>`;
+                    container.innerHTML = `<iframe src="${screen.embed_url}" style="width:100%; height:100%; border:none; border-radius:8px;" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>`;
+                } else if(screen.type === 'IMAGE_PREVIEW') {
+                    container.innerHTML = `
+                        <div style="text-align:center; max-width:90%; max-height:90%; z-index:5;">
+                            ${screen.image_url ? `<img src="${screen.image_url}" style="max-width:100%; max-height:220px; border-radius:8px; border:1px solid var(--accent-cyan);" />` : ''}
+                            <h4 style="color:var(--accent-cyan); margin-top:8px;">${screen.title}</h4>
+                            <p style="font-size:11px; color:var(--text-bright); margin-top:4px;">${screen.content}</p>
+                        </div>
+                    `;
                 } else if(screen.type === 'PERSON_CARD' && screen.person) {
                     container.innerHTML = `
-                        <div style="background:rgba(10,20,38,0.9); border:1px solid var(--accent-cyan); padding:20px; border-radius:12px; text-align:center; max-width:320px; z-index:5;">
+                        <div style="background:rgba(10,20,38,0.95); border:1px solid var(--accent-cyan); padding:20px; border-radius:12px; text-align:center; max-width:320px; z-index:5;">
                             <div style="font-size:36px; margin-bottom:6px;">👤</div>
                             <h3 style="color:var(--accent-cyan); font-size:18px;">${screen.person.name}</h3>
                             <p style="font-size:11px; color:var(--text-dim); margin-bottom:8px;">Categoria: ${screen.person.category || 'Amicizia'}</p>
-                            <p style="font-size:12px;">${screen.person.notes || 'Nessuna nota aggiuntiva'}</p>
-                        </div>
-                    `;
-                } else if(screen.type === 'SEARCH_PREVIEW') {
-                    container.innerHTML = `
-                        <div style="background:rgba(10,20,38,0.9); border:1px solid var(--panel-border); padding:16px; border-radius:8px; max-width:440px; font-size:12px; z-index:5;">
-                            <h4 style="color:var(--accent-cyan); margin-bottom:6px;">🔍 ${screen.query}</h4>
-                            <p style="color:var(--text-bright);">${screen.content}</p>
+                            <p style="font-size:12px;">${screen.person.notes || 'Menzionato in conversazione'}</p>
                         </div>
                     `;
                 }
             }
 
-            // CHAT REST LOGIC
             const input = document.getElementById('cmd-input');
             const btn = document.getElementById('send-cmd-btn');
             const feed = document.getElementById('chat-feed');
@@ -243,8 +244,9 @@ def get_dashboard_html() -> str:
                     });
                     const data = await res.json();
                     if(data.reply) {
-                        appendMsg(data.reply, 'peter', data.query_used, data.media);
+                        appendMsg(data.reply, 'peter');
                         if(data.screen) updateHudScreen(data.screen);
+                        loadBrainSummary();
                     }
                 } catch(e) {
                     appendMsg("Errore di connessione.", "peter");
@@ -253,73 +255,53 @@ def get_dashboard_html() -> str:
             btn.onclick = sendMessage;
             input.onkeypress = (e) => { if(e.key === 'Enter') sendMessage(); };
 
-            function appendMsg(text, sender, toolUsed=null, media=null) {
+            async function uploadImageChat() {
+                const fileInput = document.getElementById('image-upload-input');
+                if(!fileInput.files[0]) return;
+                
+                const formData = new FormData();
+                formData.append('file', fileInput.files[0]);
+                formData.append('message', input.value.trim());
+
+                appendMsg("[Invio immagine in corso...]", 'user');
+                input.value = '';
+
+                try {
+                    const res = await fetch('/chat/image', { method: 'POST', body: formData });
+                    const data = await res.json();
+                    if(data.reply) {
+                        appendMsg(data.reply, 'peter');
+                        if(data.screen) updateHudScreen(data.screen);
+                        loadBrainSummary();
+                    }
+                } catch(e) {
+                    appendMsg("Errore invio immagine.", "peter");
+                }
+            }
+
+            function appendMsg(text, sender) {
                 const div = document.createElement('div');
                 div.className = `msg ${sender}`;
-                let html = text;
-                div.innerHTML = html;
+                div.innerText = text;
                 feed.appendChild(div);
                 feed.scrollTop = feed.scrollHeight;
             }
 
-            // FULL-DUPLEX WEBSOCKET VOICE STREAMING
-            let ws = null;
-            let mediaRecorder = null;
-            let isRecording = false;
-
-            function toggleVoiceSession() {
-                const micBtn = document.getElementById('mic-btn');
-                const statusText = document.getElementById('voice-status-text');
-
-                if(!isRecording) {
-                    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-                    ws = new WebSocket(`${protocol}//${window.location.host}/ws/voice`);
-                    
-                    ws.onopen = () => {
-                        navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
-                            mediaRecorder = new MediaRecorder(stream);
-                            mediaRecorder.ondataavailable = e => { if(ws.readyState === WebSocket.OPEN) ws.send(e.data); };
-                            mediaRecorder.start(2500); // Invia blocchi audio ogni 2.5s
-                            isRecording = true;
-                            micBtn.classList.add('recording');
-                            statusText.innerText = 'Ascolto in corso...';
-                        });
-                    };
-
-                    ws.onmessage = async (event) => {
-                        if(typeof event.data === 'string') {
-                            const data = JSON.parse(event.data);
-                            appendMsg(data.user_text, 'user');
-                            appendMsg(data.reply_text, 'peter');
-                            if(data.screen) updateHudScreen(data.screen);
-                        } else {
-                            // Audio risposta da Edge-TTS
-                            const blob = new Blob([event.data], { type: 'audio/mp3' });
-                            const audio = new Audio(URL.createObjectURL(blob));
-                            audio.play();
-                        }
-                    };
-                } else {
-                    if(mediaRecorder) mediaRecorder.stop();
-                    if(ws) ws.close();
-                    isRecording = false;
-                    micBtn.classList.remove('recording');
-                    statusText.innerText = 'Tap to Start Voice Chat';
-                }
+            async function loadBrainSummary() {
+                try {
+                    const res = await fetch('/memories');
+                    const data = await res.json();
+                    if(data.connected && data.long_term_facts) {
+                        document.getElementById('facts-preview').innerHTML = data.long_term_facts.slice(0, 6).map(f => `
+                            <div style="padding:4px 0; border-bottom:1px solid rgba(255,255,255,0.05);">🧠 ${f.fact}</div>
+                        `).join('');
+                    }
+                } catch(e){}
             }
 
-            // PERSONALITY & IMPORTS
-            async function savePersonality() {
-                const tone = document.getElementById('p-tone').value;
-                const initiative = document.getElementById('p-initiative').value;
-                await fetch('/api/personality', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ tone: tone, initiative_level: initiative })
-                });
-                alert('Personalità aggiornata!');
-            }
-
+            function openSettingsModal() { document.getElementById('settings-modal').style.display = 'flex'; }
+            function closeSettingsModal() { document.getElementById('settings-modal').style.display = 'none'; }
+            
             async function uploadVCF() {
                 const fileInput = document.getElementById('vcf-file');
                 if(!fileInput.files[0]) return;
@@ -327,7 +309,7 @@ def get_dashboard_html() -> str:
                 formData.append('file', fileInput.files[0]);
                 const res = await fetch('/api/import/vcf', { method: 'POST', body: formData });
                 const data = await res.json();
-                alert(`Importati ${data.count || 0} contatti da file .vcf!`);
+                alert(`Importati ${data.count || 0} contatti!`);
             }
 
             async function importICal() {
@@ -339,8 +321,10 @@ def get_dashboard_html() -> str:
                     body: JSON.stringify({ url: url })
                 });
                 const data = await res.json();
-                alert(`Sincronizzati ${data.count || 0} eventi dal link iCal!`);
+                alert(`Sincronizzati ${data.count || 0} eventi!`);
             }
+
+            loadBrainSummary();
         </script>
     </body>
     </html>
