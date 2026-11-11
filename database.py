@@ -121,4 +121,28 @@ def add_or_update_node(name: str, category: str = "Amicizia", notes: str = "") -
         print(f"Errore salvataggio nodo: {e}")
         return None
 
-def add_edge(source_id: str, target_id: str, relation_label: str = "collegato") -> dict
+def add_edge(source_id: str, target_id: str, relation_label: str = "collegato") -> dict:
+    """Crea una relazione tipizzata tra due entità nel Nexus."""
+    if not supabase or not source_id or not target_id:
+        return None
+    try:
+        existing = supabase.table("edges").select("*")\
+            .eq("source_id", source_id)\
+            .eq("target_id", target_id)\
+            .eq("relation_label", relation_label).execute()
+        if existing.data:
+            return existing.data[0]
+
+        res = supabase.table("edges").insert([{
+            "source_id": source_id,
+            "target_id": target_id,
+            "relation_label": relation_label
+        }]).execute()
+        return res.data[0] if res.data else None
+    except Exception as e:
+        print(f"Errore salvataggio relazione: {e}")
+        return None
+
+def delete_node_by_id(node_id: str) -> bool:
+    """Elimina un'entità e tutti i suoi collegamenti associati."""
+    if not supabase:
