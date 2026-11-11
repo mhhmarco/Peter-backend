@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
@@ -8,6 +8,7 @@ from database import (
     save_episodic_memory, get_graph_data
 )
 from llm import generate_peter_response, extract_and_save_facts
+from telegram_bot import process_telegram_update
 from ui import get_dashboard_html
 
 app = FastAPI(title="Peter OS Backend")
@@ -48,6 +49,12 @@ def api_delete_fact(fact_id: str):
     if not success:
         raise HTTPException(status_code=500, detail="Impossibile eliminare il fatto")
     return {"status": "deleted"}
+
+@app.post("/telegram/webhook")
+async def telegram_webhook(request: Request):
+    update = await request.json()
+    await process_telegram_update(update)
+    return {"status": "ok"}
 
 @app.post("/chat")
 async def chat_endpoint(req: ChatRequest):
