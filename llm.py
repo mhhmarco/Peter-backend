@@ -6,17 +6,15 @@ from config import GROQ_API_KEY, GROQ_URL
 from database import (
     save_fact_deduplicated, 
     add_or_update_node, 
-    save_diary_entry, 
-    get_recent_memories
+    get_graph_data
 )
 from tools import search_web, search_youtube, search_apple_music
 
 MODEL_FAST = "openai/gpt-oss-20b"        # Model 1: Router & Tool Dispatcher
 MODEL_SMART = "openai/gpt-oss-120b"      # Model 2: Conversational Core Empatico
-MODEL_FACT = "qwen/qwen3.8-27b"          # Model 3: Background Fact & Graph Processor
+MODEL_FACT = "qwen/qwen3.8-27b"          # Model 3: Background Entity & Clarification Processor
 
 def clean_json_response(raw_text: str) -> dict:
-    """Estrae e analizza l'output JSON rimuovendo eventuale sintassi markdown."""
     try:
         match = re.search(r'\{.*\}', raw_text, re.DOTALL)
         if match:
@@ -26,7 +24,6 @@ def clean_json_response(raw_text: str) -> dict:
     return {}
 
 async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
-    """MODEL 1 (Fast Router): Rileva l'intento ed esegue l'attivazione dei Tool."""
     if not GROQ_API_KEY:
         return {"web": "", "media": None, "query_used": ""}
 
@@ -76,8 +73,7 @@ async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
 
     return {"web": web_results, "media": media_data, "query_used": query_used}
 
-async def generate_peter_response(user_message: str, recent_context: str, long_term_facts: str) -> dict:
-    """MODEL 2 (Smart Core): Genera la risposta conversazionale profonda ed empatica."""
+async def generate_peter_response(user_message: str, recent_context: str, long_term_facts: str, pending_clarification: str = "") -> dict:
     if not GROQ_API_KEY:
         raise HTTPException(status_code=500, detail="Manca FREELLM_API_KEY")
 
@@ -92,8 +88,11 @@ async def generate_peter_response(user_message: str, recent_context: str, long_t
         "REGOLE COMPORTAMENTALI:\n"
         "1. Scrivi in testo fluido e naturale (stile iMessage/Telegram).\n"
         "2. Evita elenchi puntati forzati o formattazioni pesanti.\n"
-        "3. Se l'utente richiede un media, integralo con naturalezza nella risposta."
+        "3. Se ti viene segnalata una NUOVA PERSONA senza relazione chiara, CHIEDI NATURALMENTE A MARCO CHI È E CHE RUOLO HA."
     )
+
+    if pending_clarification:
+        system_prompt += f"\n\nNOTA SISTEMA: Marco ha appena menzionato '{pending_clarification}', ma non sai chi sia. Chiedigli con naturalezza chi è e che relazione hanno per aggiungerlo alla mappa Nexus."
 
     if long_term_facts:
         system_prompt += f"\n\nFatti registrati su Marco:\n{long_term_facts}"
@@ -119,17 +118,21 @@ async def generate_peter_response(user_message: str, recent_context: str, long_t
         return {"reply": reply, "query_used": query_used, "media": media_data}
 
 async def process_background_memory(user_message: str):
-    """MODEL 3 (Fact & Graph Extraction): Analizza asincronamente fatti ed entità dal messaggio."""
+    """MODEL 3: Rileva entità non note e salva automaticamente i nuovi contatti nel Nexus."""
     if not GROQ_API_KEY:
         return
 
+    graph = get_graph_data()
+    existing_names = [n["name"].lower() for n in graph.get("nodes", [])]
+
     extraction_prompt = (
-        "Analizza il messaggio dell'utente ed estrai informazioni rilevanti in formato JSON:\n"
-        "1. 'fact': un fatto permanente su Marco (preferenze, progetti, abitudini). Ritorna null se assente.\n"
-        "2. 'entity': un nome di persona, luogo o progetto menzionato da aggiungere al grafo. Ritorna null se assente.\n"
-        "3. 'category': categoria dell'entità ('Famiglia', 'Amicizia', 'Lavoro', 'Progetto').\n\n"
-        "Rispondi ESCLUSIVAMENTE con questo formato JSON:\n"
-        '{"fact": "stringa o null", "entity": "stringa o null", "category": "stringa"}'
+        "Analizza il messaggio dell'utente ed estrai:\n"
+        "1. 'fact': fatto permanente su Marco o null.\n"
+        "2. 'entity': nome proprio di persona menzionata o null.\n"
+        "3. 'relationship': tipo di relazione o ruolo menzionato (es. 'amico', 'collega', 'fratello', 'sconosciuto').\n"
+        "4. 'category': 'Amicizia', 'Famiglia', 'Lavoro', 'Progetto'.\n\n"
+        "Rispondi SOLO in JSON formato:\n"
+        '{"fact": "stringa o null", "entity": "stringa o null", "relationship": "stringa", "category": "stringa"}'
     )
 
     try:
@@ -153,48 +156,15 @@ async def process_background_memory(user_message: str):
 
                 fact = data.get("fact")
                 entity = data.get("entity")
+                relationship = data.get("relationship", "")
                 category = data.get("category", "Amicizia")
 
                 if fact and len(fact) > 5 and str(fact).lower() != "null":
                     save_fact_deduplicated(fact)
 
                 if entity and len(entity) > 2 and str(entity).lower() != "null":
-                    add_or_update_node(entity, category=category)
+                    # Salva l'entità nel Nexus se non già presente
+                    add_or_update_node(entity, category=category, notes=f"Relazione: {relationship}")
 
     except Exception as e:
         print(f"Errore Background Processing ({MODEL_FACT}): {e}")
-
-async def generate_daily_reflection():
-    """MODEL 3: Sintetizza la memoria recente per registrare una voce di diario."""
-    if not GROQ_API_KEY:
-        return None
-
-    recent_memories = get_recent_memories(limit=20)
-    if not recent_memories:
-        return None
-
-    prompt = (
-        "Sei Peter. Leggi le ultime conversazioni della giornata e scrivi un breve diario riflessivo "
-        "della giornata di Marco e delle vostre interazioni. Usa un tono personale, empatico e sintetico."
-    )
-
-    try:
-        async with httpx.AsyncClient(timeout=20.0) as client:
-            res = await client.post(
-                GROQ_URL,
-                json={
-                    "model": MODEL_FACT,
-                    "messages": [
-                        {"role": "system", "content": prompt},
-                        {"role": "user", "content": f"Memorie del giorno:\n{recent_memories}"}
-                    ]
-                },
-                headers={"Content-Type": "application/json", "Authorization": f"Bearer {GROQ_API_KEY}"}
-            )
-            if res.status_code == 200:
-                entry = res.json()["choices"][0]["message"]["content"]
-                save_diary_entry(entry, mood_summary="Riflessione automatica")
-                return entry
-    except Exception as e:
-        print(f"Errore generazione diario: {e}")
-    return None
