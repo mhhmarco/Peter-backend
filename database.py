@@ -34,6 +34,16 @@ def get_long_term_facts(limit: int = 20) -> str:
         pass
     return ""
 
+def get_all_facts():
+    """Restituisce l'elenco completo di tutti i fatti salvati per la gestione in dashboard."""
+    if not supabase:
+        return []
+    try:
+        res = supabase.table("user_facts").select("*").order("created_at", desc=True).execute()
+        return res.data or []
+    except Exception:
+        return []
+
 def update_fact_by_id(fact_id: str, new_text: str) -> bool:
     if not supabase:
         return False
@@ -98,8 +108,8 @@ def save_contact_entity(name: str, category: str = "amicizia", notes: str = "", 
             existing = res.data[0]
             updated_notes = (existing.get("notes", "") + f" | {notes}").strip(" |")
             supabase.table("contacts").update({"notes": updated_notes}).eq("id", existing["id"]).execute()
-    except Exception as e:
-        print(f"Errore entità Nexus: {e}")
+    except Exception:
+        pass
 
 def get_nexus_graph_data() -> dict:
     nodes = [{"id": "user_self", "name": "Marco", "category": "self", "x": 0, "y": 0, "z": 0, "notes": "Admin Peter OS"}]
@@ -173,10 +183,4 @@ def get_personality_settings() -> dict:
         pass
     return default_settings
 
-def save_personality_settings(settings: dict):
-    if not supabase:
-        return
-    try:
-        supabase.table("system_settings").upsert({"key": "personality", "value": settings}).execute()
-    except Exception:
-        pass
+def save
