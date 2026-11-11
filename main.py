@@ -10,7 +10,7 @@ app = FastAPI()
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
 FREELLM_API_KEY = os.getenv("FREELLM_API_KEY", "")
-FREELLM_URL = os.getenv("FREELLM_URL", "https://api.freellmapi.com/v1/chat/completions")
+FREELLM_URL = os.getenv("FREELLM_URL", "")
 
 # Supabase Client
 supabase: Client = None
@@ -38,7 +38,7 @@ async def chat_with_peter(req: ChatRequest):
     )
     
     payload = {
-        "model": "auto:fast",
+        "model": "llama-3.3-70b-versatile",
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": req.message}
