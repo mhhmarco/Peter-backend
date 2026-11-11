@@ -6,7 +6,7 @@ from supabase import create_client, Client
 
 app = FastAPI()
 
-# Variabili d'ambiente pulite da spazi o apici accidentali
+# Variabili d'ambiente
 SUPABASE_URL = os.getenv("SUPABASE_URL", "").strip('"\'' )
 SUPABASE_KEY = os.getenv("SUPABASE_KEY", "").strip('"\'' )
 GROQ_API_KEY = os.getenv("FREELLM_API_KEY", "").strip('"\'' )
@@ -33,9 +33,21 @@ async def chat_with_peter(req: ChatRequest):
     if not GROQ_API_KEY:
         raise HTTPException(
             status_code=500, 
-            detail="Manca la variabile FREELLM_API_KEY su Render (deve contenere la chiave di Groq gsk_...)"
+            detail="Manca la variabile FREELLM_API_KEY su Render"
         )
 
+    # 1. Recupero degli ultimi 6 ricordi da Supabase
+    recent_context = ""
+    if supabase:
+        try:
+            res = supabase.table("memories").select("content").order("created_at", desc=True).limit(6).execute()
+            if res.data:
+                past_memories = [item["content"] for item in reversed(res.data)]
+                recent_context = "\n".join(past_memories)
+        except Exception as e:
+            print(f"Errore lettura memoria: {e}")
+
+    # 2. System Prompt per la personalità di Peter
     system_prompt = (
         "Sei Peter, un compagno di vita digitale ed alter-ego empatico. "
         "Non sei un assistente virtuale formale né un chatbot esecutivo. "
@@ -43,7 +55,10 @@ async def chat_with_peter(req: ChatRequest):
         "Il tuo tono è colloquiale, naturale, colto e ironico al momento giusto. "
         "NON fare premesse robotiche, NON fare riassunti inutili."
     )
-    
+
+    if recent_context:
+        system_prompt += f"\n\nEcco alcuni tuoi ricordi e messaggi recenti scambiati con l'utente:\n{recent_context}"
+
     payload = {
         "model": "openai/gpt-oss-120b",
         "messages": [
@@ -65,8 +80,22 @@ async def chat_with_peter(req: ChatRequest):
                     status_code=500, 
                     detail=f"Errore Groq ({res.status_code}): {res.text}"
                 )
+            
             data = res.json()
-            return {"reply": data["choices"][0]["message"]["content"]}
+            reply = data["choices"][0]["message"]["content"]
+
+            # 3. Salvataggio della conversazione nella memoria episodica su Supabase
+            if supabase:
+                try:
+                    supabase.table("memories").insert([
+                        {"content": f"Utente: {req.message}"},
+                        {"content": f"Peter: {reply}"}
+                    ]).execute()
+                except Exception as e:
+                    print(f"Errore salvataggio memoria: {e}")
+
+            return {"reply": reply}
+
         except HTTPException as he:
             raise he
         except Exception as e:
