@@ -1,3 +1,4 @@
+# telegram_bot.py
 import httpx
 from config import TELEGRAM_BOT_TOKEN
 from database import get_recent_memories, get_long_term_facts, save_episodic_memory
@@ -15,13 +16,23 @@ async def process_telegram_update(update: dict):
 
     result = await generate_peter_response(user_text, recent_context, long_term_facts)
     reply = result["reply"]
+    media = result.get("media")
+
+    # Se c'è un media allegato, aggiungiamo il link diretto per Telegram
+    if media and media.get("embed_url"):
+        embed_url = media["embed_url"]
+        if "youtube" in embed_url:
+            # Convertiamo embed url in link YouTube standard
+            video_id = embed_url.split("/")[-1].split("?")[0]
+            reply += f"\n\n🎬 Video trovato: https://www.youtube.com/watch?v={video_id}"
+        elif "applemusic" in embed_url:
+            reply += f"\n\n🎵 Apple Music: {media.get('title', 'Apri su Apple Music')}"
 
     save_episodic_memory(user_text, reply)
     await extract_and_save_facts(user_text)
 
-    # Pulizia rigorosa del token da spazi o a capo accidentali
     clean_token = TELEGRAM_BOT_TOKEN.strip()
     telegram_url = f"https://api.telegram.org/bot{clean_token}/sendMessage"
-    
+
     async with httpx.AsyncClient() as client:
         await client.post(telegram_url, json={"chat_id": chat_id, "text": reply})
