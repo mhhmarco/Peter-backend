@@ -50,14 +50,26 @@ def get_dashboard_html() -> str:
 
             .chat-footer { padding: 12px 16px; border-top: 1px solid var(--border-neon); background: rgba(4, 7, 12, 0.98); }
             form { display: flex; gap: 8px; }
-            input { flex: 1; padding: 10px 16px; background: rgba(15, 23, 42, 0.9); border: 1px solid var(--border-neon); border-radius: 20px; color: #fff; font-size: 13px; outline: none; }
-            input:focus { border-color: var(--accent-cyan); }
-            button.send-btn { padding: 10px 20px; background: var(--accent-cyan); color: #000; border: none; border-radius: 20px; font-weight: 700; font-size: 12px; cursor: pointer; }
+            input, select, textarea { padding: 8px 12px; background: rgba(15, 23, 42, 0.9); border: 1px solid var(--border-neon); border-radius: 8px; color: #fff; font-size: 12px; outline: none; }
+            input:focus, select:focus, textarea:focus { border-color: var(--accent-cyan); }
+            button.send-btn { padding: 8px 16px; background: var(--accent-cyan); color: #000; border: none; border-radius: 8px; font-weight: 700; font-size: 12px; cursor: pointer; }
 
             .hud-sidebar { padding: 16px; background: var(--bg-core); display: flex; flex-direction: column; gap: 14px; overflow-y: auto; }
             .card { background: var(--panel-bg); border: 1px solid var(--border-neon); border-radius: 10px; padding: 14px; }
             .card-title { font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--accent-cyan); margin-bottom: 8px; display: flex; justify-content: space-between; }
             .fact-item { font-size: 11px; color: var(--text-main); padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+
+            /* LAYOUT NEXUS 3D */
+            .nexus-container { display: grid; grid-template-columns: 1fr 360px; width: 100%; height: 100%; }
+            .nexus-sidebar { background: var(--bg-core); border-left: 1px solid var(--border-neon); padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
+            .nexus-badge { font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; }
+            .badge-famiglia { background: #ef444430; color: #ef4444; border: 1px solid #ef4444; }
+            .badge-amicizia { background: #3b82f630; color: #3b82f6; border: 1px solid #3b82f6; }
+            .badge-lavoro { background: #10b98130; color: #10b981; border: 1px solid #10b981; }
+            .badge-progetto { background: #f59e0b30; color: #f59e0b; border: 1px solid #f59e0b; }
+            .badge-self { background: #00f0ff30; color: #00f0ff; border: 1px solid #00f0ff; }
+
+            .relation-item { font-size: 11px; padding: 6px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-neon); border-radius: 6px; margin-top: 4px; display: flex; justify-content: space-between; align-items: center; }
 
             .settings-container { padding: 24px; max-width: 700px; margin: 0 auto; width: 100%; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
             .setting-row { background: var(--panel-bg); border: 1px solid var(--border-neon); border-radius: 10px; padding: 16px; display: flex; justify-content: space-between; align-items: center; }
@@ -111,11 +123,52 @@ def get_dashboard_html() -> str:
                 </div>
             </div>
 
-            <!-- TAB 3: GRAPH -->
+            <!-- TAB 3: GRAPH (NEXUS 3D) -->
             <div id="tab-graph" class="tab-content">
-                <div style="width: 100%; height: 100%; padding: 16px; display: flex; flex-direction: column;">
-                    <h2 style="margin-bottom: 10px; font-size: 16px;">Grafo Concettuale Entità (Nexus)</h2>
-                    <canvas id="graph-canvas" style="flex: 1; background: var(--panel-bg); border: 1px solid var(--border-neon); border-radius: 10px;"></canvas>
+                <div class="nexus-container">
+                    <div style="position: relative; height: 100%;">
+                        <canvas id="graph-canvas" style="width: 100%; height: 100%; background: var(--panel-bg);"></canvas>
+                        <div style="position: absolute; top: 12px; left: 12px; font-size: 11px; color: var(--text-dim); background: rgba(0,0,0,0.6); padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border-neon);">
+                            💡 Clicca su un nodo nel grafo per aprire la Scheda Persona.
+                        </div>
+                    </div>
+
+                    <aside class="nexus-sidebar">
+                        <!-- SCHEDA PERSONA SELEZIONATA -->
+                        <div class="card">
+                            <div class="card-title">SCHEDA ENTITÀ / PERSONA</div>
+                            <div id="node-details">
+                                <p style="font-size: 11px; color: var(--text-dim);">Seleziona una persona dal grafo a sinistra.</p>
+                            </div>
+                        </div>
+
+                        <!-- FORMS INSERIMENTO DATI PREGRESSI -->
+                        <div class="card">
+                            <div class="card-title">INSERISCI DATI PREGRESSI NEXUS</div>
+                            <form id="add-node-form" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px;">
+                                <input type="text" id="node-name" placeholder="Nome Persona / Entità" required />
+                                <select id="node-category">
+                                    <option value="Amicizia">Amicizia</option>
+                                    <option value="Famiglia">Famiglia</option>
+                                    <option value="Lavoro">Lavoro</option>
+                                    <option value="Progetto">Progetto</option>
+                                    <option value="Self">Self</option>
+                                </select>
+                                <textarea id="node-notes" placeholder="Note / Dettagli sul contatto..." rows="2"></textarea>
+                                <button type="submit" class="send-btn">SALVA ENTITÀ</button>
+                            </form>
+
+                            <hr style="border-color: var(--border-neon); margin: 10px 0;">
+
+                            <div class="card-title">AGGIUNGI COLLEGAMENTO TIPIZZATO</div>
+                            <form id="add-edge-form" style="display: flex; flex-direction: column; gap: 8px;">
+                                <select id="edge-source" required><option value="">Seleziona Origine...</option></select>
+                                <select id="edge-target" required><option value="">Seleziona Destinazione...</option></select>
+                                <input type="text" id="edge-label" placeholder="Tipo Legame (es. Fratello di, Collega di)" required />
+                                <button type="submit" class="send-btn">CREA LEGAME</button>
+                            </form>
+                        </div>
+                    </aside>
                 </div>
             </div>
 
@@ -135,6 +188,9 @@ def get_dashboard_html() -> str:
         </div>
 
         <script>
+            let currentGraphData = { nodes: [], edges: [] };
+            let renderedNodes = [];
+
             function switchTab(tabId) {
                 document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
                 document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
@@ -189,37 +245,41 @@ def get_dashboard_html() -> str:
                 if (!canvas) return;
                 const ctx = canvas.getContext('2d');
                 canvas.width = canvas.parentElement.clientWidth;
-                canvas.height = canvas.parentElement.clientHeight - 40;
+                canvas.height = canvas.parentElement.clientHeight;
                 
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
 
                 try {
                     const res = await fetch('/api/graph');
-                    const data = await res.json();
-                    const nodes = data.nodes || [];
-                    const edges = data.edges || [];
+                    currentGraphData = await res.json();
+                    const nodes = currentGraphData.nodes || [];
+                    const edges = currentGraphData.edges || [];
+
+                    updateSelectDropdowns(nodes);
 
                     const centerX = canvas.width / 2;
                     const centerY = canvas.height / 2;
 
-                    // Nodo centrale (Marco)
+                    const marcoNode = { id: 'marco-core', name: 'Marco', category: 'Self', x: centerX, y: centerY, r: 18 };
+                    renderedNodes = [marcoNode];
+
                     ctx.fillStyle = '#00f0ff';
-                    ctx.shadowBlur = 12;
+                    ctx.shadowBlur = 14;
                     ctx.shadowColor = '#00f0ff';
                     ctx.beginPath();
-                    ctx.arc(centerX, centerY, 16, 0, Math.PI * 2);
+                    ctx.arc(centerX, centerY, marcoNode.r, 0, Math.PI * 2);
                     ctx.fill();
                     ctx.shadowBlur = 0;
 
                     ctx.fillStyle = '#ffffff';
                     ctx.font = 'bold 12px sans-serif';
-                    ctx.fillText('Marco', centerX - 18, centerY + 32);
+                    ctx.fillText('Marco', centerX - 18, centerY + 34);
 
                     if (nodes.length === 0) return;
 
-                    const radius = Math.min(centerX, centerY) * 0.6;
+                    const radius = Math.min(centerX, centerY) * 0.65;
                     const angleStep = (Math.PI * 2) / nodes.length;
-                    const positions = {};
+                    const positions = { 'marco-core': { x: centerX, y: centerY } };
 
                     nodes.forEach((node, idx) => {
                         const angle = idx * angleStep;
@@ -227,36 +287,174 @@ def get_dashboard_html() -> str:
                         const y = centerY + radius * Math.sin(angle);
                         positions[node.id] = { x, y };
 
-                        ctx.strokeStyle = 'rgba(0, 240, 255, 0.2)';
+                        renderedNodes.push({ ...node, x, y, r: 12 });
+
+                        ctx.strokeStyle = 'rgba(0, 240, 255, 0.15)';
                         ctx.beginPath();
                         ctx.moveTo(centerX, centerY);
                         ctx.lineTo(x, y);
                         ctx.stroke();
 
-                        ctx.fillStyle = '#2563eb';
+                        let color = '#2563eb';
+                        if (node.category === 'Famiglia') color = '#ef4444';
+                        if (node.category === 'Lavoro') color = '#10b981';
+                        if (node.category === 'Progetto') color = '#f59e0b';
+
+                        ctx.fillStyle = color;
                         ctx.beginPath();
-                        ctx.arc(x, y, 9, 0, Math.PI * 2);
+                        ctx.arc(x, y, 10, 0, Math.PI * 2);
                         ctx.fill();
 
                         ctx.fillStyle = '#f0f6fc';
                         ctx.font = '11px sans-serif';
-                        ctx.fillText(node.label || node.name || 'Nodo', x - 15, y + 20);
+                        ctx.fillText(node.name || 'Entità', x - 18, y + 22);
                     });
 
                     edges.forEach(edge => {
-                        const p1 = positions[edge.source_id];
-                        const p2 = positions[edge.target_id];
+                        const p1 = positions[edge.source_id] || positions['marco-core'];
+                        const p2 = positions[edge.target_id] || positions['marco-core'];
                         if (p1 && p2) {
-                            ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+                            ctx.strokeStyle = 'rgba(0, 240, 255, 0.4)';
                             ctx.beginPath();
                             ctx.moveTo(p1.x, p1.y);
                             ctx.lineTo(p2.x, p2.y);
                             ctx.stroke();
+
+                            const midX = (p1.x + p2.x) / 2;
+                            const midY = (p1.y + p2.y) / 2;
+                            ctx.fillStyle = '#00f0ff';
+                            ctx.font = '9px monospace';
+                            ctx.fillText(edge.relation_label || 'collegato', midX - 15, midY - 4);
                         }
                     });
+
                 } catch (e) {
-                    console.error("Errore caricamento grafo Nexus:", e);
+                    console.error("Errore caricamento Nexus Graph:", e);
                 }
+            }
+
+            document.getElementById('graph-canvas').addEventListener('click', (e) => {
+                const rect = e.target.getBoundingClientRect();
+                const clickX = e.clientX - rect.left;
+                const clickY = e.clientY - rect.top;
+
+                const clicked = renderedNodes.find(n => {
+                    const dx = clickX - n.x;
+                    const dy = clickY - n.y;
+                    return Math.sqrt(dx*dx + dy*dy) <= n.r + 4;
+                });
+
+                if (clicked) {
+                    showNodeCard(clicked);
+                }
+            });
+
+            function showNodeCard(node) {
+                const detailsDiv = document.getElementById('node-details');
+                const edges = currentGraphData.edges || [];
+                const nodes = currentGraphData.nodes || [];
+
+                const nodeEdges = edges.filter(e => e.source_id === node.id || e.target_id === node.id);
+                let catBadge = `<span class="nexus-badge badge-${(node.category || 'amicizia').toLowerCase()}">${node.category || 'Amicizia'}</span>`;
+
+                let html = `
+                    <div style="display:flex; justify-space-between; align-items:center; margin-bottom:8px;">
+                        <h3 style="font-size:15px; color:#fff;">${node.name}</h3>
+                        ${catBadge}
+                    </div>
+                    <p style="font-size:11px; color:var(--text-dim); margin-bottom:10px;">${node.notes || 'Nessuna nota aggiuntiva registrata.'}</p>
+                    
+                    <div style="font-size:10px; font-weight:bold; color:var(--accent-cyan); text-transform:uppercase; margin-bottom:6px;">
+                        COLLEGAMENTI (${nodeEdges.length})
+                    </div>
+                `;
+
+                if (nodeEdges.length === 0) {
+                    html += `<p style="font-size:11px; color:var(--text-dim);">Nessuna relazione registrata.</p>`;
+                } else {
+                    nodeEdges.forEach(edge => {
+                        const otherId = edge.source_id === node.id ? edge.target_id : edge.source_id;
+                        const otherNode = nodes.find(n => n.id === otherId) || { name: 'Marco' };
+                        html += `
+                            <div class="relation-item">
+                                <span><strong>${edge.relation_label}</strong> ➔ ${otherNode.name}</span>
+                                <button style="background:none; border:none; color:#ef4444; cursor:pointer; font-size:10px;" onclick="deleteEdge('${edge.id}')">✖</button>
+                            </div>
+                        `;
+                    });
+                }
+
+                if (node.id !== 'marco-core') {
+                    html += `
+                        <button style="margin-top:14px; width:100%; background:#ef444420; color:#ef4444; border:1px solid #ef444440; padding:6px; border-radius:6px; cursor:pointer; font-size:11px; font-weight:bold;" onclick="deleteNode('${node.id}')">
+                            ELIMINA PERSONA
+                        </button>
+                    `;
+                }
+
+                detailsDiv.innerHTML = html;
+            }
+
+            function updateSelectDropdowns(nodes) {
+                const srcSelect = document.getElementById('edge-source');
+                const tgtSelect = document.getElementById('edge-target');
+
+                let options = `<option value="marco-core">Marco (Self)</option>`;
+                nodes.forEach(n => {
+                    options += `<option value="${n.id}">${n.name} (${n.category || 'Amicizia'})</option>`;
+                });
+
+                srcSelect.innerHTML = options;
+                tgtSelect.innerHTML = options;
+            }
+
+            document.getElementById('add-node-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const name = document.getElementById('node-name').value.trim();
+                const category = document.getElementById('node-category').value;
+                const notes = document.getElementById('node-notes').value.trim();
+
+                if (!name) return;
+                await fetch('/api/graph/node', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, category, notes })
+                });
+
+                document.getElementById('node-name').value = '';
+                document.getElementById('node-notes').value = '';
+                drawNexusGraph();
+            });
+
+            document.getElementById('add-edge-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const source_id = document.getElementById('edge-source').value;
+                const target_id = document.getElementById('edge-target').value;
+                const relation_label = document.getElementById('edge-label').value.trim();
+
+                if (!source_id || !target_id || !relation_label || source_id === target_id) return;
+
+                await fetch('/api/graph/edge', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ source_id, target_id, relation_label })
+                });
+
+                document.getElementById('edge-label').value = '';
+                drawNexusGraph();
+            });
+
+            async function deleteNode(id) {
+                if (confirm("Eliminare questa persona e tutte le sue relazioni?")) {
+                    await fetch(`/api/graph/node/${id}`, { method: 'DELETE' });
+                    document.getElementById('node-details').innerHTML = '<p style="font-size:11px; color:var(--text-dim);">Persona eliminata.</p>';
+                    drawNexusGraph();
+                }
+            }
+
+            async function deleteEdge(id) {
+                await fetch(`/api/graph/edge/${id}`, { method: 'DELETE' });
+                drawNexusGraph();
             }
 
             form.addEventListener('submit', async (e) => {
