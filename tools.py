@@ -4,12 +4,25 @@ import httpx
 import tempfile
 import os
 import edge_tts
+from duckduckgo_search import DDGS
 from config import TELEGRAM_BOT_TOKEN
 from database import get_telegram_chat_id
 
 def search_youtube(query: str) -> dict:
-    """Estrae l'ID esatto e restituisce un URL embed sicuro compatibile con iframe."""
-    clean_query = query.replace("video", "").replace("metti", "").strip()
+    """Estrae l'ID esatto a 11 caratteri e restituisce un URL embed sicuro compatibile con iframe."""
+    # Se l'utente ha passato un link diretto di YouTube
+    url_match = re.search(r'(?:v=|\/embed\/|\/watch\?v=|\/youtu\.be\/)([a-zA-Z0-9_-]{11})', query)
+    if url_match:
+        video_id = url_match.group(1)
+        return {
+            "title": f"Video YouTube ({video_id})",
+            "embed_url": f"https://www.youtube-nocookie.com/embed/{video_id}?autoplay=1&modestbranding=1&rel=0",
+            "watch_url": f"https://www.youtube.com/watch?v={video_id}",
+            "source": "youtube"
+        }
+
+    # Ricerca tramite DuckDuckGo
+    clean_query = query.replace("video", "").replace("metti", "").replace("canzone", "").strip()
     try:
         with DDGS() as ddgs:
             res = list(ddgs.videos(clean_query if clean_query else query, max_results=5))
@@ -20,7 +33,6 @@ def search_youtube(query: str) -> dict:
                     video_id = match.group(1)
                     return {
                         "title": v.get("title", query),
-                        # Usiamo youtube-nocookie o l'embed standard con i parametri di sblocco origine
                         "embed_url": f"https://www.youtube-nocookie.com/embed/{video_id}?autoplay=1&modestbranding=1&rel=0",
                         "watch_url": f"https://www.youtube.com/watch?v={video_id}",
                         "source": "youtube"
@@ -36,7 +48,7 @@ def search_youtube(query: str) -> dict:
         "watch_url": f"https://www.youtube.com/results?search_query={encoded}",
         "source": "youtube"
     }
-    
+
 def search_web(query: str, max_results: int = 4) -> str:
     try:
         results = []
@@ -58,34 +70,6 @@ def search_image(query: str) -> str:
     except Exception as e:
         print(f"Errore ricerca immagine: {e}")
     return ""
-
-def search_youtube(query: str) -> dict:
-    """Estrae l'ID esatto e fornisce un player iframe sicuro senza blocchi d'origine."""
-    clean_query = query.replace("video", "").replace("gatti", "funny cats").strip()
-    try:
-        with DDGS() as ddgs:
-            res = list(ddgs.videos(clean_query if clean_query else query, max_results=5))
-            for v in res:
-                url = v.get("content", "") or v.get("href", "")
-                match = re.search(r'(?:v=|\/embed\/|\/watch\?v=|\/youtu\.be\/)([a-zA-Z0-9_-]{11})', url)
-                if match:
-                    video_id = match.group(1)
-                    return {
-                        "title": v.get("title", query),
-                        "embed_url": f"https://www.youtube.com/embed/{video_id}?autoplay=1&enablejsapi=1",
-                        "watch_url": f"https://www.youtube.com/watch?v={video_id}",
-                        "source": "youtube"
-                    }
-    except Exception as e:
-        print(f"Errore ricerca YouTube: {e}")
-    
-    encoded = urllib.parse.quote(query)
-    return {
-        "title": f"Ricerca YouTube: {query}",
-        "embed_url": f"https://www.youtube.com/embed?listType=search&list={encoded}",
-        "watch_url": f"https://www.youtube.com/results?search_query={encoded}",
-        "source": "youtube"
-    }
 
 def search_apple_music(query: str) -> dict:
     q_enc = urllib.parse.quote(query)
