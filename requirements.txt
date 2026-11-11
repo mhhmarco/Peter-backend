@@ -3,3 +3,4 @@ uvicorn
 httpx
 supabase
 duckduckgo-search
+beautifulsoup4
