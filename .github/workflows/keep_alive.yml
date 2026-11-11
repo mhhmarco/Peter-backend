@@ -1,0 +1,14 @@
+name: Keep Render Alive
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'  # Esegue il ping ogni 10 minuti
+
+jobs:
+  ping-server:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Render Backend
+        run: |
+          curl -s https://peter-backend-vgnb.onrender.com/ping > /dev/null
+          echo "Ping inviato con successo a Peter OS"
