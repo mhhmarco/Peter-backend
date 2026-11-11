@@ -1,4 +1,4 @@
-fastapi==0.110.0
-uvicorn==0.28.0
-httpx==0.25.2
-supabase==2.3.4
+fastapi
+uvicorn
+httpx
+supabase
