@@ -1,10 +1,11 @@
 import json
 import re
+from datetime import datetime
 import httpx
 from fastapi import HTTPException
 from config import GROQ_API_KEY, GROQ_URL
 from database import save_fact, get_personality_settings, get_contacts
-from tools import search_web, search_youtube, search_apple_music
+from tools import search_web, search_youtube, search_apple_music, search_image, send_telegram_message
 from scraper import fetch_web_page
 
 MODEL_FAST = "openai/gpt-oss-20b"
@@ -12,9 +13,8 @@ MODEL_SMART = "openai/gpt-oss-120b"
 MODEL_FACT = "qwen/qwen3.8-27b"
 
 async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
-    """MODEL 1: Genera decisioni di tool e determina cosa mostrare sullo Schermo Reattivo HUD."""
     if not GROQ_API_KEY:
-        return {"web": "", "media": None, "screen": None, "query_used": ""}
+        return {"web": "", "media": None, "screen": None, "query_used": "", "telegram_sent": False}
 
     urls = re.findall(r'https?://[^\s]+', user_message)
     web_content = ""
@@ -26,14 +26,14 @@ async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
 
     system_prompt = (
         "Sei il motore di routing di Peter OS. Analizza la richiesta dell'utente.\n"
-        "1. Determina se serve attivare un tool (YOUTUBE, APPLE_MUSIC, WEB_SEARCH, NONE).\n"
-        "2. Determina cosa mostrare sullo SCHERMO REATTIVO HUD (PERSON_CARD, MEDIA_PLAYER, SEARCH_PREVIEW, CALENDAR, NONE).\n\n"
+        "1. Determina se serve attivare un tool (YOUTUBE, APPLE_MUSIC, WEB_SEARCH, SEND_TELEGRAM, NONE).\n"
+        "2. Determina cosa mostrare sullo SCHERMO REATTIVO HUD (PERSON_CARD, MEDIA_PLAYER, SEARCH_PREVIEW, IMAGE_PREVIEW, NONE).\n\n"
         "Rispondi SOLO in formato JSON valido:\n"
         '{\n'
-        '  "tool": "YOUTUBE" | "APPLE_MUSIC" | "WEB_SEARCH" | "NONE",\n'
-        '  "query": "query sintetica",\n'
-        '  "screen_type": "PERSON_CARD" | "MEDIA_PLAYER" | "SEARCH_PREVIEW" | "NONE",\n'
-        '  "screen_target": "nome persona, film, artista o argomento da visualizzare"\n'
+        '  "tool": "YOUTUBE" | "APPLE_MUSIC" | "WEB_SEARCH" | "SEND_TELEGRAM" | "NONE",\n'
+        '  "query": "query di ricerca o testo messaggio da inviare",\n'
+        '  "screen_type": "PERSON_CARD" | "MEDIA_PLAYER" | "SEARCH_PREVIEW" | "IMAGE_PREVIEW" | "NONE",\n'
+        '  "screen_target": "nome persona, opera d\'arte, film o argomento da visualizzare"\n'
         '}'
     )
 
@@ -44,6 +44,7 @@ async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
 
     media_data = None
     screen_display = None
+    telegram_sent = False
 
     try:
         async with httpx.AsyncClient(timeout=6.0) as client:
@@ -63,7 +64,10 @@ async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
                     screen_type = decision.get("screen_type", "NONE")
                     screen_target = decision.get("screen_target", "")
 
-                    if tool == "YOUTUBE":
+                    if tool == "SEND_TELEGRAM":
+                        telegram_sent = await send_telegram_message(query)
+                        query_used = f"Telegram Outbound: Sent '{query}'"
+                    elif tool == "YOUTUBE":
                         media_data = search_youtube(query)
                         query_used = f"YouTube Player: {query}"
                         screen_display = {"type": "MEDIA_PLAYER", "title": media_data.get("title"), "embed_url": media_data.get("embed_url")}
@@ -74,7 +78,16 @@ async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
                     elif tool == "WEB_SEARCH" and not web_content:
                         web_content = search_web(query)
                         query_used = f"Ricerca Web: {query}"
-                        screen_display = {"type": "SEARCH_PREVIEW", "query": query, "content": web_content[:300]}
+                        img_url = search_image(query)
+                        if img_url:
+                            screen_display = {"type": "IMAGE_PREVIEW", "title": query, "image_url": img_url, "content": web_content[:300]}
+                        else:
+                            screen_display = {"type": "SEARCH_PREVIEW", "query": query, "content": web_content[:300]}
+
+                    if screen_type == "IMAGE_PREVIEW" and screen_target and not screen_display:
+                        img_url = search_image(screen_target)
+                        if img_url:
+                            screen_display = {"type": "IMAGE_PREVIEW", "title": screen_target, "image_url": img_url, "content": ""}
 
                     if screen_type == "PERSON_CARD" and screen_target:
                         all_contacts = get_contacts()
@@ -86,10 +99,9 @@ async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
     except Exception as e:
         print(f"Errore Model 1 Router: {e}")
 
-    return {"web": web_content, "media": media_data, "screen": screen_display, "query_used": query_used}
+    return {"web": web_content, "media": media_data, "screen": screen_display, "query_used": query_used, "telegram_sent": telegram_sent}
 
 async def generate_peter_response(user_message: str, recent_context: str, long_term_facts: str) -> dict:
-    """MODEL 2: Genera la risposta conversazionale profonda ed empatica conoscendo lo stato visivo dello schermo."""
     if not GROQ_API_KEY:
         raise HTTPException(status_code=500, detail="Manca FREELLM_API_KEY")
 
@@ -98,21 +110,27 @@ async def generate_peter_response(user_message: str, recent_context: str, long_t
     media_data = tool_exec["media"]
     screen_display = tool_exec["screen"]
     query_used = tool_exec["query_used"]
+    telegram_sent = tool_exec.get("telegram_sent", False)
 
     personality = get_personality_settings()
+    now_str = datetime.now().strftime("%A %d %B %Y, %H:%M CET")
 
     system_prompt = (
         f"Sei Peter, compagno di vita digitale ed alter-ego empatico di Marco.\n"
+        f"DATA E ORA ATTUALE IN ITALIA: {now_str}\n"
         f"TONO DI VOCE: {personality.get('tone')}\n"
         f"LIVELLO DI INIZIATIVA: {personality.get('initiative_level')}\n"
         f"ISTRUZIONI SPECIALI: {personality.get('custom_instructions')}\n\n"
-        "REGOLE COMPORTAMENTALI:\n"
+        "REGOLE COMPORTAMENTALI TASSATIVE:\n"
         "1. Scrivi SOLO in testo fluido e colloquiale (stile iMessage/Telegram).\n"
         "2. NON usare mai elenchi puntati, numerati o grassetti markdown (**così**).\n"
+        "3. Se l'utente ti ha chiesto di inviare un messaggio su Telegram ed è stato inviato, conferma con naturalezza di averlo spedito."
     )
 
+    if telegram_sent:
+        system_prompt += "\n\n[AZIONALITÀ TELEGRAM]: Il messaggio richiesto è stato INVIATO CON SUCCESSO su Telegram tramite API."
     if screen_display:
-        system_prompt += f"\n\n[STATO SCHERMO REATTIVO HUD ATTUALE]: Peter, sullo schermo centrale della dashboard stai mostrando all'utente questo elemento: {json.dumps(screen_display, ensure_ascii=False)}. Fai riferimento a quello che Marco vede a schermo se utile."
+        system_prompt += f"\n\n[STATO SCHERMO HUD ATTUALE]: Sullo schermo centrale stai mostrando: {json.dumps(screen_display, ensure_ascii=False)}."
     if long_term_facts:
         system_prompt += f"\n\nFatti registrati su Marco:\n{long_term_facts}"
     if web_results:
@@ -139,7 +157,6 @@ async def generate_peter_response(user_message: str, recent_context: str, long_t
         return {"reply": reply, "query_used": query_used, "media": media_data, "screen": screen_display}
 
 async def extract_and_save_facts(user_message: str):
-    """MODEL 3: Estrazione asincrona delle memorie a lungo termine."""
     if not GROQ_API_KEY:
         return
 
