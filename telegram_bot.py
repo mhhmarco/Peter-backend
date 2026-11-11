@@ -1,10 +1,10 @@
-# telegram_bot.py
 import httpx
+from fastapi import BackgroundTasks
 from config import TELEGRAM_BOT_TOKEN
 from database import get_recent_memories, get_long_term_facts, save_episodic_memory
-from llm import generate_peter_response, extract_and_save_facts
+from llm import generate_peter_response, process_background_memory
 
-async def process_telegram_update(update: dict):
+async def process_telegram_update(update: dict, background_tasks: BackgroundTasks):
     if not TELEGRAM_BOT_TOKEN or "message" not in update or "text" not in update["message"]:
         return
 
@@ -18,21 +18,23 @@ async def process_telegram_update(update: dict):
     reply = result["reply"]
     media = result.get("media")
 
-    # Se c'è un media allegato, aggiungiamo il link diretto per Telegram
+    # Formattazione media per messaggio Telegram
     if media and media.get("embed_url"):
         embed_url = media["embed_url"]
         if "youtube" in embed_url:
-            # Convertiamo embed url in link YouTube standard
             video_id = embed_url.split("/")[-1].split("?")[0]
             reply += f"\n\n🎬 Video trovato: https://www.youtube.com/watch?v={video_id}"
         elif "applemusic" in embed_url:
-            reply += f"\n\n🎵 Apple Music: {media.get('title', 'Apri su Apple Music')}"
+            reply += f"\n\n🎵 {media.get('title', 'Apri su Apple Music')}"
 
     save_episodic_memory(user_text, reply)
-    await extract_and_save_facts(user_text)
+    
+    # Task asincrono in background per estrazione fatti/grafo da Telegram
+    background_tasks.add_task(process_background_memory, user_text)
 
     clean_token = TELEGRAM_BOT_TOKEN.strip()
     telegram_url = f"https://api.telegram.org/bot{clean_token}/sendMessage"
 
     async with httpx.AsyncClient() as client:
         await client.post(telegram_url, json={"chat_id": chat_id, "text": reply})
+
