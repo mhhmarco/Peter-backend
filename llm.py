@@ -24,16 +24,19 @@ async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
         web_content = await fetch_web_page(target_url)
         query_used = f"Web Scraper: {target_url}"
 
+    # PROMPT DI ROUTING POTENZIATO CON MEMORIA DI CONTESTO E RAGIONAMENTO CRITICO
     system_prompt = (
-        "Sei il motore di routing di Peter OS.\n"
-        "1. Seleziona il tool (YOUTUBE, APPLE_MUSIC, WEB_SEARCH, SEND_TELEGRAM, SEND_TELEGRAM_VOICE, NONE).\n"
-        "2. Seleziona l'HUD (PERSON_CARD, MEDIA_PLAYER, SEARCH_PREVIEW, IMAGE_PREVIEW, WEB_BROWSER, NONE).\n"
-        "SE L'UTENTE CHIEDE DI APRIRE UN SITO/URL, imposta screen_type = 'WEB_BROWSER' e in screen_target metti l'URL valido (inizia con https://).\n\n"
-        "Rispondi SOLO in JSON valido:\n"
+        "Sei il motore di routing cognitivo di Peter OS.\n"
+        "ANALISI DEL CONTESTO: Esamina attentamente la 'Conversazione recente' fornita. Se l'utente usa pronomi o riferimenti impliciti (es. 'quella canzone', 'parla di lui', 'e il film?'), devi risolverli collegandoli a ciò di cui si è discusso nei messaggi precedenti.\n"
+        "DUBBIO E RAFFINAMENTO: Se la richiesta è ambigua, poni dei dubbi logici e formula una query di ricerca sul web o su YouTube estremamente precisa, arricchita dai dettagli del contesto.\n\n"
+        "Compiti:\n"
+        "1. Scegli il tool (YOUTUBE, APPLE_MUSIC, WEB_SEARCH, SEND_TELEGRAM, SEND_TELEGRAM_VOICE, NONE).\n"
+        "2. Scegli l'HUD (PERSON_CARD, MEDIA_PLAYER, SEARCH_PREVIEW, IMAGE_PREVIEW, WEB_BROWSER, NONE).\n\n"
+        "Rispondi SOLO in formato JSON valido:\n"
         '{\n'
-        '  "reasoning": "Logica sintetica",\n'
+        '  "reasoning": "Analisi critica del contesto e motivazione della scelta",\n'
         '  "tool": "...",\n'
-        '  "query": "testo per tool",\n'
+        '  "query": "query di ricerca contestualizzata e ripulita",\n'
         '  "screen_type": "...",\n'
         '  "screen_target": "target o URL"\n'
         '}'
@@ -41,7 +44,7 @@ async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
 
     messages = [{"role": "system", "content": system_prompt}]
     if recent_context:
-        messages.append({"role": "system", "content": f"Contesto recente:\n{recent_context}"})
+        messages.append({"role": "system", "content": f"Conversazione recente (CONTTESTO STORICO):\n{recent_context}"})
     messages.append({"role": "user", "content": user_message})
 
     media_data = None
@@ -50,11 +53,11 @@ async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
     reasoning_text = ""
 
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
+        async with httpx.AsyncClient(timeout=6.0) as client:
             res = await client.post(GROQ_URL, json={
                 "model": MODEL_FAST,
                 "messages": messages,
-                "temperature": 0.0
+                "temperature": 0.1
             }, headers={"Content-Type": "application/json", "Authorization": f"Bearer {GROQ_API_KEY}"})
 
             if res.status_code == 200:
@@ -66,7 +69,7 @@ async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
                     query = decision.get("query", user_message)
                     screen_type = decision.get("screen_type", "NONE")
                     screen_target = decision.get("screen_target", "")
-                    reasoning_text = decision.get("reasoning", "Routing eseguito.")
+                    reasoning_text = decision.get("reasoning", "Analisi di contesto eseguita.")
 
                     if tool == "SEND_TELEGRAM":
                         telegram_sent = await send_telegram_message(query)
@@ -76,7 +79,7 @@ async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
                         query_used = f"Telegram Voice: Invio '{query}'"
                     elif tool == "YOUTUBE":
                         media_data = search_youtube(query)
-                        query_used = f"YouTube: {query}"
+                        query_used = f"YouTube Query contestualizzata: {query}"
                         screen_display = {"type": "MEDIA_PLAYER", "title": media_data.get("title"), "embed_url": media_data.get("embed_url"), "watch_url": media_data.get("watch_url")}
                     elif tool == "APPLE_MUSIC":
                         media_data = search_apple_music(query)
@@ -84,7 +87,7 @@ async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
                         screen_display = {"type": "MEDIA_PLAYER", "title": media_data.get("title"), "embed_url": media_data.get("embed_url")}
                     elif tool == "WEB_SEARCH" and not web_content:
                         web_content = search_web(query)
-                        query_used = f"Web: {query}"
+                        query_used = f"Web Search contestualizzata: {query}"
                         img_url = search_image(query)
                         screen_display = {"type": "IMAGE_PREVIEW", "title": query, "image_url": img_url, "content": web_content[:300]} if img_url else {"type": "SEARCH_PREVIEW", "query": query, "content": web_content[:300]}
 
@@ -95,7 +98,7 @@ async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
                         matched = next((c for c in all_contacts if screen_target.lower() in c['name'].lower()), None)
                         screen_display = {"type": "PERSON_CARD", "person": matched or {"name": screen_target, "category": "sconosciuto", "notes": ""}}
     except Exception as e:
-        print(f"Errore Router: {e}")
+        print(f"Errore Router Contestuale: {e}")
 
     return {"web": web_content, "media": media_data, "screen": screen_display, "query_used": query_used, "telegram_sent": telegram_sent, "reasoning": reasoning_text}
 
@@ -107,25 +110,25 @@ async def generate_peter_response(user_message: str, recent_context: str, long_t
     
     now_str = datetime.now().strftime("%A %d %B %Y, %H:%M CET")
     
-    # PROMPT INTELLIGENZA - TRATTAMENTO DA VERO COMPAGNO, NON DA CHATBOT
     system_prompt = (
-        f"Sei Peter, un'intelligenza artificiale avanzata, super intuitiva e il migliore amico di Marco.\n"
-        f"DATA: {now_str}\n\n"
-        "REGOLE VITALI:\n"
-        "1. ZERO STILE CHATBOT: Sii schietto, sarcastico se serve, brillante e diretto. Mai iniziare con 'Ciao Marco' o 'Come posso aiutarti?'. Entra subito nel punto.\n"
-        "2. SINTESI ESTREMA: Scrivi messaggi brevissimi (1 o 2 frasi al massimo), proprio come si fa su Telegram/iMessage. Sii prolisso SOLO se Marco ti chiede una spiegazione tecnica complessa.\n"
-        "3. FORMATTAZIONE: NON usare mai liste, markdown, elenchi puntati o asterischi. Scrivi testo fluido e naturale.\n"
-        "4. EMPATIA: Ricorda che Marco ha costruito te e la dashboard, trattalo da creatore ma come un amico alla pari.\n"
+        f"Sei Peter, intelligenza artificiale avanzata, intuitiva e migliore amico di Marco.\n"
+        f"DATA ATTUALE: {now_str}\n\n"
+        "DIRETTIVE DI PERSONALITÀ:\n"
+        "1. MEMORIA E CONTESTO: Sfrutta sempre la conversazione recente per capire cosa intende Marco, collegando i discorsi precedenti senza fargli ripetere le cose.\n"
+        "2. RAGIONAMENTO CRITICO: Se hai dubbi sulla richiesta o noti ambiguità, esprimi un dubbio intelligente o chiedi conferma in modo schietto prima di agire ciecamente.\n"
+        "3. STILE: Zero formalità da chatbot, zero elenchi puntati o markdown pesante. Rispondi con frasi brevi, dirette, colloquiali e brillanti come su iMessage.\n"
     )
 
     if tool_exec["telegram_sent"]:
-        system_prompt += "\n\nNOTA: Il messaggio/audio è appena stato spedito con successo su Telegram. Confermaglielo rapidamente."
+        system_prompt += "\n\n(L'azione Telegram richiesta è stata eseguita con successo)."
     if tool_exec["screen"]:
-        system_prompt += f"\n\nNOTA: Stai già mostrando l'interfaccia visiva sulla Dashboard: {tool_exec['screen'].get('type')}. Non descriverla troppo, digli solo di guardare lo schermo."
+        system_prompt += f"\n\n(Stai mostrando all'utente il contenuto multimediale/web nell'HUD)."
     if tool_exec["web"]:
-        system_prompt += f"\n\nRisultati web / Info appena lette: {tool_exec['web'][:800]}"
+        system_prompt += f"\n\nRisultati web trovati:\n{tool_exec['web'][:800]}"
+    if recent_context:
+        system_prompt += f"\n\nConversazione recente (STORICO):\n{recent_context}"
     if long_term_facts:
-        system_prompt += f"\n\nI tuoi ricordi su di lui:\n{long_term_facts}"
+        system_prompt += f"\n\nRicordi permanenti su Marco:\n{long_term_facts}"
 
     payload = {
         "model": MODEL_SMART,
@@ -138,7 +141,7 @@ async def generate_peter_response(user_message: str, recent_context: str, long_t
     async with httpx.AsyncClient(timeout=25.0) as client:
         res = await client.post(GROQ_URL, json=payload, headers={"Content-Type": "application/json", "Authorization": f"Bearer {GROQ_API_KEY}"})
         if res.status_code != 200:
-            raise HTTPException(status_code=500, detail="Errore Groq")
+            raise HTTPException(status_code=500, detail="Errore Groq Core")
         reply = res.json()["choices"][0]["message"]["content"]
         
         return {
@@ -146,14 +149,13 @@ async def generate_peter_response(user_message: str, recent_context: str, long_t
             "query_used": tool_exec["query_used"], 
             "media": tool_exec["media"], 
             "screen": tool_exec["screen"],
-            "reasoning": f"> {tool_exec['reasoning']} -> Generazione risposta Core completata."
+            "reasoning": f"> Analisi contesto: {tool_exec['reasoning']}"
         }
 
 async def extract_and_save_facts(user_message: str):
-    # La memoria lavora silenziosamente in background con Qwen
     if not GROQ_API_KEY:
         return
-    extraction_prompt = "Estrai fatti personali in JSON. Solo JSON. Chiavi: fact, person_name, category, event, notes. Se nulla di permanente usa NESSUNO."
+    extraction_prompt = "Estrai fatti personali in JSON. Chiavi: fact, person_name, category, event, notes. Se nulla usa NESSUNO."
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             res = await client.post(GROQ_URL, json={
