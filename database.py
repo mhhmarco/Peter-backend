@@ -71,7 +71,27 @@ def save_fact(fact_text: str):
     except Exception:
         pass
 
-# GESTIONE CONTATTI & CALENDARIO
+# GESTIONE TELEGRAM CHAT ID
+def save_telegram_chat_id(chat_id: int):
+    if not supabase:
+        return
+    try:
+        supabase.table("system_settings").upsert({"key": "last_telegram_chat_id", "value": str(chat_id)}).execute()
+    except Exception as e:
+        print(f"Errore salvataggio Telegram Chat ID: {e}")
+
+def get_telegram_chat_id() -> str:
+    if not supabase:
+        return ""
+    try:
+        res = supabase.table("system_settings").select("value").eq("key", "last_telegram_chat_id").execute()
+        if res.data:
+            return res.data[0]["value"]
+    except Exception:
+        pass
+    return ""
+
+# CONTATTI & CALENDARIO
 def save_contacts_batch(contacts: list):
     if not supabase or not contacts:
         return
@@ -97,26 +117,16 @@ def save_calendar_events_batch(events: list):
     except Exception as e:
         print(f"Errore salvataggio batch calendari: {e}")
 
-def get_calendar_events():
-    if not supabase:
-        return []
-    try:
-        res = supabase.table("calendar_events").select("*").limit(30).execute()
-        return res.data or []
-    except Exception:
-        return []
-
-# PERSONALITY MATRIX
 def get_personality_settings() -> dict:
     default_settings = {
         "tone": "Schietto, empatico, naturale, colto e ironico.",
         "initiative_level": "Alto (Suggerimenti proattivi)",
-        "custom_instructions": "Tratta Marco come un amico fidato. Fai riferimenti espliciti agli elementi visibili sullo Schermo HUD quando pertinenti."
+        "custom_instructions": "Tratta Marco come un amico fidato alla pari. Fai riferimenti espliciti a quello che vede sullo Schermo HUD."
     }
     if not supabase:
         return default_settings
     try:
-        res = supabase.table("system_settings").select("*").eq("key", "personality").execute()
+        res = supabase.table("system_settings").select("value").eq("key", "personality").execute()
         if res.data:
             return res.data[0]["value"]
     except Exception:
