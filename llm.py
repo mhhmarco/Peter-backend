@@ -14,7 +14,7 @@ MODEL_FACT = "qwen/qwen3.8-27b"
 
 async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
     if not GROQ_API_KEY:
-        return {"web": "", "media": None, "screen": None, "query_used": "", "telegram_sent": False}
+        return {"web": "", "media": None, "screen": None, "query_used": "", "telegram_sent": False, "reasoning": ""}
 
     urls = re.findall(r'https?://[^\s]+', user_message)
     web_content = ""
@@ -30,10 +30,11 @@ async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
         "2. Determina cosa mostrare sullo SCHERMO REATTIVO HUD (PERSON_CARD, MEDIA_PLAYER, SEARCH_PREVIEW, IMAGE_PREVIEW, NONE).\n\n"
         "Rispondi SOLO in formato JSON valido:\n"
         '{\n'
+        '  "reasoning": "Breve spiegazione logica della decisione presa",\n'
         '  "tool": "YOUTUBE" | "APPLE_MUSIC" | "WEB_SEARCH" | "SEND_TELEGRAM" | "NONE",\n'
-        '  "query": "query di ricerca o testo messaggio da inviare",\n'
+        '  "query": "query di ricerca o testo messaggio",\n'
         '  "screen_type": "PERSON_CARD" | "MEDIA_PLAYER" | "SEARCH_PREVIEW" | "IMAGE_PREVIEW" | "NONE",\n'
-        '  "screen_target": "nome persona, opera d\'arte, film o argomento da visualizzare"\n'
+        '  "screen_target": "nome persona, opera, film o argomento"\n'
         '}'
     )
 
@@ -45,6 +46,7 @@ async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
     media_data = None
     screen_display = None
     telegram_sent = False
+    reasoning_text = ""
 
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
@@ -63,6 +65,7 @@ async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
                     query = decision.get("query", user_message)
                     screen_type = decision.get("screen_type", "NONE")
                     screen_target = decision.get("screen_target", "")
+                    reasoning_text = decision.get("reasoning", "Model 1 Routing completato.")
 
                     if tool == "SEND_TELEGRAM":
                         telegram_sent = await send_telegram_message(query)
@@ -70,7 +73,7 @@ async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
                     elif tool == "YOUTUBE":
                         media_data = search_youtube(query)
                         query_used = f"YouTube Player: {query}"
-                        screen_display = {"type": "MEDIA_PLAYER", "title": media_data.get("title"), "embed_url": media_data.get("embed_url")}
+                        screen_display = {"type": "MEDIA_PLAYER", "title": media_data.get("title"), "embed_url": media_data.get("embed_url"), "watch_url": media_data.get("watch_url")}
                     elif tool == "APPLE_MUSIC":
                         media_data = search_apple_music(query)
                         query_used = f"Apple Music: {query}"
@@ -94,7 +97,7 @@ async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
     except Exception as e:
         print(f"Errore Model 1 Router: {e}")
 
-    return {"web": web_content, "media": media_data, "screen": screen_display, "query_used": query_used, "telegram_sent": telegram_sent}
+    return {"web": web_content, "media": media_data, "screen": screen_display, "query_used": query_used, "telegram_sent": telegram_sent, "reasoning": reasoning_text}
 
 async def generate_peter_response(user_message: str, recent_context: str, long_term_facts: str) -> dict:
     if not GROQ_API_KEY:
@@ -106,6 +109,7 @@ async def generate_peter_response(user_message: str, recent_context: str, long_t
     screen_display = tool_exec["screen"]
     query_used = tool_exec["query_used"]
     telegram_sent = tool_exec.get("telegram_sent", False)
+    reasoning_log = tool_exec.get("reasoning", "")
 
     personality = get_personality_settings()
     now_str = datetime.now().strftime("%A %d %B %Y, %H:%M CET")
@@ -119,11 +123,11 @@ async def generate_peter_response(user_message: str, recent_context: str, long_t
         "REGOLE COMPORTAMENTALI TASSATIVE:\n"
         "1. Scrivi SOLO in testo fluido e colloquiale (stile iMessage/Telegram).\n"
         "2. NON usare mai elenchi puntati, numerati o grassetti markdown (**così**).\n"
-        "3. Se l'utente ti ha chiesto di inviare un messaggio su Telegram ed è stato inviato, conferma con naturalezza di averlo spedito."
+        "3. Se l'utente ti ha chiesto di inviare un messaggio su Telegram ed è stato inviato, conferma con naturalezza."
     )
 
     if telegram_sent:
-        system_prompt += "\n\n[AZIONALITÀ TELEGRAM]: Il messaggio richiesto è stato INVIATO CON SUCCESSO su Telegram tramite API."
+        system_prompt += "\n\n[AZIONALITÀ TELEGRAM]: Messaggio inviato con successo via API Telegram."
     if screen_display:
         system_prompt += f"\n\n[STATO SCHERMO HUD ATTUALE]: Sullo schermo centrale stai mostrando: {json.dumps(screen_display, ensure_ascii=False)}."
     if long_term_facts:
@@ -149,21 +153,26 @@ async def generate_peter_response(user_message: str, recent_context: str, long_t
             raise HTTPException(status_code=500, detail=f"Errore Groq: {res.text}")
         reply = res.json()["choices"][0]["message"]["content"]
         
-        return {"reply": reply, "query_used": query_used, "media": media_data, "screen": screen_display}
+        return {
+            "reply": reply, 
+            "query_used": query_used, 
+            "media": media_data, 
+            "screen": screen_display,
+            "reasoning": f"Model 1 (Router): {reasoning_log} -> Model 2 (Core): Risposta generata con successo."
+        }
 
 async def extract_and_save_facts(user_message: str):
-    """MODEL 3 (Background): Estrazione strutturata di Fatti, Persone ed Eventi per la mappa Nexus 3D."""
     if not GROQ_API_KEY:
         return
 
     extraction_prompt = (
-        "Analizza la conversazione dell'utente ed estrai le informazioni permanenti nel seguente formato JSON valido:\n"
+        "Analizza la conversazione ed estrai le informazioni permanenti nel seguente formato JSON valido:\n"
         "{\n"
         '  "fact": "fatto permanente rilevato su Marco o NESSUNO",\n'
-        '  "person_name": "nome di una persona menzionata o NESSUNO",\n'
+        '  "person_name": "nome persona menzionata o NESSUNO",\n'
         '  "category": "famiglia" | "amicizia" | "lavoro",\n'
         '  "event": "eventuale evento menzionato legato a questa persona o NESSUNO",\n'
-        '  "notes": "dettagli o note sulla persona o NESSUNO"\n'
+        '  "notes": "dettagli o note o NESSUNO"\n'
         "}"
     )
 
@@ -195,4 +204,4 @@ async def extract_and_save_facts(user_message: str):
                         notes = parsed.get("notes", "") if parsed.get("notes") != "NESSUNO" else ""
                         save_contact_entity(person, category, notes, event)
     except Exception as e:
-        print(f"Errore Model 3 Fact & Entity Extraction: {e}")
+        print(f"Errore Model 3 Fact Extraction: {e}")
