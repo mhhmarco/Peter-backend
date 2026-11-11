@@ -35,7 +35,7 @@ class ICalRequest(BaseModel):
 
 @app.get("/ping")
 def ping():
-    """Endpoint di Keep-Alive per mantenere attivo il server (GitHub Actions / UptimeRobot)."""
+    """Endpoint di Keep-Alive per mantenere attivo il server."""
     return {"status": "alive"}
 
 @app.get("/", response_class=HTMLResponse)
