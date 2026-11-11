@@ -5,7 +5,7 @@ def get_dashboard_html() -> str:
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>PETER HUD OS v8.1</title>
+        <title>PETER HUD OS v8.2 - Nexus Brain</title>
         <style>
             :root { 
                 --bg-main: #060913; 
@@ -14,6 +14,7 @@ def get_dashboard_html() -> str:
                 --accent-cyan: #00f0ff; 
                 --accent-purple: #8b5cf6; 
                 --accent-green: #10b981; 
+                --accent-pink: #ec4899;
                 --text-bright: #f8fafc; 
                 --text-dim: #94a3b8; 
             }
@@ -28,7 +29,6 @@ def get_dashboard_html() -> str:
             .sys-badge { display: flex; align-items: center; gap: 8px; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); padding: 4px 14px; border-radius: 30px; font-size: 11px; color: var(--accent-green); font-weight: 600; letter-spacing: 1px; }
             .clock-display { font-family: monospace; font-size: 14px; color: var(--accent-cyan); letter-spacing: 2px; }
 
-            /* GRIGLIA PRINCIPALE BLOCCATA */
             .command-grid { flex: 1; display: grid; grid-template-columns: 260px 1fr 340px; gap: 16px; padding: 16px; height: calc(100vh - 120px); overflow: hidden; }
 
             .sidebar-panel { background: var(--panel-bg); border: 1px solid var(--glass-border); border-radius: 20px; padding: 18px; display: flex; flex-direction: column; gap: 16px; backdrop-filter: blur(24px); box-shadow: 0 8px 32px rgba(0,0,0,0.3); height: 100%; overflow: hidden; }
@@ -40,17 +40,14 @@ def get_dashboard_html() -> str:
             #peter-avatar-canvas { width: 130px; height: 130px; border-radius: 50%; cursor: pointer; }
             .avatar-status-tag { font-size: 9px; font-family: monospace; letter-spacing: 1.5px; color: var(--accent-cyan); background: rgba(0,240,255,0.1); padding: 3px 10px; border-radius: 12px; border: 1px solid rgba(0,240,255,0.3); }
 
-            /* LAYOUT CENTRALE CON ALTEZZE FISSE E RIGIDE */
             .center-workspace { display: flex; flex-direction: column; gap: 16px; height: 100%; overflow: hidden; }
             .view-tab { display: none; flex-direction: column; gap: 16px; height: 100%; width: 100%; overflow: hidden; }
             .view-tab.active { display: flex; }
 
-            /* HUD DISPLAY FISSO A 280PX */
             .hud-screen { background: var(--panel-bg); border: 1px solid var(--glass-border); border-radius: 20px; height: 280px; flex-shrink: 0; position: relative; overflow: hidden; display: flex; flex-direction: column; backdrop-filter: blur(20px); }
             .hud-screen-header { padding: 8px 16px; background: rgba(0,0,0,0.3); border-bottom: 1px solid var(--glass-border); font-size: 10px; font-family: monospace; color: var(--accent-cyan); display: flex; justify-content: space-between; flex-shrink: 0; }
             #hud-screen-content { flex: 1; padding: 12px; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative; }
 
-            /* CHAT FEED CHE OCCUPA ESATTAMENTE LO SPAZIO RIMANENTE */
             .feed-panel { background: var(--panel-bg); border: 1px solid var(--glass-border); border-radius: 20px; flex: 1; display: flex; flex-direction: column; overflow: hidden; backdrop-filter: blur(20px); min-height: 0; }
             .panel-header { padding: 10px 16px; border-bottom: 1px solid var(--glass-border); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--accent-cyan); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
             
@@ -78,7 +75,13 @@ def get_dashboard_html() -> str:
             .cmd-btn { padding: 10px 24px; background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue)); color: #000; border: none; border-radius: 24px; font-weight: 800; font-size: 12px; cursor: pointer; transition: transform 0.2s; }
             .cmd-btn:hover { transform: scale(1.03); }
 
+            /* NEXUS OBSIDIAN BRAIN GRAPH & LAYER CONTROLS */
             #nexus-graph-canvas { width: 100%; height: 100%; display: block; background: #060913; cursor: grab; }
+            .nexus-toolbar { position: absolute; top: 16px; left: 16px; display: flex; gap: 8px; z-index: 10; background: rgba(13,22,41,0.85); padding: 8px 12px; border-radius: 12px; border: 1px solid var(--glass-border); backdrop-filter: blur(10px); }
+            .nexus-filter-btn { background: rgba(0,240,255,0.1); border: 1px solid rgba(0,240,255,0.3); color: var(--text-bright); padding: 4px 10px; border-radius: 8px; font-size: 10px; font-weight: 700; cursor: pointer; transition: all 0.2s; }
+            .nexus-filter-btn.active, .nexus-filter-btn:hover { background: var(--accent-cyan); color: #000; box-shadow: 0 0 10px rgba(0,240,255,0.4); }
+            
+            .nexus-inspector { position: absolute; bottom: 16px; right: 16px; width: 280px; background: rgba(13,22,41,0.92); border: 1px solid var(--accent-cyan); border-radius: 14px; padding: 14px; display: none; z-index: 10; backdrop-filter: blur(15px); box-shadow: 0 8px 25px rgba(0,0,0,0.5); }
         </style>
     </head>
     <body>
@@ -92,7 +95,7 @@ def get_dashboard_html() -> str:
             <aside class="sidebar-panel">
                 <div class="nav-menu">
                     <div class="nav-item active" onclick="switchMainView('hud')">🌐 Dashboard AI</div>
-                    <div class="nav-item" onclick="switchMainView('nexus')">🕸️ Nexus 3D Graph</div>
+                    <div class="nav-item" onclick="switchMainView('nexus')">🕸️ Nexus Second Brain</div>
                 </div>
                 <div class="peter-avatar-card">
                     <canvas id="peter-avatar-canvas" title="Clicca per parlare a voce con Peter"></canvas>
@@ -118,13 +121,28 @@ def get_dashboard_html() -> str:
                     <section class="feed-panel">
                         <div class="panel-header"><span>LIVE DIALOG FEED</span><span style="font-size: 10px; color: var(--accent-green);">● READY</span></div>
                         <div id="chat-feed">
-                            <div class="msg peter">Layout fisso e pulito applicato. Dimmi tutto Marco, come procediamo?</div>
+                            <div class="msg peter">Nexus Second Brain aggiornato con i layer multipli[cite: 5, 6]! Clicca su Nexus 3D Graph per esplorare memorie, persone ed eventi.</div>
                         </div>
                     </section>
                 </div>
 
+                <!-- VISTA NEXUS OBSIDIAN BRAIN 3D -->
                 <div id="view-nexus" class="view-tab" style="position: relative; overflow: hidden; border-radius: 20px; border: 1px solid var(--glass-border); height: 100%;">
+                    <div class="nexus-toolbar">
+                        <button class="nexus-filter-btn active" onclick="filterNexusLayer('all', this)">TUTTO</button>
+                        <button class="nexus-filter-btn" onclick="filterNexusLayer('person', this)">👥 Persone</button>
+                        <button class="nexus-filter-btn" onclick="filterNexusLayer('memory', this)">🧠 Memorie</button>
+                        <button class="nexus-filter-btn" onclick="filterNexusLayer('event', this)">📅 Eventi</button>
+                    </div>
                     <canvas id="nexus-graph-canvas"></canvas>
+                    <div id="nexus-inspector" class="nexus-inspector">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                            <span id="inspector-type" style="font-size:9px; font-family:monospace; color:var(--accent-cyan); text-transform:uppercase;">NODO</span>
+                            <span onclick="document.getElementById('nexus-inspector').style.display='none'" style="cursor:pointer; font-size:12px; color:var(--text-dim);">✕</span>
+                        </div>
+                        <h4 id="inspector-title" style="font-size:14px; color:#fff; margin-bottom:4px;">Nome</h4>
+                        <p id="inspector-desc" style="font-size:11px; color:var(--text-dim); line-height:1.4;">Dettagli...</p>
+                    </div>
                 </div>
             </main>
 
@@ -149,6 +167,8 @@ def get_dashboard_html() -> str:
 
         <script>
             let currentAvatarState = 'IDLE';
+            let activeNexusFilter = 'all';
+            let nexusNodesCache = [];
 
             setInterval(() => {
                 document.getElementById('live-clock').innerText = new Date().toTimeString().split(' ')[0];
@@ -160,6 +180,12 @@ def get_dashboard_html() -> str:
                 event.target.classList.add('active');
                 if(view === 'hud') document.getElementById('view-hud').classList.add('active');
                 else if(view === 'nexus') { document.getElementById('view-nexus').classList.add('active'); loadNexus3D(); }
+            }
+
+            function filterNexusLayer(layer, btn) {
+                document.querySelectorAll('.nexus-filter-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                activeNexusFilter = layer;
             }
 
             (function initPeterAvatar() {
@@ -204,7 +230,7 @@ def get_dashboard_html() -> str:
                         <div style="width:100%; max-width:400px; background:rgba(15,23,42,0.95); border:1px solid var(--accent-cyan); border-radius:14px; padding:16px; display:flex; flex-direction:column; gap:10px; text-align:center;">
                             <div style="font-size:28px;">🌐</div>
                             <h3 style="color:var(--accent-cyan); font-size:13px; word-break:break-all;">${screen.url}</h3>
-                            <p style="font-size:10px; color:var(--text-dim);">Navigazione sicura via LinkViewer Card.</p>
+                            <p style="font-size:10px; color:var(--text-dim);">LinkViewer Card</p>
                             <a href="${screen.url}" target="_blank" style="background:linear-gradient(135deg, var(--accent-cyan), var(--accent-purple)); color:#000; text-decoration:none; padding:8px 14px; border-radius:8px; font-weight:800; font-size:11px; display:inline-block;">Apri Pagina Web ↗</a>
                         </div>
                     `;
@@ -215,13 +241,11 @@ def get_dashboard_html() -> str:
                         const vidId = embedLink.split('watch?v=')[1]?.substring(0, 11);
                         if(vidId) embedLink = `https://www.youtube-nocookie.com/embed/${vidId}?autoplay=1`;
                     }
-                    
                     container.innerHTML = `
                         <div style="width:100%; height:100%; display:flex; flex-direction:column; gap:8px; justify-content:center; align-items:center;">
                             <div style="width:100%; max-width:400px; aspect-ratio:16/9; border-radius:10px; overflow:hidden; border:1px solid var(--accent-cyan); background:#000;">
                                 <iframe src="${embedLink}" style="width:100%; height:100%; border:none;" allow="accelerometer; autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
                             </div>
-                            ${screen.watch_url ? `<a href="${screen.watch_url}" target="_blank" style="color:var(--accent-cyan); font-size:11px; text-decoration:none; background:rgba(0,240,255,0.08); padding:4px 10px; border-radius:6px; border:1px solid rgba(0,240,255,0.2);">🔗 Apri video su YouTube</a>` : ''}
                         </div>
                     `;
                 } 
@@ -297,6 +321,7 @@ def get_dashboard_html() -> str:
                 }
             }
 
+            // MOTORE GRAFICO OBSIDIAN SECOND BRAIN 3D CON INTERAZIONE E CLICK
             async function loadNexus3D() {
                 const canvas = document.getElementById('nexus-graph-canvas');
                 if(!canvas) return;
@@ -307,52 +332,92 @@ def get_dashboard_html() -> str:
                 try {
                     const res = await fetch('/api/nexus');
                     const data = await res.json();
-                    const nodes = data.nodes || [];
+                    nexusNodesCache = data.nodes || [];
 
                     let rot = 0;
+                    let projectedNodes = [];
+
+                    canvas.onclick = (e) => {
+                        const rect = canvas.getBoundingClientRect();
+                        const clickX = e.clientX - rect.left;
+                        const clickY = e.clientY - rect.top;
+                        
+                        for(let pn of projectedNodes) {
+                            const dist = Math.hypot(pn.px - clickX, pn.py - clickY);
+                            if(dist < (pn.node.type === 'core' ? 18 : 12)) {
+                                showInspector(pn.node);
+                                break;
+                            }
+                        }
+                    };
+
                     function drawGraph() {
                         ctx.clearRect(0, 0, canvas.width, canvas.height);
                         const cx = canvas.width / 2;
                         const cy = canvas.height / 2;
-                        rot += 0.005;
+                        rot += 0.003;
+                        projectedNodes = [];
 
-                        ctx.strokeStyle = 'rgba(0, 240, 255, 0.2)';
+                        const filteredNodes = nexusNodesCache.filter(n => activeNexusFilter === 'all' || n.type === activeNexusFilter || n.type === 'core');
+
+                        // Disegna connessioni neurali
                         ctx.lineWidth = 1;
-
-                        nodes.forEach((n, idx) => {
-                            if(idx === 0) return;
+                        filteredNodes.forEach((n) => {
+                            if(n.type === 'core') return;
                             let x = n.x * Math.cos(rot) - n.z * Math.sin(rot);
                             let z = n.x * Math.sin(rot) + n.z * Math.cos(rot);
-                            let scale = 300 / (300 + z);
+                            let scale = 320 / (320 + z);
                             let px = cx + x * scale;
                             let py = cy + n.y * scale;
 
+                            ctx.strokeStyle = n.type === 'person' ? 'rgba(0, 240, 255, 0.25)' : n.type === 'memory' ? 'rgba(139, 92, 246, 0.25)' : 'rgba(236, 72, 153, 0.25)';
                             ctx.beginPath();
                             ctx.moveTo(cx, cy);
                             ctx.lineTo(px, py);
                             ctx.stroke();
-
-                            ctx.beginPath();
-                            ctx.arc(px, py, 6 * scale, 0, Math.PI * 2);
-                            ctx.fillStyle = n.category === 'famiglia' ? '#8b5cf6' : '#00f0ff';
-                            ctx.fill();
-
-                            ctx.fillStyle = '#f8fafc';
-                            ctx.font = '10px Inter';
-                            ctx.fillText(n.name, px + 10, py + 4);
                         });
 
-                        ctx.beginPath();
-                        ctx.arc(cx, cy, 10, 0, Math.PI * 2);
-                        ctx.fillStyle = '#10b981';
-                        ctx.fill();
-                        ctx.fillStyle = '#f8fafc';
-                        ctx.fillText("Marco (Tu)", cx + 14, cy + 4);
+                        // Disegna nodi
+                        filteredNodes.forEach((n) => {
+                            let x = n.x * Math.cos(rot) - n.z * Math.sin(rot);
+                            let z = n.x * Math.sin(rot) + n.z * Math.cos(rot);
+                            let scale = 320 / (320 + z);
+                            let px = cx + x * scale;
+                            let py = cy + n.y * scale;
+
+                            projectedNodes.push({ px, py, node: n });
+
+                            ctx.beginPath();
+                            let radius = n.type === 'core' ? 12 : 7 * scale;
+                            ctx.arc(px, py, radius, 0, Math.PI * 2);
+                            
+                            if(n.type === 'core') ctx.fillStyle = '#10b981';
+                            else if(n.type === 'person') ctx.fillStyle = '#00f0ff';
+                            else if(n.type === 'memory') ctx.fillStyle = '#8b5cf6';
+                            else if(n.type === 'event') ctx.fillStyle = '#ec4899';
+                            
+                            ctx.shadowBlur = 12;
+                            ctx.shadowColor = ctx.fillStyle;
+                            ctx.fill();
+                            ctx.shadowBlur = 0;
+
+                            ctx.fillStyle = '#f8fafc';
+                            ctx.font = `${Math.max(9, 11 * scale)}px Inter`;
+                            ctx.fillText(n.name, px + 12, py + 4);
+                        });
 
                         requestAnimationFrame(drawGraph);
                     }
                     drawGraph();
                 } catch(e) {}
+            }
+
+            function showInspector(node) {
+                const inspector = document.getElementById('nexus-inspector');
+                document.getElementById('inspector-type').innerText = `LAYER // ${node.type.toUpperCase()}`;
+                document.getElementById('inspector-title').innerText = node.name;
+                document.getElementById('inspector-desc').innerText = `${node.notes || ''} \n\n${node.details || ''}`;
+                inspector.style.display = 'block';
             }
 
             let ws = null;
