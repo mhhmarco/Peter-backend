@@ -19,6 +19,9 @@ async def process_telegram_update(update: dict):
     save_episodic_memory(user_text, reply)
     await extract_and_save_facts(user_text)
 
-    telegram_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    # Pulizia rigorosa del token da spazi o a capo accidentali
+    clean_token = TELEGRAM_BOT_TOKEN.strip()
+    telegram_url = f"https://api.telegram.org/bot{clean_token}/sendMessage"
+    
     async with httpx.AsyncClient() as client:
         await client.post(telegram_url, json={"chat_id": chat_id, "text": reply})
