@@ -7,6 +7,36 @@ import edge_tts
 from config import TELEGRAM_BOT_TOKEN
 from database import get_telegram_chat_id
 
+def search_youtube(query: str) -> dict:
+    """Estrae l'ID esatto e restituisce un URL embed sicuro compatibile con iframe."""
+    clean_query = query.replace("video", "").replace("metti", "").strip()
+    try:
+        with DDGS() as ddgs:
+            res = list(ddgs.videos(clean_query if clean_query else query, max_results=5))
+            for v in res:
+                url = v.get("content", "") or v.get("href", "")
+                match = re.search(r'(?:v=|\/embed\/|\/watch\?v=|\/youtu\.be\/)([a-zA-Z0-9_-]{11})', url)
+                if match:
+                    video_id = match.group(1)
+                    return {
+                        "title": v.get("title", query),
+                        # Usiamo youtube-nocookie o l'embed standard con i parametri di sblocco origine
+                        "embed_url": f"https://www.youtube-nocookie.com/embed/{video_id}?autoplay=1&modestbranding=1&rel=0",
+                        "watch_url": f"https://www.youtube.com/watch?v={video_id}",
+                        "source": "youtube"
+                    }
+    except Exception as e:
+        print(f"Errore ricerca YouTube: {e}")
+    
+    # Fallback se non trova l'ID diretto
+    encoded = urllib.parse.quote(query)
+    return {
+        "title": f"Ricerca YouTube: {query}",
+        "embed_url": f"https://www.youtube-nocookie.com/embed?listType=search&list={encoded}",
+        "watch_url": f"https://www.youtube.com/results?search_query={encoded}",
+        "source": "youtube"
+    }
+    
 def search_web(query: str, max_results: int = 4) -> str:
     try:
         results = []
