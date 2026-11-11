@@ -1,102 +1,87 @@
 import json
-import re
 import httpx
 from fastapi import HTTPException
-from config import GROQ_API_KEY, GROQ_URL, MODEL_NAME
+from config import GROQ_API_KEY, GROQ_URL
 from database import save_fact
 from tools import search_web, search_youtube, search_apple_music
 
-def detect_intent_fallback(user_message: str) -> dict:
-    """Rilevamento d'intento tramite regole per garantire l'attivazione dei media."""
-    msg = user_message.lower()
-    if any(w in msg for w in ["youtube", "video", "guarda", "mostrami il video", "metti il video", "su youtube"]):
-        clean_q = re.sub(r'youtube|video|guarda|metti|cerca|play|su', '', user_message, flags=re.I).strip()
-        return {"tool": "YOUTUBE", "query": clean_q or user_message}
-    if any(w in msg for w in ["apple music", "canzone", "musica", "su apple", "brano"]):
-        clean_q = re.sub(r'apple music|canzone|musica|brano|su|metti|cerca', '', user_message, flags=re.I).strip()
-        return {"tool": "APPLE_MUSIC", "query": clean_q or user_message}
-    if any(w in msg for w in ["cerca", "dove", "cos'è", "chi è", "meteo", "ristorante", "pizzeria", "prezzo", "notizie"]):
-        return {"tool": "WEB_SEARCH", "query": user_message}
-    return {"tool": "NONE", "query": ""}
+# Assegnazione Modelli dai tuoi disponibili
+MODEL_FAST = "openai/gpt-oss-20b"        # Model 1: Router & Tool Dispatcher
+MODEL_SMART = "openai/gpt-oss-120b"      # Model 2: Conversational Core Empatico
+MODEL_FACT = "qwen/qwen3.8-27b"          # Model 3: Background Fact Extraction
 
-def execute_by_intent(tool: str, query: str) -> dict:
-    web_results = ""
-    media_data = None
-    query_used = ""
-
-    if tool == "YOUTUBE":
-        media_data = search_youtube(query)
-        query_used = f"YouTube Player: {query}"
-    elif tool == "APPLE_MUSIC":
-        media_data = search_apple_music(query)
-        query_used = f"Apple Music Widget: {query}"
-    elif tool == "WEB_SEARCH":
-        web_results = search_web(query)
-        query_used = f"Ricerca Web: {query}"
-
-    return {"web": web_results, "media": media_data, "query_used": query_used}
-
-async def analyze_intent_and_execute_tools(user_message: str, recent_context: str) -> dict:
+async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
+    """MODEL 1 (Fast Router): Rileva l'intento ed esegue l'attivazione dei Tool."""
     if not GROQ_API_KEY:
-        fallback = detect_intent_fallback(user_message)
-        return execute_by_intent(fallback["tool"], fallback["query"])
+        return {"web": "", "media": None, "query_used": ""}
 
-    router_prompt = (
-        "Analizza la richiesta dell'utente.\n"
-        "Rispondi ESCLUSIVAMENTE in formato JSON valido:\n"
+    system_prompt = (
+        "Sei il motore di routing di Peter OS. Analizza la richiesta dell'utente.\n"
+        "Determina se serve attivare uno dei seguenti strumenti:\n"
+        "- YOUTUBE: per video, brani musicali o trailer su YouTube.\n"
+        "- APPLE_MUSIC: per brani o album su Apple Music.\n"
+        "- WEB_SEARCH: per dati in tempo reale, locali, meteo, notizie o ricerche.\n"
+        "- NONE: conversazione normale.\n\n"
+        "Rispondi SOLO ed ESCLUSIVAMENTE in formato JSON valido:\n"
         '{"tool": "YOUTUBE" | "APPLE_MUSIC" | "WEB_SEARCH" | "NONE", "query": "query sintetica"}'
     )
 
-    messages = [{"role": "system", "content": router_prompt}]
+    messages = [{"role": "system", "content": system_prompt}]
     if recent_context:
-        messages.append({"role": "system", "content": f"Contesto:\n{recent_context}"})
+        messages.append({"role": "system", "content": f"Contesto recente:\n{recent_context}"})
     messages.append({"role": "user", "content": user_message})
 
-    tool = "NONE"
-    query = user_message
+    web_results, media_data, query_used = "", None, ""
 
     try:
         async with httpx.AsyncClient(timeout=6.0) as client:
             res = await client.post(GROQ_URL, json={
-                "model": MODEL_NAME,
+                "model": MODEL_FAST,
                 "messages": messages,
                 "temperature": 0.0
             }, headers={"Content-Type": "application/json", "Authorization": f"Bearer {GROQ_API_KEY}"})
-            
+
             if res.status_code == 200:
-                text = res.json()["choices"][0]["message"]["content"].strip()
-                if "{" in text and "}" in text:
-                    text = text[text.find("{"):text.rfind("}")+1]
-                    decision = json.loads(text)
+                raw_text = res.json()["choices"][0]["message"]["content"].strip()
+                if "{" in raw_text and "}" in raw_text:
+                    raw_text = raw_text[raw_text.find("{"):raw_text.rfind("}")+1]
+                    decision = json.loads(raw_text)
                     tool = decision.get("tool", "NONE")
                     query = decision.get("query", user_message)
-    except Exception:
-        pass
 
-    if tool == "NONE":
-        fallback = detect_intent_fallback(user_message)
-        tool = fallback["tool"]
-        query = fallback["query"] or user_message
+                    if tool == "YOUTUBE":
+                        media_data = search_youtube(query)
+                        query_used = f"YouTube Player: {query}"
+                    elif tool == "APPLE_MUSIC":
+                        media_data = search_apple_music(query)
+                        query_used = f"Apple Music: {query}"
+                    elif tool == "WEB_SEARCH":
+                        web_results = search_web(query)
+                        query_used = f"Ricerca Web: {query}"
+    except Exception as e:
+        print(f"Errore Model 1 Router ({MODEL_FAST}): {e}")
 
-    return execute_by_intent(tool, query)
+    return {"web": web_results, "media": media_data, "query_used": query_used}
 
 async def generate_peter_response(user_message: str, recent_context: str, long_term_facts: str) -> dict:
+    """MODEL 2 (Smart Core): Genera la risposta conversazionale profonda ed empatica."""
     if not GROQ_API_KEY:
         raise HTTPException(status_code=500, detail="Manca FREELLM_API_KEY")
 
-    tool_exec = await analyze_intent_and_execute_tools(user_message, recent_context)
+    # Passaggio 1: Router rapido
+    tool_exec = await model_1_route_tools(user_message, recent_context)
     web_results = tool_exec["web"]
     media_data = tool_exec["media"]
     query_used = tool_exec["query_used"]
 
+    # Passaggio 2: Risposta con GPT-OSS-120B
     system_prompt = (
-        "Sei Peter, compagno di vita ed alter-ego digitale di Marco. "
-        "Sei schietto, brillante, ironico e profondo. Parli come un amico fidato alla pari.\n\n"
-        "REGOLE COMPORTAMENTALI TASSATIVE:\n"
-        "1. Scrivi in testo fluido, naturale e colloquiale.\n"
-        "2. NON usare mai elenchi puntati, numeri o formattazioni markdown pesanti.\n"
-        "3. Non forzare mai la creatina, Nexus o i fatti personali a sproposito.\n"
-        "4. Se l'utente ha chiesto un video o un brano musicale, conferma in modo naturale ed entusiasta che hai caricato il player nel dashboard."
+        "Sei Peter, compagno di vita digitale ed alter-ego empatico di Marco. "
+        "Sei schietto, naturale, colto e ironico. Parli da amico fidato, alla pari.\n\n"
+        "REGOLE COMPORTAMENTALI:\n"
+        "1. Scrivi SOLO in testo fluido e colloquiale (stile iMessage/Telegram).\n"
+        "2. NON usare mai elenchi puntati, numerati o grassetti markdown (**così**).\n"
+        "3. Se l'utente ti chiede un brano o un video, conferma con entusiasmo che il player è stato caricato sulla Dashboard."
     )
 
     if long_term_facts:
@@ -107,7 +92,7 @@ async def generate_peter_response(user_message: str, recent_context: str, long_t
         system_prompt += f"\n\nConversazione recente:\n{recent_context}"
 
     payload = {
-        "model": MODEL_NAME,
+        "model": MODEL_SMART,
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_message}
@@ -125,28 +110,30 @@ async def generate_peter_response(user_message: str, recent_context: str, long_t
         return {"reply": reply, "query_used": query_used, "media": media_data}
 
 async def extract_and_save_facts(user_message: str):
+    """MODEL 3 (Background Fact Processor): Estrazione asincrona delle memorie a lungo termine con Qwen."""
     if not GROQ_API_KEY:
         return
 
     extraction_prompt = (
         "Analizza il messaggio dell'utente. Se contiene un fatto permanente su di lui "
-        "(progetti, preferenze, persone, abitudini), estrai SOLO quel fatto in una frase sintetica in italiano. "
+        "(progetti, preferenze, persone, abitudini, competenze), estrai SOLO quel fatto in una frase sintetica in italiano. "
         "Altrimenti rispondi SOLO 'NESSUNO'."
     )
 
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             res = await client.post(GROQ_URL, json={
-                "model": MODEL_NAME,
+                "model": MODEL_FACT,
                 "messages": [
                     {"role": "system", "content": extraction_prompt},
                     {"role": "user", "content": user_message}
                 ],
                 "temperature": 0.1
             }, headers={"Content-Type": "application/json", "Authorization": f"Bearer {GROQ_API_KEY}"})
+            
             if res.status_code == 200:
                 extracted = res.json()["choices"][0]["message"]["content"].strip()
                 if extracted and extracted.upper() != "NESSUNO":
                     save_fact(extracted)
     except Exception as e:
-        print(f"Fact extraction error: {e}")
+        print(f"Errore Model 3 Fact Extraction ({MODEL_FACT}): {e}")
