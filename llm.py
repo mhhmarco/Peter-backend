@@ -1,14 +1,26 @@
+# llm.py
 import json
+import re
 import httpx
 from fastapi import HTTPException
 from config import GROQ_API_KEY, GROQ_URL
 from database import save_fact
 from tools import search_web, search_youtube, search_apple_music
 
-# Assegnazione Modelli dai tuoi disponibili
 MODEL_FAST = "openai/gpt-oss-20b"        # Model 1: Router & Tool Dispatcher
 MODEL_SMART = "openai/gpt-oss-120b"      # Model 2: Conversational Core Empatico
 MODEL_FACT = "qwen/qwen3.8-27b"          # Model 3: Background Fact Extraction
+
+def clean_json_response(raw_text: str) -> dict:
+    """Estrae e parsing del JSON anche se racchiuso in fenced code blocks markdown."""
+    try:
+        # Cerca il blocco JSON principale
+        match = re.search(r'\{.*\}', raw_text, re.DOTALL)
+        if match:
+            return json.loads(match.group(0))
+    except Exception as e:
+        print(f"Errore parsing JSON: {e}")
+    return {"tool": "NONE", "query": ""}
 
 async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
     """MODEL 1 (Fast Router): Rileva l'intento ed esegue l'attivazione dei Tool."""
@@ -20,10 +32,10 @@ async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
         "Determina se serve attivare uno dei seguenti strumenti:\n"
         "- YOUTUBE: per video, brani musicali o trailer su YouTube.\n"
         "- APPLE_MUSIC: per brani o album su Apple Music.\n"
-        "- WEB_SEARCH: per dati in tempo reale, locali, meteo, notizie o ricerche.\n"
+        "- WEB_SEARCH: per dati in tempo reale, notizie, informazioni aggiornate.\n"
         "- NONE: conversazione normale.\n\n"
-        "Rispondi SOLO ed ESCLUSIVAMENTE in formato JSON valido:\n"
-        '{"tool": "YOUTUBE" | "APPLE_MUSIC" | "WEB_SEARCH" | "NONE", "query": "query sintetica"}'
+        "Rispondi SCRIVENDO SOLO ED ESCLUSIVAMENTE IL SEGUENTE JSON VALIDO SENZA TESTO EXTRA:\n"
+        '{"tool": "YOUTUBE" | "APPLE_MUSIC" | "WEB_SEARCH" | "NONE", "query": "query di ricerca sintetica"}'
     )
 
     messages = [{"role": "system", "content": system_prompt}]
@@ -35,29 +47,31 @@ async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
 
     try:
         async with httpx.AsyncClient(timeout=6.0) as client:
-            res = await client.post(GROQ_URL, json={
-                "model": MODEL_FAST,
-                "messages": messages,
-                "temperature": 0.0
-            }, headers={"Content-Type": "application/json", "Authorization": f"Bearer {GROQ_API_KEY}"})
+            res = await client.post(
+                GROQ_URL,
+                json={
+                    "model": MODEL_FAST,
+                    "messages": messages,
+                    "temperature": 0.0
+                },
+                headers={"Content-Type": "application/json", "Authorization": f"Bearer {GROQ_API_KEY}"}
+            )
 
             if res.status_code == 200:
                 raw_text = res.json()["choices"][0]["message"]["content"].strip()
-                if "{" in raw_text and "}" in raw_text:
-                    raw_text = raw_text[raw_text.find("{"):raw_text.rfind("}")+1]
-                    decision = json.loads(raw_text)
-                    tool = decision.get("tool", "NONE")
-                    query = decision.get("query", user_message)
+                decision = clean_json_response(raw_text)
+                tool = decision.get("tool", "NONE")
+                query = decision.get("query", user_message)
 
-                    if tool == "YOUTUBE":
-                        media_data = search_youtube(query)
-                        query_used = f"YouTube Player: {query}"
-                    elif tool == "APPLE_MUSIC":
-                        media_data = search_apple_music(query)
-                        query_used = f"Apple Music: {query}"
-                    elif tool == "WEB_SEARCH":
-                        web_results = search_web(query)
-                        query_used = f"Ricerca Web: {query}"
+                if tool == "YOUTUBE":
+                    media_data = search_youtube(query)
+                    query_used = f"YouTube: {query}"
+                elif tool == "APPLE_MUSIC":
+                    media_data = search_apple_music(query)
+                    query_used = f"Apple Music: {query}"
+                elif tool == "WEB_SEARCH":
+                    web_results = search_web(query)
+                    query_used = f"Ricerca Web: {query}"
     except Exception as e:
         print(f"Errore Model 1 Router ({MODEL_FAST}): {e}")
 
@@ -68,20 +82,18 @@ async def generate_peter_response(user_message: str, recent_context: str, long_t
     if not GROQ_API_KEY:
         raise HTTPException(status_code=500, detail="Manca FREELLM_API_KEY")
 
-    # Passaggio 1: Router rapido
     tool_exec = await model_1_route_tools(user_message, recent_context)
     web_results = tool_exec["web"]
     media_data = tool_exec["media"]
     query_used = tool_exec["query_used"]
 
-    # Passaggio 2: Risposta con GPT-OSS-120B
     system_prompt = (
-        "Sei Peter, compagno di vita digitale ed alter-ego empatico di Marco. "
+        "Sei Peter, compagno di vita digitale ed alter-ego empatico di Marco.\n"
         "Sei schietto, naturale, colto e ironico. Parli da amico fidato, alla pari.\n\n"
         "REGOLE COMPORTAMENTALI:\n"
-        "1. Scrivi SOLO in testo fluido e colloquiale (stile iMessage/Telegram).\n"
-        "2. NON usare mai elenchi puntati, numerati o grassetti markdown (**così**).\n"
-        "3. Se l'utente ti chiede un brano o un video, conferma con entusiasmo che il player è stato caricato sulla Dashboard."
+        "1. Scrivi in testo fluido e naturale (stile iMessage/Telegram).\n"
+        "2. Evita elenchi puntati forzati o formattazioni pesanti.\n"
+        "3. Se è stato caricato un contenuto multimediale (video/musica), integralo o menzionalo con naturalezza."
     )
 
     if long_term_facts:
@@ -106,34 +118,38 @@ async def generate_peter_response(user_message: str, recent_context: str, long_t
         if res.status_code != 200:
             raise HTTPException(status_code=500, detail=f"Errore Groq: {res.text}")
         reply = res.json()["choices"][0]["message"]["content"]
-        
+
         return {"reply": reply, "query_used": query_used, "media": media_data}
 
 async def extract_and_save_facts(user_message: str):
-    """MODEL 3 (Background Fact Processor): Estrazione asincrona delle memorie a lungo termine con Qwen."""
+    """MODEL 3 (Background Fact Processor): Estrazione asincrona fatti permanenti."""
     if not GROQ_API_KEY:
         return
 
     extraction_prompt = (
         "Analizza il messaggio dell'utente. Se contiene un fatto permanente su di lui "
-        "(progetti, preferenze, persone, abitudini, competenze), estrai SOLO quel fatto in una frase sintetica in italiano. "
+        "(progetti, preferenze, persone, abitudini, competenze), estrai SOLO quel fatto in una frase sintetica in italiano.\n"
         "Altrimenti rispondi SOLO 'NESSUNO'."
     )
 
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            res = await client.post(GROQ_URL, json={
-                "model": MODEL_FACT,
-                "messages": [
-                    {"role": "system", "content": extraction_prompt},
-                    {"role": "user", "content": user_message}
-                ],
-                "temperature": 0.1
-            }, headers={"Content-Type": "application/json", "Authorization": f"Bearer {GROQ_API_KEY}"})
-            
+            res = await client.post(
+                GROQ_URL,
+                json={
+                    "model": MODEL_FACT,
+                    "messages": [
+                        {"role": "system", "content": extraction_prompt},
+                        {"role": "user", "content": user_message}
+                    ],
+                    "temperature": 0.1
+                },
+                headers={"Content-Type": "application/json", "Authorization": f"Bearer {GROQ_API_KEY}"}
+            )
+
             if res.status_code == 200:
                 extracted = res.json()["choices"][0]["message"]["content"].strip()
-                if extracted and extracted.upper() != "NESSUNO":
+                if extracted and extracted.upper() != "NESSUNO" and len(extracted) > 5:
                     save_fact(extracted)
     except Exception as e:
         print(f"Errore Model 3 Fact Extraction ({MODEL_FACT}): {e}")
