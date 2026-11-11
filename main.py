@@ -1,20 +1,31 @@
-from fastapi import FastAPI, HTTPException, Request
+import tempfile
+import os
+import httpx
+import edge_tts
+from fastapi import FastAPI, HTTPException, Request, UploadFile, File, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
 from database import (
     supabase, supabase_error_log, get_recent_memories, 
     get_long_term_facts, get_all_facts, delete_fact_by_id, 
-    save_episodic_memory
+    save_episodic_memory, save_contacts_batch, get_contacts,
+    save_calendar_events_batch, get_calendar_events,
+    get_personality_settings, save_personality_settings
 )
 from llm import generate_peter_response, extract_and_save_facts
 from telegram_bot import process_telegram_update
 from ui import get_dashboard_html
+from importer import parse_vcard, fetch_and_parse_ical
+from config import GROQ_API_KEY, GROQ_URL
 
 app = FastAPI(title="Peter OS Backend")
 
 class ChatRequest(BaseModel):
     message: str
+
+class ICalRequest(BaseModel):
+    url: str
 
 @app.get("/", response_class=HTMLResponse)
 def root_dashboard():
@@ -35,9 +46,36 @@ def check_memories():
     except Exception as e:
         return {"connected": False, "error": f"Errore lettura: {str(e)}"}
 
-@app.get("/api/facts")
-def api_get_facts():
-    return get_all_facts()
+@app.get("/api/contacts")
+def api_get_contacts():
+    return get_contacts()
+
+@app.post("/api/import/vcf")
+async def import_vcf(file: UploadFile = File(...)):
+    content = await file.read()
+    text = content.decode("utf-8", errors="ignore")
+    contacts = parse_vcard(text)
+    if contacts:
+        save_contacts_batch(contacts)
+        return {"status": "success", "count": len(contacts)}
+    return {"status": "no_contacts_found"}
+
+@app.post("/api/import/ical")
+async def import_ical(req: ICalRequest):
+    events = await fetch_and_parse_ical(req.url)
+    if events:
+        save_calendar_events_batch(events)
+        return {"status": "success", "count": len(events)}
+    return {"status": "no_events_found"}
+
+@app.get("/api/personality")
+def api_get_personality():
+    return get_personality_settings()
+
+@app.post("/api/personality")
+def api_save_personality(settings: dict):
+    save_personality_settings(settings)
+    return {"status": "updated"}
 
 @app.delete("/api/facts/{fact_id}")
 def api_delete_fact(fact_id: str):
@@ -61,8 +99,74 @@ async def chat_endpoint(req: ChatRequest):
     reply = result["reply"]
     query_used = result.get("query_used")
     media = result.get("media")
+    screen = result.get("screen")
 
     save_episodic_memory(req.message, reply)
     await extract_and_save_facts(req.message)
 
-    return {"reply": reply, "query_used": query_used, "media": media}
+    return {"reply": reply, "query_used": query_used, "media": media, "screen": screen}
+
+# CANALE WEBSOCKET VOCALE FULL-DUPLEX (STT Whisper + LLM + TTS Edge)
+@app.websocket("/ws/voice")
+async def websocket_voice_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    try:
+        while True:
+            audio_bytes = await websocket.receive_bytes()
+            if not audio_bytes:
+                continue
+
+            # 1. Trascrizione Audio via Groq Whisper
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
+                tmp.write(audio_bytes)
+                tmp_path = tmp.name
+
+            user_text = ""
+            try:
+                async with httpx.AsyncClient(timeout=15.0) as client:
+                    with open(tmp_path, "rb") as f:
+                        res = await client.post(
+                            "https://api.groq.com/openai/v1/audio/transcriptions",
+                            headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
+                            files={"file": ("audio.wav", f, "audio/wav")},
+                            data={"model": "whisper-large-v3-turbo", "language": "it"}
+                        )
+                        if res.status_code == 200:
+                            user_text = res.json().get("text", "").strip()
+            finally:
+                if os.path.exists(tmp_path):
+                    os.remove(tmp_path)
+
+            if not user_text:
+                continue
+
+            # 2. Generazione Risposta Conversazionale
+            recent_context = get_recent_memories(limit=6)
+            long_term_facts = get_long_term_facts(limit=10)
+            llm_res = await generate_peter_response(user_text, recent_context, long_term_facts)
+            reply_text = llm_res["reply"]
+            screen_data = llm_res.get("screen")
+
+            save_episodic_memory(user_text, reply_text)
+            await extract_and_save_facts(user_text)
+
+            # 3. Sintesi Vocale Italiana via Edge-TTS
+            tts = edge_tts.Communicate(reply_text, voice="it-IT-DiegoNeural")
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_mp3:
+                await tts.save(tmp_mp3.name)
+                with open(tmp_mp3.name, "rb") as f_mp3:
+                    audio_out = f_mp3.read()
+                os.remove(tmp_mp3.name)
+
+            # Invia testo, payload visivo ed audio al browser
+            await websocket.send_json({
+                "user_text": user_text,
+                "reply_text": reply_text,
+                "screen": screen_data
+            })
+            await websocket.send_bytes(audio_out)
+
+    except WebSocketDisconnect:
+        print("Connessione vocale WebSocket chiusa.")
+    except Exception as e:
+        print(f"Errore WebSocket Voice: {e}")
