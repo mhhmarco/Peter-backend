@@ -6,12 +6,11 @@ from supabase import create_client, Client
 
 app = FastAPI()
 
-# Variabili d'ambiente
+# Variabili d'ambiente pulite da spazi o apici accidentali
 SUPABASE_URL = os.getenv("SUPABASE_URL", "").strip('"\'' )
 SUPABASE_KEY = os.getenv("SUPABASE_KEY", "").strip('"\'' )
 GROQ_API_KEY = os.getenv("FREELLM_API_KEY", "").strip('"\'' )
 
-# Endpoint Groq fisso
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 # Inizializzazione Supabase
@@ -31,6 +30,12 @@ def health_check():
 
 @app.post("/chat")
 async def chat_with_peter(req: ChatRequest):
+    if not GROQ_API_KEY:
+        raise HTTPException(
+            status_code=500, 
+            detail="Manca la variabile FREELLM_API_KEY su Render (deve contenere la chiave di Groq gsk_...)"
+        )
+
     system_prompt = (
         "Sei Peter, un compagno di vita digitale ed alter-ego empatico. "
         "Non sei un assistente virtuale formale né un chatbot esecutivo. "
@@ -55,8 +60,14 @@ async def chat_with_peter(req: ChatRequest):
     async with httpx.AsyncClient(timeout=30.0) as client:
         try:
             res = await client.post(GROQ_URL, json=payload, headers=headers)
-            res.raise_for_status()
+            if res.status_code != 200:
+                raise HTTPException(
+                    status_code=500, 
+                    detail=f"Errore Groq ({res.status_code}): {res.text}"
+                )
             data = res.json()
             return {"reply": data["choices"][0]["message"]["content"]}
+        except HTTPException as he:
+            raise he
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Errore chiamata Groq: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Errore connessione: {str(e)}")
