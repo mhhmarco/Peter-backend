@@ -3,6 +3,7 @@ import urllib.parse
 from duckduckgo_search import DDGS
 
 def search_web(query: str, max_results: int = 4) -> str:
+    """Ricerca web in tempo reale tramite DuckDuckGo."""
     try:
         results = []
         with DDGS() as ddgs:
@@ -15,6 +16,7 @@ def search_web(query: str, max_results: int = 4) -> str:
     return ""
 
 def search_youtube(query: str) -> dict:
+    """Estrazione dell'ID video per un player YouTube senza restrizioni di embed."""
     try:
         with DDGS() as ddgs:
             res = list(ddgs.videos(query, max_results=3))
@@ -38,6 +40,7 @@ def search_youtube(query: str) -> dict:
     }
 
 def search_apple_music(query: str) -> dict:
+    """Widget Player per Apple Music."""
     q_enc = urllib.parse.quote(query)
     return {
         "title": f"Apple Music: {query}",
