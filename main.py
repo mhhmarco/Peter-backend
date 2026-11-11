@@ -33,6 +33,11 @@ class FactUpdateRequest(BaseModel):
 class ICalRequest(BaseModel):
     url: str
 
+@app.get("/ping")
+def ping():
+    """Endpoint di Keep-Alive per mantenere attivo il server (GitHub Actions / UptimeRobot)."""
+    return {"status": "alive"}
+
 @app.get("/", response_class=HTMLResponse)
 def root_dashboard():
     return get_dashboard_html()
@@ -62,7 +67,7 @@ def api_get_contacts():
 
 @app.post("/api/tts")
 async def api_tts_speech(req: TTSRequest):
-    """Genera lo stream audio della risposta di Peter per la dashboard."""
+    """Genera lo stream audio MP3 per la voce nativa di Peter nella dashboard."""
     try:
         tts = edge_tts.Communicate(req.text, voice="it-IT-DiegoNeural")
         with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_mp3:
