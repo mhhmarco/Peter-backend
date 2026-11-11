@@ -5,11 +5,11 @@ def get_dashboard_html() -> str:
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>PETER HUD OS v8.2 - Nexus Brain</title>
+        <title>PETER HUD OS v8.3 - Second Brain</title>
         <style>
             :root { 
                 --bg-main: #060913; 
-                --panel-bg: rgba(13, 22, 41, 0.75); 
+                --panel-bg: rgba(13, 22, 41, 0.82); 
                 --glass-border: rgba(0, 240, 255, 0.18); 
                 --accent-cyan: #00f0ff; 
                 --accent-purple: #8b5cf6; 
@@ -29,6 +29,7 @@ def get_dashboard_html() -> str:
             .sys-badge { display: flex; align-items: center; gap: 8px; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); padding: 4px 14px; border-radius: 30px; font-size: 11px; color: var(--accent-green); font-weight: 600; letter-spacing: 1px; }
             .clock-display { font-family: monospace; font-size: 14px; color: var(--accent-cyan); letter-spacing: 2px; }
 
+            /* GRIGLIA RESPONSIVE (DESKTOP / MOBILE) */
             .command-grid { flex: 1; display: grid; grid-template-columns: 260px 1fr 340px; gap: 16px; padding: 16px; height: calc(100vh - 120px); overflow: hidden; }
 
             .sidebar-panel { background: var(--panel-bg); border: 1px solid var(--glass-border); border-radius: 20px; padding: 18px; display: flex; flex-direction: column; gap: 16px; backdrop-filter: blur(24px); box-shadow: 0 8px 32px rgba(0,0,0,0.3); height: 100%; overflow: hidden; }
@@ -75,13 +76,22 @@ def get_dashboard_html() -> str:
             .cmd-btn { padding: 10px 24px; background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue)); color: #000; border: none; border-radius: 24px; font-weight: 800; font-size: 12px; cursor: pointer; transition: transform 0.2s; }
             .cmd-btn:hover { transform: scale(1.03); }
 
-            /* NEXUS OBSIDIAN BRAIN GRAPH & LAYER CONTROLS */
+            /* NEXUS OBSIDIAN BRAIN 3D ZOOMABILE E DRAGGABILE */
             #nexus-graph-canvas { width: 100%; height: 100%; display: block; background: #060913; cursor: grab; }
-            .nexus-toolbar { position: absolute; top: 16px; left: 16px; display: flex; gap: 8px; z-index: 10; background: rgba(13,22,41,0.85); padding: 8px 12px; border-radius: 12px; border: 1px solid var(--glass-border); backdrop-filter: blur(10px); }
+            #nexus-graph-canvas:active { cursor: grabbing; }
+            .nexus-toolbar { position: absolute; top: 16px; left: 16px; display: flex; gap: 6px; z-index: 10; background: rgba(13,22,41,0.88); padding: 8px 12px; border-radius: 12px; border: 1px solid var(--glass-border); backdrop-filter: blur(10px); flex-wrap: wrap; }
             .nexus-filter-btn { background: rgba(0,240,255,0.1); border: 1px solid rgba(0,240,255,0.3); color: var(--text-bright); padding: 4px 10px; border-radius: 8px; font-size: 10px; font-weight: 700; cursor: pointer; transition: all 0.2s; }
             .nexus-filter-btn.active, .nexus-filter-btn:hover { background: var(--accent-cyan); color: #000; box-shadow: 0 0 10px rgba(0,240,255,0.4); }
             
-            .nexus-inspector { position: absolute; bottom: 16px; right: 16px; width: 280px; background: rgba(13,22,41,0.92); border: 1px solid var(--accent-cyan); border-radius: 14px; padding: 14px; display: none; z-index: 10; backdrop-filter: blur(15px); box-shadow: 0 8px 25px rgba(0,0,0,0.5); }
+            .nexus-inspector { position: absolute; bottom: 16px; right: 16px; width: 280px; background: rgba(13,22,41,0.95); border: 1px solid var(--accent-cyan); border-radius: 14px; padding: 14px; display: none; z-index: 10; backdrop-filter: blur(15px); box-shadow: 0 8px 25px rgba(0,0,0,0.6); }
+
+            /* RESPONSIVE PER MOBILE */
+            @media (max-width: 900px) {
+                .command-grid { grid-template-columns: 1fr; grid-template-rows: auto 1fr; height: auto; overflow-y: auto; }
+                body { height: auto; overflow: auto; }
+                .right-sidebar { display: none; }
+                .sidebar-panel { height: auto; }
+            }
         </style>
     </head>
     <body>
@@ -121,12 +131,12 @@ def get_dashboard_html() -> str:
                     <section class="feed-panel">
                         <div class="panel-header"><span>LIVE DIALOG FEED</span><span style="font-size: 10px; color: var(--accent-green);">● READY</span></div>
                         <div id="chat-feed">
-                            <div class="msg peter">Nexus Second Brain aggiornato con i layer multipli[cite: 5, 6]! Clicca su Nexus 3D Graph per esplorare memorie, persone ed eventi.</div>
+                            <div class="msg peter">Nexus Second Brain operativo: usa i filtri in alto, zoomma con la rotellina e trascina il grafo per esplorare liberamente le galassie di memorie, persone ed eventi!</div>
                         </div>
                     </section>
                 </div>
 
-                <!-- VISTA NEXUS OBSIDIAN BRAIN 3D -->
+                <!-- VISTA NEXUS OBSIDIAN BRAIN 3D INTERATTIVA -->
                 <div id="view-nexus" class="view-tab" style="position: relative; overflow: hidden; border-radius: 20px; border: 1px solid var(--glass-border); height: 100%;">
                     <div class="nexus-toolbar">
                         <button class="nexus-filter-btn active" onclick="filterNexusLayer('all', this)">TUTTO</button>
@@ -230,7 +240,6 @@ def get_dashboard_html() -> str:
                         <div style="width:100%; max-width:400px; background:rgba(15,23,42,0.95); border:1px solid var(--accent-cyan); border-radius:14px; padding:16px; display:flex; flex-direction:column; gap:10px; text-align:center;">
                             <div style="font-size:28px;">🌐</div>
                             <h3 style="color:var(--accent-cyan); font-size:13px; word-break:break-all;">${screen.url}</h3>
-                            <p style="font-size:10px; color:var(--text-dim);">LinkViewer Card</p>
                             <a href="${screen.url}" target="_blank" style="background:linear-gradient(135deg, var(--accent-cyan), var(--accent-purple)); color:#000; text-decoration:none; padding:8px 14px; border-radius:8px; font-weight:800; font-size:11px; display:inline-block;">Apri Pagina Web ↗</a>
                         </div>
                     `;
@@ -321,7 +330,7 @@ def get_dashboard_html() -> str:
                 }
             }
 
-            // MOTORE GRAFICO OBSIDIAN SECOND BRAIN 3D CON INTERAZIONE E CLICK
+            // MOTORE GRAFICO OBSIDIAN SECOND BRAIN CON PAN & ZOOM MANUALE
             async function loadNexus3D() {
                 const canvas = document.getElementById('nexus-graph-canvas');
                 if(!canvas) return;
@@ -334,8 +343,34 @@ def get_dashboard_html() -> str:
                     const data = await res.json();
                     nexusNodesCache = data.nodes || [];
 
-                    let rot = 0;
+                    let panX = canvas.width / 2;
+                    let panY = canvas.height / 2;
+                    let zoom = 1.0;
+                    let isDragging = false;
+                    let startX, startY;
                     let projectedNodes = [];
+
+                    canvas.onmousedown = (e) => {
+                        isDragging = true;
+                        startX = e.clientX - panX;
+                        startY = e.clientY - panY;
+                    };
+
+                    window.onmousemove = (e) => {
+                        if(!isDragging) return;
+                        panX = e.clientX - startX;
+                        panY = e.clientY - startY;
+                    };
+
+                    window.onmouseup = () => { isDragging = false; };
+
+                    canvas.onwheel = (e) => {
+                        e.preventDefault();
+                        const zoomFactor = 1.1;
+                        if(e.deltaY < 0) zoom *= zoomFactor;
+                        else zoom /= zoomFactor;
+                        zoom = Math.max(0.4, Math.min(3.5, zoom));
+                    };
 
                     canvas.onclick = (e) => {
                         const rect = canvas.getBoundingClientRect();
@@ -344,7 +379,7 @@ def get_dashboard_html() -> str:
                         
                         for(let pn of projectedNodes) {
                             const dist = Math.hypot(pn.px - clickX, pn.py - clickY);
-                            if(dist < (pn.node.type === 'core' ? 18 : 12)) {
+                            if(dist < (pn.node.type === 'core' ? 22 : 14 * zoom)) {
                                 showInspector(pn.node);
                                 break;
                             }
@@ -353,57 +388,48 @@ def get_dashboard_html() -> str:
 
                     function drawGraph() {
                         ctx.clearRect(0, 0, canvas.width, canvas.height);
-                        const cx = canvas.width / 2;
-                        const cy = canvas.height / 2;
-                        rot += 0.003;
                         projectedNodes = [];
 
                         const filteredNodes = nexusNodesCache.filter(n => activeNexusFilter === 'all' || n.type === activeNexusFilter || n.type === 'core');
 
-                        // Disegna connessioni neurali
+                        // Connessioni
                         ctx.lineWidth = 1;
                         filteredNodes.forEach((n) => {
                             if(n.type === 'core') return;
-                            let x = n.x * Math.cos(rot) - n.z * Math.sin(rot);
-                            let z = n.x * Math.sin(rot) + n.z * Math.cos(rot);
-                            let scale = 320 / (320 + z);
-                            let px = cx + x * scale;
-                            let py = cy + n.y * scale;
+                            let px = panX + (n.x * zoom);
+                            let py = panY + (n.y * zoom);
 
                             ctx.strokeStyle = n.type === 'person' ? 'rgba(0, 240, 255, 0.25)' : n.type === 'memory' ? 'rgba(139, 92, 246, 0.25)' : 'rgba(236, 72, 153, 0.25)';
                             ctx.beginPath();
-                            ctx.moveTo(cx, cy);
+                            ctx.moveTo(panX, panY);
                             ctx.lineTo(px, py);
                             ctx.stroke();
                         });
 
-                        // Disegna nodi
+                        // Nodi
                         filteredNodes.forEach((n) => {
-                            let x = n.x * Math.cos(rot) - n.z * Math.sin(rot);
-                            let z = n.x * Math.sin(rot) + n.z * Math.cos(rot);
-                            let scale = 320 / (320 + z);
-                            let px = cx + x * scale;
-                            let py = cy + n.y * scale;
+                            let px = panX + (n.x * zoom);
+                            let py = panY + (n.y * zoom);
 
                             projectedNodes.push({ px, py, node: n });
 
                             ctx.beginPath();
-                            let radius = n.type === 'core' ? 12 : 7 * scale;
+                            let radius = (n.type === 'core' ? 14 : 7) * zoom;
                             ctx.arc(px, py, radius, 0, Math.PI * 2);
                             
-                            if(n.type === 'core') ctx.fillStyle = '#10b981';
-                            else if(n.type === 'person') ctx.fillStyle = '#00f0ff';
-                            else if(n.type === 'memory') ctx.fillStyle = '#8b5cf6';
-                            else if(n.type === 'event') ctx.fillStyle = '#ec4899';
+                            if(n.type === 'core') ctx.fillStyle = '#10b981'; // Verde
+                            else if(n.type === 'person') ctx.fillStyle = '#00f0ff'; // Ciano
+                            else if(n.type === 'memory') ctx.fillStyle = '#8b5cf6'; // Viola
+                            else if(n.type === 'event') ctx.fillStyle = '#ec4899'; // Rosa
                             
-                            ctx.shadowBlur = 12;
+                            ctx.shadowBlur = 10;
                             ctx.shadowColor = ctx.fillStyle;
                             ctx.fill();
                             ctx.shadowBlur = 0;
 
                             ctx.fillStyle = '#f8fafc';
-                            ctx.font = `${Math.max(9, 11 * scale)}px Inter`;
-                            ctx.fillText(n.name, px + 12, py + 4);
+                            ctx.font = `${Math.max(9, 10 * zoom)}px Inter`;
+                            ctx.fillText(n.name, px + (radius + 4), py + 4);
                         });
 
                         requestAnimationFrame(drawGraph);
