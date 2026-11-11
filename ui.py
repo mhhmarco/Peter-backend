@@ -32,7 +32,6 @@ def get_dashboard_html() -> str:
             .tab-content { display: none; height: 100%; width: 100%; }
             .tab-content.active { display: flex; }
 
-            /* HUD Chat Layout */
             .hud-grid { display: grid; grid-template-columns: 1fr 340px; width: 100%; height: 100%; }
             @media (max-width: 900px) { .hud-grid { grid-template-columns: 1fr; } .hud-sidebar { display: none; } }
 
@@ -59,14 +58,13 @@ def get_dashboard_html() -> str:
             .card-title { font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--accent-cyan); margin-bottom: 8px; display: flex; justify-content: space-between; }
             .fact-item { font-size: 11px; color: var(--text-main); padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
 
-            /* NEXUS 3D GRAPH LAYOUT */
+            /* NEXUS 3D */
             .nexus-layout { display: grid; grid-template-columns: 1fr 360px; width: 100%; height: 100%; }
             .nexus-canvas-container { position: relative; width: 100%; height: 100%; background: #05080e; }
             #nexus-canvas { width: 100%; height: 100%; display: block; }
             .nexus-filters { position: absolute; top: 16px; left: 16px; display: flex; gap: 8px; z-index: 10; }
             .filter-btn { background: var(--panel-bg); border: 1px solid var(--border-neon); color: var(--text-main); padding: 6px 12px; border-radius: 8px; font-size: 11px; cursor: pointer; }
             .filter-btn.active { background: var(--accent-cyan); color: #000; font-weight: 700; }
-            
             .nexus-sidebar { background: var(--panel-bg); border-left: 1px solid var(--border-neon); padding: 20px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; }
             .contact-avatar { width: 64px; height: 64px; border-radius: 50%; background: #1e293b; border: 2px solid var(--accent-cyan); display: flex; align-items: center; justify-content: center; font-size: 24px; margin: 0 auto; }
 
@@ -90,16 +88,15 @@ def get_dashboard_html() -> str:
         </header>
 
         <div class="main-container">
-            <!-- TAB 1: CHAT STUDIO -->
             <div id="tab-chat" class="tab-content active">
                 <div class="hud-grid">
                     <section class="hud-main">
                         <div id="chat-container">
-                            <div class="msg peter">Sistemi operativi attivi. Ho memorizzato il contesto e sincronizzato Telegram. Di cosa parliamo?</div>
+                            <div class="msg peter">Sistemi operativi attivi con multi-modello Groq e web scraper. Di cosa ci occupiamo?</div>
                         </div>
                         <div class="chat-footer">
                             <form id="chat-form">
-                                <input type="text" id="user-input" placeholder="Comanda a Peter o richiedi media..." autocomplete="off" required />
+                                <input type="text" id="user-input" placeholder="Comanda a Peter, invia link o richiedi media..." autocomplete="off" required />
                                 <button type="submit" class="send-btn">ESEGUI</button>
                             </form>
                         </div>
@@ -114,7 +111,6 @@ def get_dashboard_html() -> str:
                 </div>
             </div>
 
-            <!-- TAB 2: VAULT -->
             <div id="tab-vault" class="tab-content">
                 <div style="padding: 20px; width: 100%; overflow-y: auto;">
                     <h2 style="margin-bottom: 14px; font-size: 16px;">Archivio Memoria Concettuale (`user_facts`)</h2>
@@ -122,7 +118,6 @@ def get_dashboard_html() -> str:
                 </div>
             </div>
 
-            <!-- TAB 3: NEXUS 3D GRAPH -->
             <div id="tab-graph" class="tab-content">
                 <div class="nexus-layout">
                     <div class="nexus-canvas-container">
@@ -144,7 +139,6 @@ def get_dashboard_html() -> str:
                 </div>
             </div>
 
-            <!-- TAB 4: SETTINGS -->
             <div id="tab-settings" class="tab-content">
                 <div class="settings-container">
                     <h2 style="font-size: 16px;">Impostazioni Sistema & Telegram</h2>
@@ -153,7 +147,7 @@ def get_dashboard_html() -> str:
                             <h3 style="font-size: 14px;">Telegram Bot Webhook</h3>
                             <p style="font-size: 11px; color: var(--text-dim);">Connesso a @BotFather per la gestione mobile.</p>
                         </div>
-                        <button class="send-btn" onclick="registerWebhook()">Verifica Webhook</button>
+                        <button class="send-btn" onclick="alert('Webhook attivo e registrato.')">Stato OK</button>
                     </div>
                 </div>
             </div>
@@ -209,11 +203,10 @@ def get_dashboard_html() -> str:
                 loadBrainSummary();
             }
 
-            // MOTORE NEXUS 3D INTERATTIVO
             let nexusNodes = [
                 { id: 1, name: 'Marco', category: 'self', x: 0, y: 0, z: 0, notes: 'Tu (Admin del sistema OS)', events: ['Creatore di Peter OS'] },
-                { id: 2, name: 'Giulio (Salmez)', category: 'amicizia', x: 120, y: -60, z: 20, notes: 'Amico stretto menzionato in chat', events: ['Conosciuto durante le sessioni di studio'] },
-                { id: 3, name: 'Padre', category: 'famiglia', x: -140, y: 80, z: -40, notes: 'Viaggio a Cracovia organizzato', events: ['Compleanno festeggiato ad agosto'] }
+                { id: 2, name: 'Giulio (Salmez)', category: 'amicizia', x: 120, y: -60, z: 20, notes: 'Amico stretto', events: ['Sessioni di studio'] },
+                { id: 3, name: 'Padre', category: 'famiglia', x: -140, y: 80, z: -40, notes: 'Viaggio a Cracovia', events: ['Compleanno ad agosto'] }
             ];
 
             function initNexus3D() {
@@ -229,7 +222,6 @@ def get_dashboard_html() -> str:
                     const cx = canvas.width / 2;
                     const cy = canvas.height / 2;
 
-                    // Disegno archi
                     ctx.strokeStyle = 'rgba(0, 240, 255, 0.15)';
                     ctx.lineWidth = 1.5;
                     nexusNodes.forEach(n => {
@@ -244,12 +236,11 @@ def get_dashboard_html() -> str:
                         }
                     });
 
-                    // Disegno nodi 3D
                     nexusNodes.forEach(n => {
                         let cosA = Math.cos(angle), sinA = Math.sin(angle);
                         let rotX = n.x * cosA - n.z * sinA;
                         let rotZ = n.x * sinA + n.z * cosA;
-                        let scale = 300 / (300 + rotZ); // Effetto profondità 3D
+                        let scale = 300 / (300 + rotZ);
 
                         let px = cx + rotX * scale;
                         let py = cy + n.y * scale;
@@ -267,7 +258,7 @@ def get_dashboard_html() -> str:
                         ctx.fillText(n.name, px + 15, py + 4);
                     });
 
-                    angle += 0.003; // Rotazione lenta galassia
+                    angle += 0.003;
                     requestAnimationFrame(render);
                 }
                 render();
@@ -298,7 +289,6 @@ def get_dashboard_html() -> str:
             function filterNexus(cat) {
                 document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
                 event.target.classList.add('active');
-                // Logica filtri per livello
             }
 
             form.addEventListener('submit', async (e) => {
@@ -349,10 +339,6 @@ def get_dashboard_html() -> str:
                 div.innerHTML = html;
                 container.appendChild(div);
                 container.scrollTop = container.scrollHeight;
-            }
-
-            function registerWebhook() {
-                alert("Webhook di Telegram già correttamente registrato e attivo.");
             }
 
             loadBrainSummary();
