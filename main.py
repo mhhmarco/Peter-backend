@@ -3,7 +3,7 @@ import os
 import httpx
 import edge_tts
 from fastapi import FastAPI, HTTPException, Request, UploadFile, File, WebSocket, WebSocketDisconnect, BackgroundTasks
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from pydantic import BaseModel
 
 from database import (
@@ -23,6 +23,9 @@ app = FastAPI(title="Peter OS Backend")
 
 class ChatRequest(BaseModel):
     message: str
+
+class TTSRequest(BaseModel):
+    text: str
 
 class FactUpdateRequest(BaseModel):
     fact: str
@@ -56,6 +59,20 @@ def api_get_nexus():
 @app.get("/api/contacts")
 def api_get_contacts():
     return get_contacts()
+
+@app.post("/api/tts")
+async def api_tts_speech(req: TTSRequest):
+    """Genera lo stream audio della risposta di Peter per la dashboard."""
+    try:
+        tts = edge_tts.Communicate(req.text, voice="it-IT-DiegoNeural")
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_mp3:
+            await tts.save(tmp_mp3.name)
+            with open(tmp_mp3.name, "rb") as f:
+                audio_bytes = f.read()
+            os.remove(tmp_mp3.name)
+        return Response(content=audio_bytes, media_type="audio/mp3")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.put("/api/facts/{fact_id}")
 def api_update_fact(fact_id: str, req: FactUpdateRequest):
