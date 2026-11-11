@@ -2,7 +2,7 @@ import tempfile
 import os
 import httpx
 import edge_tts
-from fastapi import FastAPI, HTTPException, Request, UploadFile, File, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Request, UploadFile, File, WebSocket, WebSocketDisconnect, BackgroundTasks
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
@@ -10,7 +10,8 @@ from database import (
     supabase, supabase_error_log, get_recent_memories, 
     get_long_term_facts, get_all_facts, delete_fact_by_id, 
     save_episodic_memory, save_contacts_batch, get_contacts,
-    save_calendar_events_batch, get_personality_settings, save_personality_settings
+    save_calendar_events_batch, get_personality_settings, save_personality_settings,
+    get_nexus_graph_data
 )
 from llm import generate_peter_response, extract_and_save_facts
 from telegram_bot import process_telegram_update
@@ -44,6 +45,11 @@ def check_memories():
         }
     except Exception as e:
         return {"connected": False, "error": f"Errore lettura: {str(e)}"}
+
+@app.get("/api/nexus")
+def api_get_nexus():
+    """Endpoint per la Mappa 3D Nexus Interattiva."""
+    return get_nexus_graph_data()
 
 @app.get("/api/contacts")
 def api_get_contacts():
@@ -84,13 +90,13 @@ def api_delete_fact(fact_id: str):
     return {"status": "deleted"}
 
 @app.post("/telegram/webhook")
-async def telegram_webhook(request: Request):
+async def telegram_webhook(request: Request, background_tasks: BackgroundTasks):
     update = await request.json()
-    await process_telegram_update(update)
+    background_tasks.add_task(process_telegram_update, update)
     return {"status": "ok"}
 
 @app.post("/chat")
-async def chat_endpoint(req: ChatRequest):
+async def chat_endpoint(req: ChatRequest, background_tasks: BackgroundTasks):
     recent_context = get_recent_memories(limit=8)
     long_term_facts = get_long_term_facts(limit=15)
 
@@ -101,11 +107,12 @@ async def chat_endpoint(req: ChatRequest):
     screen = result.get("screen")
 
     save_episodic_memory(req.message, reply)
-    await extract_and_save_facts(req.message)
+    
+    # Esecuzione asincrona background per velocità istantanea
+    background_tasks.add_task(extract_and_save_facts, req.message)
 
     return {"reply": reply, "query_used": query_used, "media": media, "screen": screen}
 
-# CANALE WEBSOCKET VOCALE FULL-DUPLEX (Groq Whisper-Large-V3-Turbo + LLM + Edge-TTS)
 @app.websocket("/ws/voice")
 async def websocket_voice_endpoint(websocket: WebSocket):
     await websocket.accept()
@@ -121,7 +128,7 @@ async def websocket_voice_endpoint(websocket: WebSocket):
 
             user_text = ""
             try:
-                async with httpx.AsyncClient(timeout=15.0) as client:
+                async with httpx.AsyncClient(timeout=10.0) as client:
                     with open(tmp_path, "rb") as f:
                         res = await client.post(
                             "https://api.groq.com/openai/v1/audio/transcriptions",
