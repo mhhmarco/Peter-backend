@@ -45,7 +45,7 @@ async def chat_with_peter(req: ChatRequest):
     )
     
     payload = {
-        "model": "gpt-oss-120b",
+        "model": "openai/gpt-oss-120b",
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": req.message}
