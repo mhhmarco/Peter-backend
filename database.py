@@ -105,6 +105,21 @@ def save_contact_entity(name: str, category: str = "amicizia", notes: str = "", 
     except Exception as e:
         print(f"Errore salvataggio contatto: {e}")
 
+def save_contacts_batch(contacts: list):
+    if not supabase or not contacts: return
+    try:
+        supabase.table("contacts").insert(contacts).execute()
+    except Exception as e:
+        print(f"Errore batch contatti: {e}")
+
+def get_contacts():
+    if not supabase: return []
+    try:
+        res = supabase.table("contacts").select("*").limit(50).execute()
+        return res.data or []
+    except Exception:
+        return []
+
 def save_event_entity(title: str, description: str = ""):
     if not supabase or not title or title.upper() == "NESSUNO": return
     try:
@@ -115,6 +130,13 @@ def save_event_entity(title: str, description: str = ""):
         }]).execute()
     except Exception as e:
         print(f"Errore salvataggio evento: {e}")
+
+def save_calendar_events_batch(events: list):
+    if not supabase or not events: return
+    try:
+        supabase.table("calendar_events").insert(events).execute()
+    except Exception as e:
+        print(f"Errore batch eventi: {e}")
 
 def get_nexus_graph_data() -> dict:
     nodes = [{"id": "user_self", "name": "Marco (Tu)", "category": "core", "type": "core", "x": 0, "y": 0, "z": 0, "notes": "Admin Peter OS - Centro neurale principale"}]
@@ -183,4 +205,3 @@ def save_personality_settings(settings: dict):
         supabase.table("system_settings").upsert({"key": "personality", "value": settings}).execute()
     except Exception:
         pass
-        
