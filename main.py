@@ -6,11 +6,15 @@ from supabase import create_client, Client
 
 app = FastAPI()
 
-# Variabili d'ambiente
-SUPABASE_URL = os.getenv("SUPABASE_URL", "")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
-FREELLM_API_KEY = os.getenv("FREELLM_API_KEY", "")
-FREELLM_URL = os.getenv("FREELLM_URL", "")
+# Variabili d'ambiente con pulizia di spazi e virgolette
+SUPABASE_URL = os.getenv("SUPABASE_URL", "").strip('"\' ')
+SUPABASE_KEY = os.getenv("SUPABASE_KEY", "").strip('"\' ')
+FREELLM_API_KEY = os.getenv("FREELLM_API_KEY", "").strip('"\' ')
+
+# URL Groq predefinito pulito
+FREELLM_URL = os.getenv("FREELLM_URL", "https://api.groq.com/openai/v1/chat/completions").strip('"\' ')
+if not FREELLM_URL:
+    FREELLM_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 # Supabase Client
 supabase: Client = None
