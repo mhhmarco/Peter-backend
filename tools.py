@@ -1,13 +1,14 @@
+import re
 import urllib.parse
 from duckduckgo_search import DDGS
 
-def search_web(query: str, max_results: int = 5) -> str:
-    """Ricerca web live via DuckDuckGo."""
+def search_web(query: str, max_results: int = 4) -> str:
+    """Ricerca web in tempo reale tramite DuckDuckGo."""
     try:
         results = []
         with DDGS() as ddgs:
             for r in ddgs.text(query, max_results=max_results):
-                results.append(f"Fonte: {r['title']}\nSnippet: {r['body']}\nURL: {r['href']}\n")
+                results.append(f"Fonte: {r['title']}\nSnippet: {r['body']}\nURL: {r['href']}")
         if results:
             return "\n---\n".join(results)
     except Exception as e:
@@ -15,39 +16,35 @@ def search_web(query: str, max_results: int = 5) -> str:
     return ""
 
 def search_youtube(query: str) -> dict:
-    """Restituisce il player iFrame embed per qualsiasi video o ricerca YouTube."""
-    q_enc = urllib.parse.quote(query)
+    """Estrazione precisa dell'ID video per un player YouTube senza restrizioni di embed."""
     try:
         with DDGS() as ddgs:
-            res = list(ddgs.videos(query, max_results=1))
-            if res and "content" in res[0]:
-                url = res[0]["content"]
-                v_id = ""
-                if "v=" in url:
-                    v_id = url.split("v=")[1].split("&")[0]
-                elif "youtu.be/" in url:
-                    v_id = url.split("youtu.be/")[1].split("?")[0]
-                if v_id:
+            res = list(ddgs.videos(query, max_results=3))
+            for v in res:
+                url = v.get("content", "")
+                # Estrazione ID a 11 caratteri da url standard o corto
+                match = re.search(r'(?:v=|\/)([0-9A-Za-z_-]{11})', url)
+                if match:
+                    video_id = match.group(1)
                     return {
-                        "title": res[0].get("title", query),
-                        "embed_url": f"https://www.youtube.com/embed/{v_id}?autoplay=1",
+                        "title": v.get("title", query),
+                        "embed_url": f"https://www.youtube-nocookie.com/embed/{video_id}?autoplay=1",
                         "source": "youtube"
                     }
     except Exception as e:
-        print(f"Errore ricerca YouTube DDG: {e}")
+        print(f"Errore ricerca YouTube: {e}")
     
-    # Fallback garantito: YouTube List Search Embed
     return {
         "title": f"Ricerca YouTube: {query}",
-        "embed_url": f"https://www.youtube.com/embed?listType=search&list={q_enc}",
+        "embed_url": "",
         "source": "youtube"
     }
 
 def search_apple_music(query: str) -> dict:
-    """Genera il player widget di Apple Music."""
+    """Widget Player per Apple Music."""
     q_enc = urllib.parse.quote(query)
     return {
-        "title": f"Musica: {query}",
+        "title": f"Apple Music: {query}",
         "embed_url": f"https://embed.music.apple.com/it/search?term={q_enc}",
         "source": "applemusic"
     }
