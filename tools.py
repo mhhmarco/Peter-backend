@@ -6,19 +6,20 @@ from config import TELEGRAM_BOT_TOKEN
 from database import get_telegram_chat_id
 
 def search_web(query: str, max_results: int = 4) -> str:
+    """Ricerca web con gestione timeout e pulizia dei dati."""
     try:
         results = []
         with DDGS() as ddgs:
             for r in ddgs.text(query, max_results=max_results):
-                results.append(f"Fonte: {r['title']}\nSnippet: {r['body']}\nURL: {r['href']}")
+                results.append(f"Fonte: {r.get('title', '')}\nSnippet: {r.get('body', '')}\nURL: {r.get('href', '')}")
         if results:
             return "\n---\n".join(results)
     except Exception as e:
         print(f"Errore ricerca web DDG: {e}")
-    return ""
+    return "Nessun risultato rilevante trovato sul web."
 
 def search_image(query: str) -> str:
-    """Cerca l'URL di un'immagine rilevante sul web."""
+    """Cerca URL immagine sul web."""
     try:
         with DDGS() as ddgs:
             results = list(ddgs.images(query, max_results=1))
@@ -29,26 +30,29 @@ def search_image(query: str) -> str:
     return ""
 
 def search_youtube(query: str) -> dict:
-    """Estrae l'ID esatto del video YouTube per il player embed."""
+    """Estrae l'ID esatto del video YouTube per iframe senza blocchi."""
     try:
         with DDGS() as ddgs:
             res = list(ddgs.videos(query, max_results=3))
             for v in res:
-                url = v.get("content", "")
-                match = re.search(r'(?:v=|\/)([0-9A-Za-z_-]{11})', url)
+                url = v.get("content", "") or v.get("href", "")
+                match = re.search(r'(?:v=|\/|embed\/)([0-9A-Za-z_-]{11})', url)
                 if match:
                     video_id = match.group(1)
                     return {
                         "title": v.get("title", query),
-                        "embed_url": f"https://www.youtube-nocookie.com/embed/{video_id}?autoplay=1&enablejsapi=1",
+                        "embed_url": f"https://www.youtube-nocookie.com/embed/{video_id}?autoplay=1",
+                        "watch_url": f"https://www.youtube.com/watch?v={video_id}",
                         "source": "youtube"
                     }
     except Exception as e:
-        print(f"Errore ricerca YouTube: {e}")
+        print(f"Errore ricerca YouTube DDG: {e}")
     
+    encoded = urllib.parse.quote(query)
     return {
         "title": f"Ricerca YouTube: {query}",
-        "embed_url": "",
+        "embed_url": f"https://www.youtube-nocookie.com/embed?listType=search&list={encoded}",
+        "watch_url": f"https://www.youtube.com/results?search_query={encoded}",
         "source": "youtube"
     }
 
@@ -61,16 +65,14 @@ def search_apple_music(query: str) -> dict:
     }
 
 async def send_telegram_message(message_text: str) -> bool:
-    """Invia un messaggio reale sulla chat Telegram dell'utente."""
     token = TELEGRAM_BOT_TOKEN.strip()
     chat_id = get_telegram_chat_id()
     if not token or not chat_id:
-        print("Manca Token o Chat ID di Telegram")
         return False
     
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=8.0) as client:
             res = await client.post(url, json={"chat_id": chat_id, "text": message_text})
             return res.status_code == 200
     except Exception as e:
