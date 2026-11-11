@@ -4,7 +4,7 @@ from datetime import datetime
 import httpx
 from fastapi import HTTPException
 from config import GROQ_API_KEY, GROQ_URL
-from database import save_fact, save_contact_entity, save_event_entity, get_personality_settings, get_contacts
+from database import save_fact, save_contact_entity, save_event_entity, get_contacts
 from tools import search_web, search_youtube, search_apple_music, search_image, send_telegram_message, send_telegram_voice_note
 from scraper import fetch_web_page
 
@@ -25,11 +25,10 @@ async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
         query_used = f"Web Scraper: {target_url}"
 
     system_prompt = (
-        "Sei il motore di routing cognitivo di Peter OS.\n"
-        "Analizza il contesto e scegli:\n"
-        "1. Tool (YOUTUBE, APPLE_MUSIC, WEB_SEARCH, SEND_TELEGRAM, SEND_TELEGRAM_VOICE, NONE).\n"
-        "2. HUD (PERSON_CARD, MEDIA_PLAYER, SEARCH_PREVIEW, IMAGE_PREVIEW, WEB_BROWSER, NONE).\n\n"
-        "Rispondi SOLO in JSON valido:\n"
+        "Sei il motore di routing di Peter OS.\n"
+        "Scegli il tool (YOUTUBE, APPLE_MUSIC, WEB_SEARCH, SEND_TELEGRAM, SEND_TELEGRAM_VOICE, NONE) "
+        "e l'HUD (PERSON_CARD, MEDIA_PLAYER, SEARCH_PREVIEW, IMAGE_PREVIEW, WEB_BROWSER, NONE).\n\n"
+        "Rispondi SOLO in JSON:\n"
         '{\n'
         '  "reasoning": "Motivazione",\n'
         '  "tool": "...",\n'
@@ -66,7 +65,7 @@ async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
                     query = decision.get("query", user_message)
                     screen_type = decision.get("screen_type", "NONE")
                     screen_target = decision.get("screen_target", "")
-                    reasoning_text = decision.get("reasoning", "Routing eseguito.")
+                    reasoning_text = decision.get("reasoning", "Routing completato.")
 
                     if tool == "SEND_TELEGRAM":
                         telegram_sent = await send_telegram_message(query)
@@ -123,7 +122,7 @@ async def generate_peter_response(user_message: str, recent_context: str, long_t
     if recent_context:
         system_prompt += f"\n\nConversazione recente:\n{recent_context}"
     if long_term_facts:
-        system_prompt += f"\n\nMemorie permanenti:\n{long_term_facts}"
+        system_prompt+= f"\n\nMemorie permanenti:\n{long_term_facts}"
 
     payload = {
         "model": MODEL_SMART,
@@ -154,8 +153,10 @@ async def extract_and_save_facts(user_message: str):
         "Analizza il messaggio ed estrai entità in JSON rigoroso:\n"
         "{\n"
         '  "fact": "fatto o memoria permanente su Marco o NESSUNO",\n'
-        '  "person_name": "nome persona menzionata o NESSUNO",\n'
-        '  "category": "famiglia" o "amicizia" o "lavoro",\n'
+        '  "person_name": "nome della persona menzionata (es. Beatrice, Salmez, Takuro) o NESSUNO",\n'
+        '  "category": "famiglia" o "amicizia" o "fidanzata" o "lavoro",\n'
+        '  "birthday": "data di compleanno o nascita se menzionata (es. 20 dicembre 2004) o NESSUNO",\n'
+        '  "notes": "dettagli o relazioni associate alla persona o NESSUNO",\n'
         '  "event_title": "titolo evento o appuntamento o NESSUNO",\n'
         '  "event_desc": "dettagli evento o NESSUNO"\n'
         "}"
@@ -180,7 +181,12 @@ async def extract_and_save_facts(user_message: str):
                         
                     person = parsed.get("person_name")
                     if person and person.upper() != "NESSUNO":
-                        save_contact_entity(person, parsed.get("category", "amicizia"), parsed.get("event_desc", ""))
+                        save_contact_entity(
+                            name=person,
+                            category=parsed.get("category", "amicizia"),
+                            notes=parsed.get("notes", ""),
+                            birthday=parsed.get("birthday", "")
+                        )
                         
                     ev_title = parsed.get("event_title")
                     if ev_title and ev_title.upper() != "NESSUNO":
