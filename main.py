@@ -10,14 +10,13 @@ from database import (
     supabase, supabase_error_log, get_recent_memories, 
     get_long_term_facts, get_all_facts, delete_fact_by_id, 
     save_episodic_memory, save_contacts_batch, get_contacts,
-    save_calendar_events_batch, get_calendar_events,
-    get_personality_settings, save_personality_settings
+    save_calendar_events_batch, get_personality_settings, save_personality_settings
 )
-from llm import generate_peter_response, extract_and_save_facts
+from llm import generate_peter_response, extract_and_save_facts, analyze_image_with_vision
 from telegram_bot import process_telegram_update
 from ui import get_dashboard_html
 from importer import parse_vcard, fetch_and_parse_ical
-from config import GROQ_API_KEY, GROQ_URL
+from config import GROQ_API_KEY
 
 app = FastAPI(title="Peter OS Backend")
 
@@ -106,7 +105,24 @@ async def chat_endpoint(req: ChatRequest):
 
     return {"reply": reply, "query_used": query_used, "media": media, "screen": screen}
 
-# CANALE WEBSOCKET VOCALE FULL-DUPLEX (STT Whisper + LLM + TTS Edge)
+@app.post("/chat/image")
+async def chat_image_endpoint(file: UploadFile = File(...), message: str = ""):
+    """Endpoint multimodale per inviare foto ed estrarre informazioni visive."""
+    image_bytes = await file.read()
+    description = await analyze_image_with_vision(image_bytes, prompt=message or "Descrivi ed estrai tutti i fatti o dettagli importanti da questa immagine.")
+    
+    full_prompt = f"[IMMAGINE CARICATA DALL'UTENTE]: {description}\nCommento Utente: {message}"
+    recent_context = get_recent_memories(limit=8)
+    long_term_facts = get_long_term_facts(limit=15)
+
+    result = await generate_peter_response(full_prompt, recent_context, long_term_facts)
+    reply = result["reply"]
+
+    save_episodic_memory(f"[Immagine]: {message}", reply)
+    await extract_and_save_facts(description)
+
+    return {"reply": reply, "vision_analysis": description, "screen": {"type": "IMAGE_PREVIEW", "title": "Analisi Immagine", "image_url": "", "content": description}}
+
 @app.websocket("/ws/voice")
 async def websocket_voice_endpoint(websocket: WebSocket):
     await websocket.accept()
@@ -116,7 +132,6 @@ async def websocket_voice_endpoint(websocket: WebSocket):
             if not audio_bytes:
                 continue
 
-            # 1. Trascrizione Audio via Groq Whisper
             with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
                 tmp.write(audio_bytes)
                 tmp_path = tmp.name
@@ -140,7 +155,6 @@ async def websocket_voice_endpoint(websocket: WebSocket):
             if not user_text:
                 continue
 
-            # 2. Generazione Risposta Conversazionale
             recent_context = get_recent_memories(limit=6)
             long_term_facts = get_long_term_facts(limit=10)
             llm_res = await generate_peter_response(user_text, recent_context, long_term_facts)
@@ -150,7 +164,6 @@ async def websocket_voice_endpoint(websocket: WebSocket):
             save_episodic_memory(user_text, reply_text)
             await extract_and_save_facts(user_text)
 
-            # 3. Sintesi Vocale Italiana via Edge-TTS
             tts = edge_tts.Communicate(reply_text, voice="it-IT-DiegoNeural")
             with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_mp3:
                 await tts.save(tmp_mp3.name)
@@ -158,7 +171,6 @@ async def websocket_voice_endpoint(websocket: WebSocket):
                     audio_out = f_mp3.read()
                 os.remove(tmp_mp3.name)
 
-            # Invia testo, payload visivo ed audio al browser
             await websocket.send_json({
                 "user_text": user_text,
                 "reply_text": reply_text,
@@ -167,6 +179,6 @@ async def websocket_voice_endpoint(websocket: WebSocket):
             await websocket.send_bytes(audio_out)
 
     except WebSocketDisconnect:
-        print("Connessione vocale WebSocket chiusa.")
+        pass
     except Exception as e:
         print(f"Errore WebSocket Voice: {e}")
