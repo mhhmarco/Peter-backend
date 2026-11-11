@@ -8,7 +8,7 @@ from pydantic import BaseModel
 
 from database import (
     supabase, supabase_error_log, get_recent_memories, 
-    get_long_term_facts, get_all_facts, delete_fact_by_id, 
+    get_long_term_facts, get_all_facts, delete_fact_by_id, update_fact_by_id,
     save_episodic_memory, save_contacts_batch, get_contacts,
     save_calendar_events_batch, get_personality_settings, save_personality_settings,
     get_nexus_graph_data
@@ -24,6 +24,9 @@ app = FastAPI(title="Peter OS Backend")
 class ChatRequest(BaseModel):
     message: str
 
+class FactUpdateRequest(BaseModel):
+    fact: str
+
 class ICalRequest(BaseModel):
     url: str
 
@@ -37,7 +40,7 @@ def check_memories():
         return {"connected": False, "error": "Supabase non connesso", "dettaglio": supabase_error_log}
     try:
         res_mem = supabase.table("memories").select("*").order("created_at", desc=True).limit(10).execute()
-        res_facts = supabase.table("user_facts").select("*").order("created_at", desc=True).limit(15).execute()
+        res_facts = supabase.table("user_facts").select("*").order("created_at", desc=True).limit(20).execute()
         return {
             "connected": True,
             "episodic_memories": res_mem.data,
@@ -48,12 +51,25 @@ def check_memories():
 
 @app.get("/api/nexus")
 def api_get_nexus():
-    """Endpoint per la Mappa 3D Nexus Interattiva."""
     return get_nexus_graph_data()
 
 @app.get("/api/contacts")
 def api_get_contacts():
     return get_contacts()
+
+@app.put("/api/facts/{fact_id}")
+def api_update_fact(fact_id: str, req: FactUpdateRequest):
+    success = update_fact_by_id(fact_id, req.fact)
+    if not success:
+        raise HTTPException(status_code=500, detail="Impossibile aggiornare il fatto")
+    return {"status": "updated"}
+
+@app.delete("/api/facts/{fact_id}")
+def api_delete_fact(fact_id: str):
+    success = delete_fact_by_id(fact_id)
+    if not success:
+        raise HTTPException(status_code=500, detail="Impossibile eliminare il fatto")
+    return {"status": "deleted"}
 
 @app.post("/api/import/vcf")
 async def import_vcf(file: UploadFile = File(...)):
@@ -82,13 +98,6 @@ def api_save_personality(settings: dict):
     save_personality_settings(settings)
     return {"status": "updated"}
 
-@app.delete("/api/facts/{fact_id}")
-def api_delete_fact(fact_id: str):
-    success = delete_fact_by_id(fact_id)
-    if not success:
-        raise HTTPException(status_code=500, detail="Impossibile eliminare il fatto")
-    return {"status": "deleted"}
-
 @app.post("/telegram/webhook")
 async def telegram_webhook(request: Request, background_tasks: BackgroundTasks):
     update = await request.json()
@@ -105,13 +114,12 @@ async def chat_endpoint(req: ChatRequest, background_tasks: BackgroundTasks):
     query_used = result.get("query_used")
     media = result.get("media")
     screen = result.get("screen")
+    reasoning = result.get("reasoning")
 
     save_episodic_memory(req.message, reply)
-    
-    # Esecuzione asincrona background per velocità istantanea
     background_tasks.add_task(extract_and_save_facts, req.message)
 
-    return {"reply": reply, "query_used": query_used, "media": media, "screen": screen}
+    return {"reply": reply, "query_used": query_used, "media": media, "screen": screen, "reasoning": reasoning}
 
 @app.websocket("/ws/voice")
 async def websocket_voice_endpoint(websocket: WebSocket):
@@ -150,6 +158,7 @@ async def websocket_voice_endpoint(websocket: WebSocket):
             llm_res = await generate_peter_response(user_text, recent_context, long_term_facts)
             reply_text = llm_res["reply"]
             screen_data = llm_res.get("screen")
+            reasoning_data = llm_res.get("reasoning")
 
             save_episodic_memory(user_text, reply_text)
             await extract_and_save_facts(user_text)
@@ -164,7 +173,8 @@ async def websocket_voice_endpoint(websocket: WebSocket):
             await websocket.send_json({
                 "user_text": user_text,
                 "reply_text": reply_text,
-                "screen": screen_data
+                "screen": screen_data,
+                "reasoning": reasoning_data
             })
             await websocket.send_bytes(audio_out)
 
