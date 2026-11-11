@@ -12,7 +12,7 @@ from database import (
     save_episodic_memory, save_contacts_batch, get_contacts,
     save_calendar_events_batch, get_personality_settings, save_personality_settings
 )
-from llm import generate_peter_response, extract_and_save_facts, analyze_image_with_vision
+from llm import generate_peter_response, extract_and_save_facts
 from telegram_bot import process_telegram_update
 from ui import get_dashboard_html
 from importer import parse_vcard, fetch_and_parse_ical
@@ -105,24 +105,7 @@ async def chat_endpoint(req: ChatRequest):
 
     return {"reply": reply, "query_used": query_used, "media": media, "screen": screen}
 
-@app.post("/chat/image")
-async def chat_image_endpoint(file: UploadFile = File(...), message: str = ""):
-    """Endpoint multimodale per inviare foto ed estrarre informazioni visive."""
-    image_bytes = await file.read()
-    description = await analyze_image_with_vision(image_bytes, prompt=message or "Descrivi ed estrai tutti i fatti o dettagli importanti da questa immagine.")
-    
-    full_prompt = f"[IMMAGINE CARICATA DALL'UTENTE]: {description}\nCommento Utente: {message}"
-    recent_context = get_recent_memories(limit=8)
-    long_term_facts = get_long_term_facts(limit=15)
-
-    result = await generate_peter_response(full_prompt, recent_context, long_term_facts)
-    reply = result["reply"]
-
-    save_episodic_memory(f"[Immagine]: {message}", reply)
-    await extract_and_save_facts(description)
-
-    return {"reply": reply, "vision_analysis": description, "screen": {"type": "IMAGE_PREVIEW", "title": "Analisi Immagine", "image_url": "", "content": description}}
-
+# CANALE WEBSOCKET VOCALE FULL-DUPLEX (Groq Whisper-Large-V3-Turbo + LLM + Edge-TTS)
 @app.websocket("/ws/voice")
 async def websocket_voice_endpoint(websocket: WebSocket):
     await websocket.accept()
