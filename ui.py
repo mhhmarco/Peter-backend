@@ -5,49 +5,79 @@ def get_dashboard_html() -> str:
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>PETER HUD OS v8.0</title>
+        <title>PETER HUD OS v8.1</title>
         <style>
-            :root { --bg-main: #060913; --panel-bg: rgba(13, 22, 41, 0.65); --glass-border: rgba(0, 240, 255, 0.18); --accent-cyan: #00f0ff; --accent-purple: #8b5cf6; --accent-green: #10b981; --text-bright: #f8fafc; --text-dim: #94a3b8; }
+            :root { 
+                --bg-main: #060913; 
+                --panel-bg: rgba(13, 22, 41, 0.75); 
+                --glass-border: rgba(0, 240, 255, 0.18); 
+                --accent-cyan: #00f0ff; 
+                --accent-purple: #8b5cf6; 
+                --accent-green: #10b981; 
+                --text-bright: #f8fafc; 
+                --text-dim: #94a3b8; 
+            }
             * { box-sizing: border-box; margin: 0; padding: 0; font-family: "Inter", sans-serif; }
             body { background: radial-gradient(circle at 50% 20%, #0f172a 0%, #060913 100%); color: var(--text-bright); height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
-            header { height: 56px; border-bottom: 1px solid var(--glass-border); padding: 0 24px; display: flex; align-items: center; justify-content: space-between; background: rgba(6, 9, 19, 0.8); backdrop-filter: blur(20px); z-index: 100; }
+            
+            header { height: 56px; border-bottom: 1px solid var(--glass-border); padding: 0 24px; display: flex; align-items: center; justify-content: space-between; background: rgba(6, 9, 19, 0.9); backdrop-filter: blur(20px); z-index: 100; flex-shrink: 0; }
             .header-brand { display: flex; align-items: center; gap: 12px; }
             .logo-orb { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple)); display: flex; align-items: center; justify-content: center; box-shadow: 0 0 15px rgba(0, 240, 255, 0.4); font-weight: 900; font-size: 13px; color: #000; }
             .header-title { font-size: 13px; font-weight: 800; letter-spacing: 3px; text-transform: uppercase; background: linear-gradient(90deg, #fff, var(--accent-cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+            
             .sys-badge { display: flex; align-items: center; gap: 8px; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); padding: 4px 14px; border-radius: 30px; font-size: 11px; color: var(--accent-green); font-weight: 600; letter-spacing: 1px; }
             .clock-display { font-family: monospace; font-size: 14px; color: var(--accent-cyan); letter-spacing: 2px; }
-            .command-grid { flex: 1; display: grid; grid-template-columns: 260px 1fr 340px; gap: 16px; padding: 16px; height: calc(100vh - 116px); overflow: hidden; }
-            .sidebar-panel { background: var(--panel-bg); border: 1px solid var(--glass-border); border-radius: 20px; padding: 18px; display: flex; flex-direction: column; gap: 16px; backdrop-filter: blur(24px); box-shadow: 0 8px 32px rgba(0,0,0,0.3); }
+
+            /* GRIGLIA PRINCIPALE BLOCCATA */
+            .command-grid { flex: 1; display: grid; grid-template-columns: 260px 1fr 340px; gap: 16px; padding: 16px; height: calc(100vh - 120px); overflow: hidden; }
+
+            .sidebar-panel { background: var(--panel-bg); border: 1px solid var(--glass-border); border-radius: 20px; padding: 18px; display: flex; flex-direction: column; gap: 16px; backdrop-filter: blur(24px); box-shadow: 0 8px 32px rgba(0,0,0,0.3); height: 100%; overflow: hidden; }
             .nav-menu { display: flex; flex-direction: column; gap: 8px; }
-            .nav-item { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 12px; font-size: 12px; font-weight: 600; color: var(--text-dim); cursor: pointer; transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); }
+            .nav-item { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 12px; font-size: 12px; font-weight: 600; color: var(--text-dim); cursor: pointer; transition: all 0.25s ease; }
             .nav-item.active, .nav-item:hover { background: linear-gradient(90deg, rgba(0, 240, 255, 0.12), transparent); color: var(--accent-cyan); border-left: 3px solid var(--accent-cyan); transform: translateX(2px); }
-            .peter-avatar-card { background: rgba(0,0,0,0.4); border: 1px solid var(--glass-border); border-radius: 16px; padding: 14px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 8px; position: relative; overflow: hidden; }
-            #peter-avatar-canvas { width: 140px; height: 140px; border-radius: 50%; cursor: pointer; }
+
+            .peter-avatar-card { background: rgba(0,0,0,0.4); border: 1px solid var(--glass-border); border-radius: 16px; padding: 14px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 8px; flex-shrink: 0; }
+            #peter-avatar-canvas { width: 130px; height: 130px; border-radius: 50%; cursor: pointer; }
             .avatar-status-tag { font-size: 9px; font-family: monospace; letter-spacing: 1.5px; color: var(--accent-cyan); background: rgba(0,240,255,0.1); padding: 3px 10px; border-radius: 12px; border: 1px solid rgba(0,240,255,0.3); }
-            .center-workspace { display: grid; grid-template-rows: 350px 1fr; gap: 16px; height: 100%; overflow: hidden; }
-            .view-tab { display: none; height: 100%; width: 100%; }
+
+            /* LAYOUT CENTRALE CON ALTEZZE FISSE E RIGIDE */
+            .center-workspace { display: flex; flex-direction: column; gap: 16px; height: 100%; overflow: hidden; }
+            .view-tab { display: none; flex-direction: column; gap: 16px; height: 100%; width: 100%; overflow: hidden; }
             .view-tab.active { display: flex; }
-            .hud-screen { background: var(--panel-bg); border: 1px solid var(--glass-border); border-radius: 20px; position: relative; overflow: hidden; display: flex; flex-direction: column; width: 100%; backdrop-filter: blur(20px); }
-            .hud-screen-header { padding: 10px 20px; background: rgba(0,0,0,0.3); border-bottom: 1px solid var(--glass-border); font-size: 10px; font-family: monospace; color: var(--accent-cyan); display: flex; justify-content: space-between; }
-            #hud-screen-content { flex: 1; padding: 14px; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative; }
-            .feed-panel { background: var(--panel-bg); border: 1px solid var(--glass-border); border-radius: 20px; display: flex; flex-direction: column; overflow: hidden; width: 100%; backdrop-filter: blur(20px); }
-            .panel-header { padding: 12px 20px; border-bottom: 1px solid var(--glass-border); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--accent-cyan); display: flex; justify-content: space-between; align-items: center; }
-            #chat-feed { flex: 1; overflow-y: auto; padding: 18px; display: flex; flex-direction: column; gap: 12px; scroll-behavior: smooth; }
-            .msg { max-width: 78%; padding: 12px 16px; border-radius: 16px; font-size: 13px; line-height: 1.5; word-wrap: break-word; }
+
+            /* HUD DISPLAY FISSO A 280PX */
+            .hud-screen { background: var(--panel-bg); border: 1px solid var(--glass-border); border-radius: 20px; height: 280px; flex-shrink: 0; position: relative; overflow: hidden; display: flex; flex-direction: column; backdrop-filter: blur(20px); }
+            .hud-screen-header { padding: 8px 16px; background: rgba(0,0,0,0.3); border-bottom: 1px solid var(--glass-border); font-size: 10px; font-family: monospace; color: var(--accent-cyan); display: flex; justify-content: space-between; flex-shrink: 0; }
+            #hud-screen-content { flex: 1; padding: 12px; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative; }
+
+            /* CHAT FEED CHE OCCUPA ESATTAMENTE LO SPAZIO RIMANENTE */
+            .feed-panel { background: var(--panel-bg); border: 1px solid var(--glass-border); border-radius: 20px; flex: 1; display: flex; flex-direction: column; overflow: hidden; backdrop-filter: blur(20px); min-height: 0; }
+            .panel-header { padding: 10px 16px; border-bottom: 1px solid var(--glass-border); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--accent-cyan); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+            
+            #chat-feed { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; scroll-behavior: smooth; min-height: 0; }
+            .msg { max-width: 80%; padding: 10px 14px; border-radius: 14px; font-size: 13px; line-height: 1.45; word-wrap: break-word; flex-shrink: 0; }
             .msg.user { align-self: flex-end; background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue)); color: #fff; border-bottom-right-radius: 4px; box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3); }
             .msg.peter { align-self: flex-start; background: rgba(15, 23, 42, 0.85); border: 1px solid var(--glass-border); border-bottom-left-radius: 4px; }
-            .right-sidebar { display: flex; flex-direction: column; gap: 16px; height: 100%; overflow-y: auto; }
-            .widget-card { background: var(--panel-bg); border: 1px solid var(--glass-border); border-radius: 20px; padding: 16px; backdrop-filter: blur(20px); box-shadow: 0 8px 32px rgba(0,0,0,0.3); }
-            .fact-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 11px; }
+            
+            .right-sidebar { display: flex; flex-direction: column; gap: 16px; height: 100%; overflow: hidden; }
+            .widget-card { background: var(--panel-bg); border: 1px solid var(--glass-border); border-radius: 20px; padding: 16px; backdrop-filter: blur(20px); box-shadow: 0 8px 32px rgba(0,0,0,0.3); display: flex; flex-direction: column; overflow: hidden; }
+            .widget-card.flex-grow { flex: 1; min-height: 0; }
+            .widget-card.fixed-small { height: 160px; flex-shrink: 0; }
+            
+            #facts-preview { flex: 1; overflow-y: auto; min-height: 0; padding-right: 4px; }
+            .fact-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 11px; }
             .fact-btn { background: transparent; border: none; color: var(--text-dim); cursor: pointer; font-size: 12px; transition: color 0.2s; }
             .fact-btn:hover { color: var(--accent-cyan); }
-            .reasoning-box { background: rgba(0,0,0,0.4); border: 1px solid rgba(0,240,255,0.15); border-radius: 10px; padding: 10px; font-size: 10px; font-family: monospace; color: var(--accent-cyan); max-height: 100px; overflow-y: auto; }
-            .bottom-command-bar { height: 64px; border-top: 1px solid var(--glass-border); padding: 0 24px; display: flex; align-items: center; gap: 16px; background: rgba(6, 9, 19, 0.95); backdrop-filter: blur(20px); }
+
+            .reasoning-box { background: rgba(0,0,0,0.4); border: 1px solid rgba(0,240,255,0.15); border-radius: 10px; padding: 8px; font-size: 10px; font-family: monospace; color: var(--accent-cyan); flex: 1; overflow-y: auto; }
+
+            .bottom-command-bar { height: 64px; border-top: 1px solid var(--glass-border); padding: 0 24px; display: flex; align-items: center; gap: 16px; background: rgba(6, 9, 19, 0.95); backdrop-filter: blur(20px); flex-shrink: 0; }
             .cmd-input-container { flex: 1; display: flex; align-items: center; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--glass-border); border-radius: 30px; padding: 6px 8px 6px 20px; transition: border-color 0.3s; }
             .cmd-input-container:focus-within { border-color: var(--accent-cyan); box-shadow: 0 0 15px rgba(0,240,255,0.15); }
             .cmd-input { flex: 1; background: transparent; border: none; outline: none; color: #fff; font-size: 13px; }
             .cmd-btn { padding: 10px 24px; background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue)); color: #000; border: none; border-radius: 24px; font-weight: 800; font-size: 12px; cursor: pointer; transition: transform 0.2s; }
             .cmd-btn:hover { transform: scale(1.03); }
+
             #nexus-graph-canvas { width: 100%; height: 100%; display: block; background: #060913; cursor: grab; }
         </style>
     </head>
@@ -67,20 +97,20 @@ def get_dashboard_html() -> str:
                 <div class="peter-avatar-card">
                     <canvas id="peter-avatar-canvas" title="Clicca per parlare a voce con Peter"></canvas>
                     <div id="avatar-status-badge" class="avatar-status-tag">STATUS // IDLE</div>
-                    <div style="font-size: 10px; color: var(--text-dim);">Clicca l'avatar per Voice Call</div>
+                    <div style="font-size: 10px; color: var(--text-dim);">Clicca per Voice Call</div>
                 </div>
             </aside>
 
             <main class="center-workspace">
-                <div id="view-hud" class="view-tab active" style="flex-direction: column; gap: 16px;">
+                <div id="view-hud" class="view-tab active">
                     <div class="hud-screen">
                         <div class="hud-screen-header">
                             <span>REACTIVE VISUAL HUD</span>
-                            <span id="hud-status-badge">STANDBY // INTERACTIVE CORE</span>
+                            <span id="hud-status-badge">STANDBY // CORE</span>
                         </div>
                         <div id="hud-screen-content">
-                            <div id="hud-default-overlay" style="text-align: center; z-index: 2;">
-                                <h2 style="font-size: 24px; font-weight: 900; letter-spacing: 4px; background: linear-gradient(90deg, #fff, var(--accent-cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">PETER COMPANION CORE</h2>
+                            <div id="hud-default-overlay" style="text-align: center;">
+                                <h2 style="font-size: 20px; font-weight: 900; letter-spacing: 3px; background: linear-gradient(90deg, #fff, var(--accent-cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">PETER COMPANION CORE</h2>
                             </div>
                         </div>
                     </div>
@@ -88,24 +118,24 @@ def get_dashboard_html() -> str:
                     <section class="feed-panel">
                         <div class="panel-header"><span>LIVE DIALOG FEED</span><span style="font-size: 10px; color: var(--accent-green);">● READY</span></div>
                         <div id="chat-feed">
-                            <div class="msg peter">Ciao Marco, sistemi neurali aggiornati. Parlerò solo in vivavoce e sarò veloce e diretto. Clicca l'avatar per usare il microfono, altrimenti scrivimi pure qua sotto.</div>
+                            <div class="msg peter">Layout fisso e pulito applicato. Dimmi tutto Marco, come procediamo?</div>
                         </div>
                     </section>
                 </div>
 
-                <div id="view-nexus" class="view-tab" style="position: relative; overflow: hidden; border-radius: 20px; border: 1px solid var(--glass-border);">
+                <div id="view-nexus" class="view-tab" style="position: relative; overflow: hidden; border-radius: 20px; border: 1px solid var(--glass-border); height: 100%;">
                     <canvas id="nexus-graph-canvas"></canvas>
                 </div>
             </main>
 
             <aside class="right-sidebar">
-                <div class="widget-card" style="flex: 1; display: flex; flex-direction: column;">
+                <div class="widget-card flex-grow">
                     <div class="panel-header" style="padding: 0 0 10px 0; border: none;">MEMORIA (EDITABLE)</div>
-                    <div id="facts-preview" style="flex: 1; overflow-y: auto;">Caricamento memorie...</div>
+                    <div id="facts-preview">Caricamento memorie...</div>
                 </div>
-                <div class="widget-card">
+                <div class="widget-card fixed-small">
                     <div class="panel-header" style="padding: 0 0 6px 0; border: none;">REASONING STREAM</div>
-                    <div id="reasoning-preview" class="reasoning-box">> Peter OS in ascolto...</div>
+                    <div id="reasoning-preview" class="reasoning-box">> In ascolto...</div>
                 </div>
             </aside>
         </div>
@@ -137,7 +167,7 @@ def get_dashboard_html() -> str:
                 const ctx = canvas.getContext('2d');
                 let angle = 0;
                 function renderAvatar() {
-                    ctx.clearRect(0, 0, 140, 140);
+                    ctx.clearRect(0, 0, 130, 130);
                     angle += (currentAvatarState === 'THINKING' ? 0.08 : 0.02);
                     let auraColor = '#00f0ff';
                     if(currentAvatarState === 'SPEAKING') auraColor = '#8b5cf6';
@@ -146,17 +176,17 @@ def get_dashboard_html() -> str:
                     document.getElementById('avatar-status-badge').innerText = `STATUS // ${currentAvatarState}`;
                     document.getElementById('avatar-status-badge').style.borderColor = auraColor;
 
-                    let radiusPulse = 42 + Math.sin(angle * 3) * (currentAvatarState === 'SPEAKING' ? 8 : 3);
-                    ctx.beginPath(); ctx.arc(70, 70, radiusPulse, 0, Math.PI * 2);
+                    let radiusPulse = 38 + Math.sin(angle * 3) * (currentAvatarState === 'SPEAKING' ? 6 : 2);
+                    ctx.beginPath(); ctx.arc(65, 65, radiusPulse, 0, Math.PI * 2);
                     ctx.strokeStyle = auraColor; ctx.lineWidth = 2; ctx.stroke();
 
                     for(let i = 0; i < 3; i++) {
-                        ctx.save(); ctx.translate(70, 70); ctx.rotate(angle * (i % 2 === 0 ? 1 : -1) + (i * Math.PI / 3));
-                        ctx.beginPath(); ctx.ellipse(0, 0, 32 + i * 6, 12, 0, 0, Math.PI * 2);
+                        ctx.save(); ctx.translate(65, 65); ctx.rotate(angle * (i % 2 === 0 ? 1 : -1) + (i * Math.PI / 3));
+                        ctx.beginPath(); ctx.ellipse(0, 0, 28 + i * 5, 10, 0, 0, Math.PI * 2);
                         ctx.strokeStyle = auraColor; ctx.globalAlpha = 0.45; ctx.stroke(); ctx.restore();
                     }
-                    ctx.beginPath(); ctx.arc(70, 70, 14 + Math.cos(angle * 2) * 2, 0, Math.PI * 2);
-                    ctx.fillStyle = auraColor; ctx.shadowBlur = 20; ctx.shadowColor = auraColor; ctx.fill(); ctx.shadowBlur = 0;
+                    ctx.beginPath(); ctx.arc(65, 65, 12 + Math.cos(angle * 2) * 2, 0, Math.PI * 2);
+                    ctx.fillStyle = auraColor; ctx.shadowBlur = 15; ctx.shadowColor = auraColor; ctx.fill(); ctx.shadowBlur = 0;
                     requestAnimationFrame(renderAvatar);
                 }
                 renderAvatar();
@@ -169,24 +199,21 @@ def get_dashboard_html() -> str:
                 if(!screen || screen.type === 'NONE') return;
                 badge.innerText = `ACTIVE DISPLAY // ${screen.type}`;
 
-                // NUOVO LINKVIEWER BROWSER INTERNO
                 if(screen.type === 'WEB_BROWSER' && screen.url) {
                     container.innerHTML = `
-                        <div style="width:100%; height:100%; display:flex; flex-direction:column; border-radius:12px; overflow:hidden; border:1px solid var(--accent-cyan); box-shadow: 0 0 20px rgba(0,240,255,0.1);">
-                            <div style="background:rgba(0,0,0,0.6); padding:8px 12px; font-size:11px; color:var(--text-dim); display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--glass-border);">
-                                <span style="font-family:monospace; color:var(--accent-cyan);">LINKVIEWER // ${screen.url}</span>
-                                <a href="${screen.url}" target="_blank" style="color:#fff; text-decoration:none; background:var(--accent-purple); padding:4px 8px; border-radius:4px;">Apri Finestra</a>
-                            </div>
-                            <!-- A causa delle restrizioni di sicurezza (X-Frame-Options) alcuni siti potrebbero bloccare l'iframe. Questo è il comportamento corretto del browser. -->
-                            <iframe src="${screen.url}" style="flex:1; width:100%; border:none; background:#ffffff;"></iframe>
+                        <div style="width:100%; max-width:400px; background:rgba(15,23,42,0.95); border:1px solid var(--accent-cyan); border-radius:14px; padding:16px; display:flex; flex-direction:column; gap:10px; text-align:center;">
+                            <div style="font-size:28px;">🌐</div>
+                            <h3 style="color:var(--accent-cyan); font-size:13px; word-break:break-all;">${screen.url}</h3>
+                            <p style="font-size:10px; color:var(--text-dim);">Navigazione sicura via LinkViewer Card.</p>
+                            <a href="${screen.url}" target="_blank" style="background:linear-gradient(135deg, var(--accent-cyan), var(--accent-purple)); color:#000; text-decoration:none; padding:8px 14px; border-radius:8px; font-weight:800; font-size:11px; display:inline-block;">Apri Pagina Web ↗</a>
                         </div>
                     `;
                 } 
                 else if(screen.type === 'MEDIA_PLAYER' && screen.embed_url) {
-                    container.innerHTML = `<div style="width:100%; max-width:480px; aspect-ratio:16/9; border-radius:12px; overflow:hidden; border:1px solid var(--accent-cyan);"><iframe src="${screen.embed_url}" style="width:100%; height:100%; border:none;" allow="accelerometer; autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>`;
+                    container.innerHTML = `<div style="width:100%; max-width:420px; aspect-ratio:16/9; border-radius:10px; overflow:hidden; border:1px solid var(--accent-cyan);"><iframe src="${screen.embed_url}" style="width:100%; height:100%; border:none;" allow="accelerometer; autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>`;
                 } 
                 else if(screen.type === 'PERSON_CARD' && screen.person) {
-                    container.innerHTML = `<div style="background:rgba(15,23,42,0.95); border:1px solid var(--accent-cyan); padding:20px; border-radius:16px; text-align:center; max-width:320px;"><div style="font-size:36px; margin-bottom:4px;">👤</div><h3 style="color:var(--accent-cyan); font-size:18px;">${screen.person.name}</h3><p style="font-size:11px; color:var(--text-dim); margin-bottom:8px;">Livello: ${screen.person.category}</p><p style="font-size:12px; line-height:1.4;">${screen.person.notes || 'In Nexus'}</p></div>`;
+                    container.innerHTML = `<div style="background:rgba(15,23,42,0.95); border:1px solid var(--accent-cyan); padding:16px; border-radius:14px; text-align:center; max-width:280px;"><div style="font-size:30px; margin-bottom:2px;">👤</div><h3 style="color:var(--accent-cyan); font-size:16px;">${screen.person.name}</h3><p style="font-size:10px; color:var(--text-dim); margin-bottom:6px;">Livello: ${screen.person.category}</p><p style="font-size:11px; line-height:1.3;">${screen.person.notes || 'In Nexus'}</p></div>`;
                 }
             }
 
@@ -210,7 +237,6 @@ def get_dashboard_html() -> str:
                         appendMsg(data.reply, 'peter');
                         if(data.screen) updateHudScreen(data.screen);
                         if(data.reasoning) document.getElementById('reasoning-preview').innerText = data.reasoning;
-                        // TTS RIMOSSO PER I MESSAGGI TESTUALI. Peter parla solo in Voice Mode.
                         currentAvatarState = 'IDLE';
                         loadBrainSummary();
                     }
@@ -235,7 +261,7 @@ def get_dashboard_html() -> str:
                     if(data.connected && data.long_term_facts) {
                         document.getElementById('facts-preview').innerHTML = data.long_term_facts.map(f => `
                             <div class="fact-item"><span id="fact-text-${f.id}">🧠 ${f.fact}</span>
-                            <div class="fact-actions">
+                            <div style="display:flex; gap:4px;">
                                 <button class="fact-btn" onclick="editFact('${f.id}', '${f.fact.replace(/'/g, "\\'")}')">✏️</button>
                                 <button class="fact-btn" onclick="deleteFact('${f.id}')">🗑️</button>
                             </div></div>`).join('');
@@ -258,7 +284,6 @@ def get_dashboard_html() -> str:
                 }
             }
 
-            // MODALITÀ VOCALE (QUI IL TTS FUNZIONA ED È GIUSTO CHE CI SIA)
             let ws = null;
             let mediaRecorder = null;
             let isRecording = false;
