@@ -28,6 +28,16 @@ class ChatRequest(BaseModel):
 def health_check():
     return {"status": "online", "agent": "Peter"}
 
+@app.get("/memories")
+def check_memories():
+    if not supabase:
+        return {"error": "Supabase non connesso"}
+    try:
+        res = supabase.table("memories").select("*").order("created_at", desc=True).limit(10).execute()
+        return {"count": len(res.data), "memories": res.data}
+    except Exception as e:
+        return {"error": str(e)}
+
 @app.post("/chat")
 async def chat_with_peter(req: ChatRequest):
     if not GROQ_API_KEY:
@@ -36,7 +46,7 @@ async def chat_with_peter(req: ChatRequest):
             detail="Manca la variabile FREELLM_API_KEY su Render"
         )
 
-    # 1. Recupero degli ultimi 6 ricordi da Supabase
+    # 1. Recupero degli ultimi ricordi
     recent_context = ""
     if supabase:
         try:
@@ -47,7 +57,7 @@ async def chat_with_peter(req: ChatRequest):
         except Exception as e:
             print(f"Errore lettura memoria: {e}")
 
-    # 2. System Prompt per la personalità di Peter
+    # 2. System Prompt
     system_prompt = (
         "Sei Peter, un compagno di vita digitale ed alter-ego empatico. "
         "Non sei un assistente virtuale formale né un chatbot esecutivo. "
@@ -84,7 +94,7 @@ async def chat_with_peter(req: ChatRequest):
             data = res.json()
             reply = data["choices"][0]["message"]["content"]
 
-            # 3. Salvataggio della conversazione nella memoria episodica su Supabase
+            # 3. Salvataggio della memoria
             if supabase:
                 try:
                     supabase.table("memories").insert([
