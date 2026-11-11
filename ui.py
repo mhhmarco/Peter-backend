@@ -297,6 +297,64 @@ def get_dashboard_html() -> str:
                 }
             }
 
+            async function loadNexus3D() {
+                const canvas = document.getElementById('nexus-graph-canvas');
+                if(!canvas) return;
+                const ctx = canvas.getContext('2d');
+                canvas.width = canvas.parentElement.clientWidth;
+                canvas.height = canvas.parentElement.clientHeight;
+
+                try {
+                    const res = await fetch('/api/nexus');
+                    const data = await res.json();
+                    const nodes = data.nodes || [];
+
+                    let rot = 0;
+                    function drawGraph() {
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        const cx = canvas.width / 2;
+                        const cy = canvas.height / 2;
+                        rot += 0.005;
+
+                        ctx.strokeStyle = 'rgba(0, 240, 255, 0.2)';
+                        ctx.lineWidth = 1;
+
+                        nodes.forEach((n, idx) => {
+                            if(idx === 0) return;
+                            let x = n.x * Math.cos(rot) - n.z * Math.sin(rot);
+                            let z = n.x * Math.sin(rot) + n.z * Math.cos(rot);
+                            let scale = 300 / (300 + z);
+                            let px = cx + x * scale;
+                            let py = cy + n.y * scale;
+
+                            ctx.beginPath();
+                            ctx.moveTo(cx, cy);
+                            ctx.lineTo(px, py);
+                            ctx.stroke();
+
+                            ctx.beginPath();
+                            ctx.arc(px, py, 6 * scale, 0, Math.PI * 2);
+                            ctx.fillStyle = n.category === 'famiglia' ? '#8b5cf6' : '#00f0ff';
+                            ctx.fill();
+
+                            ctx.fillStyle = '#f8fafc';
+                            ctx.font = '10px Inter';
+                            ctx.fillText(n.name, px + 10, py + 4);
+                        });
+
+                        ctx.beginPath();
+                        ctx.arc(cx, cy, 10, 0, Math.PI * 2);
+                        ctx.fillStyle = '#10b981';
+                        ctx.fill();
+                        ctx.fillStyle = '#f8fafc';
+                        ctx.fillText("Marco (Tu)", cx + 14, cy + 4);
+
+                        requestAnimationFrame(drawGraph);
+                    }
+                    drawGraph();
+                } catch(e) {}
+            }
+
             let ws = null;
             let mediaRecorder = null;
             let isRecording = false;
