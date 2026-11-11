@@ -5,305 +5,264 @@ def get_dashboard_html() -> str:
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Peter OS - JARVIS HUD</title>
+        <title>PETER COMMAND CENTER v3.0</title>
         <style>
             :root {
-                --bg-core: #04070c;
-                --panel-bg: rgba(10, 16, 26, 0.88);
-                --border-neon: rgba(0, 240, 255, 0.2);
+                --bg-main: #030712;
+                --panel-bg: rgba(10, 20, 38, 0.7);
+                --panel-border: rgba(0, 240, 255, 0.18);
                 --accent-cyan: #00f0ff;
-                --accent-blue: #2563eb;
-                --text-main: #f0f6fc;
-                --text-dim: #8b949e;
+                --accent-blue: #1d4ed8;
+                --accent-green: #10b981;
+                --text-bright: #f3f4f6;
+                --text-dim: #6b7280;
             }
-            * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-            body { background: var(--bg-core); color: var(--text-main); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+            * { box-sizing: border-box; margin: 0; padding: 0; font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+            body { background: var(--bg-main); color: var(--text-bright); height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
             
-            header { height: 50px; border-bottom: 1px solid var(--border-neon); padding: 0 20px; display: flex; align-items: center; justify-content: space-between; background: rgba(4, 7, 12, 0.95); }
-            .brand { display: flex; align-items: center; gap: 10px; }
-            .brand-glow { width: 10px; height: 10px; background: var(--accent-cyan); border-radius: 50%; box-shadow: 0 0 10px var(--accent-cyan); }
-            .brand h1 { font-size: 14px; font-weight: 700; letter-spacing: 1px; color: #fff; }
+            /* TOP BAR HUD */
+            header { height: 54px; border-bottom: 1px solid var(--panel-border); padding: 0 24px; display: flex; align-items: center; justify-content: space-between; background: rgba(3, 7, 18, 0.95); backdrop-filter: blur(12px); z-index: 100; }
+            .header-brand { display: flex; align-items: center; gap: 12px; }
+            .logo-icon { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--accent-cyan); display: flex; align-items: center; justify-content: center; box-shadow: 0 0 10px var(--accent-cyan); font-size: 11px; font-weight: 800; color: var(--accent-cyan); }
+            .header-title { font-size: 14px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; }
             
-            .nav-tabs { display: flex; gap: 6px; background: rgba(15, 23, 42, 0.8); padding: 3px; border-radius: 10px; border: 1px solid var(--border-neon); }
-            .tab-btn { background: transparent; border: none; color: var(--text-dim); padding: 6px 14px; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
-            .tab-btn.active { background: var(--accent-blue); color: #fff; box-shadow: 0 0 8px rgba(37, 99, 235, 0.5); }
+            .sys-status { display: flex; align-items: center; gap: 8px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); padding: 4px 12px; border-radius: 20px; font-size: 11px; color: var(--accent-green); font-weight: 600; letter-spacing: 1px; }
+            .status-dot { width: 6px; height: 6px; background: var(--accent-green); border-radius: 50%; box-shadow: 0 0 8px var(--accent-green); }
+            .clock-display { font-family: monospace; font-size: 15px; color: var(--accent-cyan); letter-spacing: 1px; }
 
-            .main-container { flex: 1; height: calc(100vh - 50px); overflow: hidden; position: relative; }
-            .tab-content { display: none; height: 100%; width: 100%; }
-            .tab-content.active { display: flex; }
+            /* MAIN COMMAND CENTER GRID */
+            .command-grid { flex: 1; display: grid; grid-template-columns: 240px 1fr 380px; gap: 14px; padding: 14px; height: calc(100vh - 114px); overflow: hidden; }
 
-            .hud-grid { display: grid; grid-template-columns: 1fr 340px; width: 100%; height: 100%; }
-            @media (max-width: 900px) { .hud-grid { grid-template-columns: 1fr; } .hud-sidebar { display: none; } }
-
-            .hud-main { display: flex; flex-direction: column; height: 100%; border-right: 1px solid var(--border-neon); background: #070a10; }
-            #chat-container { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; scroll-behavior: smooth; }
+            /* LEFT SIDEBAR */
+            .sidebar-panel { background: var(--panel-bg); border: 1px solid var(--panel-border); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 16px; backdrop-filter: blur(10px); }
+            .nav-menu { display: flex; flex-direction: column; gap: 6px; }
+            .nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; color: var(--text-dim); text-decoration: none; cursor: pointer; transition: all 0.2s; }
+            .nav-item.active, .nav-item:hover { background: rgba(0, 240, 255, 0.08); color: var(--accent-cyan); border-left: 3px solid var(--accent-cyan); }
             
-            .msg { max-width: 80%; padding: 10px 14px; border-radius: 14px; font-size: 13px; line-height: 1.45; word-wrap: break-word; }
-            .msg.user { align-self: flex-end; background: linear-gradient(135deg, #1e40af, #2563eb); color: #fff; border-bottom-right-radius: 3px; }
-            .msg.peter { align-self: flex-start; background: var(--panel-bg); color: var(--text-main); border: 1px solid var(--border-neon); border-bottom-left-radius: 3px; }
+            .voice-widget { margin-top: auto; background: rgba(0, 240, 255, 0.03); border: 1px solid var(--panel-border); border-radius: 12px; padding: 16px; text-align: center; }
+            .mic-btn { width: 56px; height: 56px; border-radius: 50%; border: 2px solid var(--accent-cyan); background: rgba(0,240,255,0.1); color: var(--accent-cyan); font-size: 20px; display: flex; align-items: center; justify-content: center; margin: 10px auto; cursor: pointer; box-shadow: 0 0 20px rgba(0,240,255,0.2); transition: all 0.3s; }
+            .mic-btn:hover { transform: scale(1.05); box-shadow: 0 0 30px var(--accent-cyan); }
+
+            /* CENTER WORKSPACE */
+            .center-workspace { display: grid; grid-template-rows: 240px 1fr; gap: 14px; height: 100%; overflow: hidden; }
             
-            .tool-badge { font-size: 10px; font-family: monospace; color: var(--accent-cyan); background: rgba(0, 240, 255, 0.1); border: 1px solid var(--border-neon); padding: 2px 6px; border-radius: 4px; margin-bottom: 6px; display: inline-block; }
-            .media-box { margin-top: 8px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-neon); background: #000; width: 100%; max-width: 420px; }
-            .media-box iframe { width: 100%; height: 200px; border: none; }
-            .typing { font-style: italic; color: var(--accent-cyan); font-size: 11px; font-family: monospace; }
+            /* AI CORE SPHERE CONTAINER */
+            .core-visualizer { background: var(--panel-bg); border: 1px solid var(--panel-border); border-radius: 14px; position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+            #core-canvas { width: 100%; height: 100%; position: absolute; top:0; left:0; }
+            .core-overlay-text { position: relative; z-index: 2; text-align: center; pointer-events: none; }
+            .core-overlay-text h2 { font-size: 22px; font-weight: 900; letter-spacing: 4px; color: #fff; text-shadow: 0 0 16px var(--accent-cyan); }
+            .core-overlay-text p { font-size: 11px; font-family: monospace; color: var(--accent-cyan); letter-spacing: 2px; }
 
-            .chat-footer { padding: 12px 16px; border-top: 1px solid var(--border-neon); background: rgba(4, 7, 12, 0.98); }
-            form { display: flex; gap: 8px; }
-            input { flex: 1; padding: 10px 16px; background: rgba(15, 23, 42, 0.9); border: 1px solid var(--border-neon); border-radius: 20px; color: #fff; font-size: 13px; outline: none; }
-            input:focus { border-color: var(--accent-cyan); }
-            button.send-btn { padding: 10px 20px; background: var(--accent-cyan); color: #000; border: none; border-radius: 20px; font-weight: 700; font-size: 12px; cursor: pointer; }
+            /* LIVE INTELLIGENCE CHAT */
+            .feed-panel { background: var(--panel-bg); border: 1px solid var(--panel-border); border-radius: 14px; display: flex; flex-direction: column; overflow: hidden; }
+            .panel-header { padding: 12px 16px; border-bottom: 1px solid var(--panel-border); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--accent-cyan); display: flex; justify-content: space-between; align-items: center; }
+            
+            #chat-feed { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; scroll-behavior: smooth; }
+            .msg { max-width: 80%; padding: 10px 14px; border-radius: 12px; font-size: 13px; line-height: 1.5; word-wrap: break-word; }
+            .msg.user { align-self: flex-end; background: linear-gradient(135deg, #1d4ed8, #2563eb); color: #fff; border-bottom-right-radius: 2px; }
+            .msg.peter { align-self: flex-start; background: rgba(15, 25, 45, 0.9); border: 1px solid var(--panel-border); border-bottom-left-radius: 2px; }
+            
+            .tool-badge { font-size: 10px; font-family: monospace; color: var(--accent-cyan); background: rgba(0, 240, 255, 0.1); border: 1px solid var(--panel-border); padding: 2px 6px; border-radius: 4px; margin-bottom: 4px; display: inline-block; }
+            .media-box { margin-top: 8px; border-radius: 8px; overflow: hidden; border: 1px solid var(--panel-border); background: #000; width: 100%; max-width: 440px; }
+            .media-box iframe { width: 100%; height: 210px; border: none; }
 
-            .hud-sidebar { padding: 16px; background: var(--bg-core); display: flex; flex-direction: column; gap: 14px; overflow-y: auto; }
-            .card { background: var(--panel-bg); border: 1px solid var(--border-neon); border-radius: 10px; padding: 14px; }
-            .card-title { font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--accent-cyan); margin-bottom: 8px; display: flex; justify-content: space-between; }
-            .fact-item { font-size: 11px; color: var(--text-main); padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+            /* RIGHT SIDEBAR - MONITORS */
+            .right-sidebar { display: flex; flex-direction: column; gap: 14px; height: 100%; overflow-y: auto; }
+            .widget-card { background: var(--panel-bg); border: 1px solid var(--panel-border); border-radius: 14px; padding: 16px; backdrop-filter: blur(10px); }
+            
+            /* LLM MATRIX */
+            .llm-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 10px; }
+            .llm-box { background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; padding: 8px; font-size: 11px; }
+            .llm-box strong { display: block; color: #fff; font-size: 11px; margin-bottom: 2px; }
+            .llm-box span { font-size: 10px; color: var(--accent-cyan); font-family: monospace; }
 
-            /* NEXUS 3D */
-            .nexus-layout { display: grid; grid-template-columns: 1fr 360px; width: 100%; height: 100%; }
-            .nexus-canvas-container { position: relative; width: 100%; height: 100%; background: #05080e; }
-            #nexus-canvas { width: 100%; height: 100%; display: block; }
-            .nexus-filters { position: absolute; top: 16px; left: 16px; display: flex; gap: 8px; z-index: 10; }
-            .filter-btn { background: var(--panel-bg); border: 1px solid var(--border-neon); color: var(--text-main); padding: 6px 12px; border-radius: 8px; font-size: 11px; cursor: pointer; }
-            .filter-btn.active { background: var(--accent-cyan); color: #000; font-weight: 700; }
-            .nexus-sidebar { background: var(--panel-bg); border-left: 1px solid var(--border-neon); padding: 20px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; }
-            .contact-avatar { width: 64px; height: 64px; border-radius: 50%; background: #1e293b; border: 2px solid var(--accent-cyan); display: flex; align-items: center; justify-content: center; font-size: 24px; margin: 0 auto; }
+            /* NEXUS PREVIEW CANVAS */
+            #nexus-preview-canvas { width: 100%; height: 140px; background: rgba(0,0,0,0.3); border-radius: 8px; border: 1px solid var(--panel-border); margin-top: 8px; }
 
-            .settings-container { padding: 24px; max-width: 700px; margin: 0 auto; width: 100%; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
-            .setting-row { background: var(--panel-bg); border: 1px solid var(--border-neon); border-radius: 10px; padding: 16px; display: flex; justify-content: space-between; align-items: center; }
+            /* BOTTOM VOICE & COMMAND BAR */
+            .bottom-command-bar { height: 60px; border-top: 1px solid var(--panel-border); padding: 0 24px; display: flex; align-items: center; gap: 16px; background: rgba(3, 7, 18, 0.98); }
+            .cmd-input-container { flex: 1; display: flex; align-items: center; background: rgba(15, 25, 45, 0.8); border: 1px solid var(--panel-border); border-radius: 30px; padding: 4px 6px 4px 20px; box-shadow: 0 0 15px rgba(0,240,255,0.05); }
+            .cmd-input-container:focus-within { border-color: var(--accent-cyan); box-shadow: 0 0 20px rgba(0,240,255,0.2); }
+            .cmd-input { flex: 1; background: transparent; border: none; outline: none; color: #fff; font-size: 13px; }
+            .cmd-btn { padding: 10px 24px; background: var(--accent-cyan); color: #000; border: none; border-radius: 24px; font-weight: 800; font-size: 12px; cursor: pointer; letter-spacing: 1px; }
         </style>
     </head>
     <body>
+        <!-- TOP HUD -->
         <header>
-            <div class="brand">
-                <div class="brand-glow"></div>
-                <h1>PETER OS</h1>
+            <div class="header-brand">
+                <div class="logo-icon">P</div>
+                <div class="header-title">PETER COMMAND CENTER</div>
             </div>
             
-            <div class="nav-tabs">
-                <button class="tab-btn active" onclick="switchTab('chat')">⚡ JARVIS Core</button>
-                <button class="tab-btn" onclick="switchTab('vault')">🧠 Memoria Fatti</button>
-                <button class="tab-btn" onclick="switchTab('graph')">🕸️ Nexus 3D</button>
-                <button class="tab-btn" onclick="switchTab('settings')">⚙️ Impostazioni</button>
+            <div class="sys-status">
+                <div class="status-dot"></div>
+                SYSTEM STATUS: OPTIMAL
             </div>
+
+            <div id="live-clock" class="clock-display">00:00:00</div>
         </header>
 
-        <div class="main-container">
-            <div id="tab-chat" class="tab-content active">
-                <div class="hud-grid">
-                    <section class="hud-main">
-                        <div id="chat-container">
-                            <div class="msg peter">Sistemi operativi attivi con multi-modello Groq e web scraper. Di cosa ci occupiamo?</div>
-                        </div>
-                        <div class="chat-footer">
-                            <form id="chat-form">
-                                <input type="text" id="user-input" placeholder="Comanda a Peter, invia link o richiedi media..." autocomplete="off" required />
-                                <button type="submit" class="send-btn">ESEGUI</button>
-                            </form>
-                        </div>
-                    </section>
-
-                    <aside class="hud-sidebar">
-                        <div class="card">
-                            <div class="card-title">MEMORIA ATTIVA <span id="fact-count">0</span></div>
-                            <div id="facts-summary">Sincronizzazione dati...</div>
-                        </div>
-                    </aside>
+        <!-- MAIN LAYOUT -->
+        <div class="command-grid">
+            <!-- LEFT NAVIGATION & VOICE -->
+            <aside class="sidebar-panel">
+                <div class="nav-menu">
+                    <div class="nav-item active">🌐 Command Center</div>
+                    <div class="nav-item">🧠 AI Core & Memory</div>
+                    <div class="nav-item">🕸️ Nexus 3D Graph</div>
+                    <div class="nav-item">📲 Telegram Bot</div>
+                    <div class="nav-item">⚙️ System Settings</div>
                 </div>
-            </div>
 
-            <div id="tab-vault" class="tab-content">
-                <div style="padding: 20px; width: 100%; overflow-y: auto;">
-                    <h2 style="margin-bottom: 14px; font-size: 16px;">Archivio Memoria Concettuale (`user_facts`)</h2>
-                    <div id="vault-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px;"></div>
+                <div class="voice-widget">
+                    <div style="font-size: 11px; font-weight: 700; color: var(--accent-cyan); letter-spacing: 1px;">VOICE ENGINE</div>
+                    <div class="mic-btn" onclick="alert('Modalità Open-Mic in ascolto continuativo...')">🎙️</div>
+                    <div style="font-size: 10px; color: var(--text-dim);">Tap to Start Voice Chat</div>
                 </div>
-            </div>
+            </aside>
 
-            <div id="tab-graph" class="tab-content">
-                <div class="nexus-layout">
-                    <div class="nexus-canvas-container">
-                        <div class="nexus-filters">
-                            <button class="filter-btn active" onclick="filterNexus('all')">Tutti</button>
-                            <button class="filter-btn" onclick="filterNexus('famiglia')">Famiglia</button>
-                            <button class="filter-btn" onclick="filterNexus('amicizia')">Amicizia</button>
-                            <button class="filter-btn" onclick="filterNexus('lavoro')">Lavoro</button>
-                        </div>
-                        <canvas id="nexus-canvas"></canvas>
-                    </div>
-                    <aside class="nexus-sidebar">
-                        <div class="contact-avatar">👤</div>
-                        <div id="contact-details" style="text-align: center;">
-                            <h3 style="font-size: 16px; margin-bottom: 6px;">Seleziona un nodo</h3>
-                            <p style="font-size: 12px; color: var(--text-dim);">Clicca su una persona nella mappa 3D per visualizzare la scheda dettagliata e gli eventi correlati.</p>
-                        </div>
-                    </aside>
-                </div>
-            </div>
-
-            <div id="tab-settings" class="tab-content">
-                <div class="settings-container">
-                    <h2 style="font-size: 16px;">Impostazioni Sistema & Telegram</h2>
-                    <div class="setting-row">
-                        <div>
-                            <h3 style="font-size: 14px;">Telegram Bot Webhook</h3>
-                            <p style="font-size: 11px; color: var(--text-dim);">Connesso a @BotFather per la gestione mobile.</p>
-                        </div>
-                        <button class="send-btn" onclick="alert('Webhook attivo e registrato.')">Stato OK</button>
+            <!-- CENTER WORKSPACE -->
+            <main class="center-workspace">
+                <!-- 3D NEURAL SPHERE -->
+                <div class="core-visualizer">
+                    <canvas id="core-canvas"></canvas>
+                    <div class="core-overlay-text">
+                        <h2>PETER AI CORE</h2>
+                        <p>v3.0.0 // GROQ MULTI-MODEL AGENT</p>
                     </div>
                 </div>
-            </div>
+
+                <!-- LIVE FEED / CHAT -->
+                <section class="feed-panel">
+                    <div class="panel-header">
+                        <span>LIVE INTELLIGENCE CHAT FEED</span>
+                        <span style="font-size: 10px; color: var(--accent-green);">● INTERACTION READY</span>
+                    </div>
+                    <div id="chat-feed">
+                        <div class="msg peter">Sistemi di bordo operativi, Marco. Groq Multi-Model Agent pronto. Invia un comando o richiedi media.</div>
+                    </div>
+                </section>
+            </main>
+
+            <!-- RIGHT MONITORS -->
+            <aside class="right-sidebar">
+                <!-- LLMs MONITOR -->
+                <div class="widget-card">
+                    <div class="panel-header" style="padding: 0 0 10px 0; border: none;">LLM ARCHITECTURE STATUS</div>
+                    <div class="llm-grid">
+                        <div class="llm-box">
+                            <strong>Router (Model 1)</strong>
+                            <span>gpt-oss-20b</span>
+                        </div>
+                        <div class="llm-box">
+                            <strong>Core (Model 2)</strong>
+                            <span>gpt-oss-120b</span>
+                        </div>
+                        <div class="llm-box">
+                            <strong>Facts (Model 3)</strong>
+                            <span>qwen3.8-27b</span>
+                        </div>
+                        <div class="llm-box">
+                            <strong>Database</strong>
+                            <span>Supabase DB</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- MEMORY INSIGHTS & NEXUS PREVIEW -->
+                <div class="widget-card">
+                    <div class="panel-header" style="padding: 0 0 10px 0; border: none;">
+                        <span>NEXUS GRAPH & MEMORY</span>
+                        <span id="fact-count-badge" style="font-size: 10px; color: var(--accent-cyan);">0 Facts</span>
+                    </div>
+                    <div id="memory-facts-preview" style="font-size: 11px; color: var(--text-dim); max-height: 80px; overflow-y: auto;">
+                        Sincronizzazione archivio Supabase...
+                    </div>
+                    <canvas id="nexus-preview-canvas"></canvas>
+                </div>
+            </aside>
         </div>
 
+        <!-- BOTTOM VOICE & COMMAND BAR -->
+        <footer class="bottom-command-bar">
+            <div class="cmd-input-container">
+                <input type="text" id="cmd-input" class="cmd-input" placeholder="TALK TO PETER — Scrivi un comando, cerca sul web o richiedi musica/video..." autocomplete="off" />
+                <button type="button" id="send-cmd-btn" class="cmd-btn">EXECUTE</button>
+            </div>
+        </footer>
+
         <script>
-            function switchTab(tabId) {
-                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-                event.target.classList.add('active');
-                document.getElementById(`tab-${tabId}`).classList.add('active');
+            // Live Clock
+            setInterval(() => {
+                const now = new Date();
+                document.getElementById('live-clock').innerText = now.toTimeString().split(' ')[0];
+            }, 1000);
 
-                if(tabId === 'vault') loadVaultData();
-                if(tabId === 'graph') initNexus3D();
-            }
-
-            const form = document.getElementById('chat-form');
-            const input = document.getElementById('user-input');
-            const container = document.getElementById('chat-container');
-            const factsSummary = document.getElementById('facts-summary');
-            const factCount = document.getElementById('fact-count');
-
-            async function loadBrainSummary() {
-                try {
-                    const res = await fetch('/memories');
-                    const data = await res.json();
-                    if(data.connected && data.long_term_facts) {
-                        factCount.innerText = data.long_term_facts.length;
-                        factsSummary.innerHTML = data.long_term_facts.slice(0, 5).map(f => `
-                            <div class="fact-item">🧠 ${f.fact}</div>
-                        `).join('');
-                    }
-                } catch(e) {}
-            }
-
-            async function loadVaultData() {
-                const grid = document.getElementById('vault-grid');
-                try {
-                    const res = await fetch('/api/facts');
-                    const facts = await res.json();
-                    grid.innerHTML = facts.map(f => `
-                        <div style="background:var(--panel-bg); border:1px solid var(--border-neon); border-radius:8px; padding:12px;">
-                            <div style="font-size:12px;">${f.fact}</div>
-                            <button style="margin-top:8px; background:#ef444420; color:#ef4444; border:1px solid #ef444440; padding:3px 6px; border-radius:4px; cursor:pointer; font-size:10px;" onclick="deleteFact('${f.id}')">Elimina</button>
-                        </div>
-                    `).join('');
-                } catch(e) {}
-            }
-
-            async function deleteFact(id) {
-                await fetch(`/api/facts/${id}`, { method: 'DELETE' });
-                loadVaultData();
-                loadBrainSummary();
-            }
-
-            let nexusNodes = [
-                { id: 1, name: 'Marco', category: 'self', x: 0, y: 0, z: 0, notes: 'Tu (Admin del sistema OS)', events: ['Creatore di Peter OS'] },
-                { id: 2, name: 'Giulio (Salmez)', category: 'amicizia', x: 120, y: -60, z: 20, notes: 'Amico stretto', events: ['Sessioni di studio'] },
-                { id: 3, name: 'Padre', category: 'famiglia', x: -140, y: 80, z: -40, notes: 'Viaggio a Cracovia', events: ['Compleanno ad agosto'] }
-            ];
-
-            function initNexus3D() {
-                const canvas = document.getElementById('nexus-canvas');
+            // 3D Wireframe Neural Core Animation
+            (function initCore3D() {
+                const canvas = document.getElementById('core-canvas');
                 const ctx = canvas.getContext('2d');
-                canvas.width = canvas.parentElement.clientWidth;
-                canvas.height = canvas.parentElement.clientHeight;
+                let width = canvas.width = canvas.parentElement.clientWidth;
+                let height = canvas.height = canvas.parentElement.clientHeight;
 
-                let angle = 0;
+                let points = [];
+                const numPoints = 60;
+                const radius = 80;
 
-                function render() {
-                    ctx.clearRect(0, 0, canvas.width, canvas.height);
-                    const cx = canvas.width / 2;
-                    const cy = canvas.height / 2;
-
-                    ctx.strokeStyle = 'rgba(0, 240, 255, 0.15)';
-                    ctx.lineWidth = 1.5;
-                    nexusNodes.forEach(n => {
-                        if(n.category !== 'self') {
-                            let cosA = Math.cos(angle), sinA = Math.sin(angle);
-                            let x1 = cx + (nexusNodes[0].x * cosA - nexusNodes[0].z * sinA);
-                            let y1 = cy + nexusNodes[0].y;
-                            let x2 = cx + (n.x * cosA - n.z * sinA);
-                            let y2 = cy + n.y;
-
-                            ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
-                        }
+                for (let i = 0; i < numPoints; i++) {
+                    let theta = Math.acos(2 * Math.random() - 1);
+                    let phi = 2 * Math.PI * Math.random();
+                    points.push({
+                        x: radius * Math.sin(theta) * Math.cos(phi),
+                        y: radius * Math.sin(theta) * Math.sin(phi),
+                        z: radius * Math.cos(theta)
                     });
+                }
 
-                    nexusNodes.forEach(n => {
-                        let cosA = Math.cos(angle), sinA = Math.sin(angle);
-                        let rotX = n.x * cosA - n.z * sinA;
-                        let rotZ = n.x * sinA + n.z * cosA;
-                        let scale = 300 / (300 + rotZ);
+                let angleX = 0.005;
+                let angleY = 0.008;
 
-                        let px = cx + rotX * scale;
-                        let py = cy + n.y * scale;
+                function animate() {
+                    ctx.clearRect(0, 0, width, height);
+                    let cx = width / 2;
+                    let cy = height / 2;
 
-                        n._renderX = px; n._renderY = py; n._scale = scale;
+                    points.forEach(p => {
+                        let x1 = p.x * Math.cos(angleY) - p.z * Math.sin(angleY);
+                        let z1 = p.x * Math.sin(angleY) + p.z * Math.cos(angleY);
+
+                        let y2 = p.y * Math.cos(angleX) - z1 * Math.sin(angleX);
+                        let z2 = p.y * Math.sin(angleX) + z1 * Math.cos(angleX);
+
+                        p.x = x1; p.y = y2; p.z = z2;
+
+                        let scale = 250 / (250 + p.z);
+                        let px = cx + p.x * scale;
+                        let py = cy + p.y * scale;
 
                         ctx.beginPath();
-                        ctx.arc(px, py, (n.category === 'self' ? 18 : 12) * scale, 0, Math.PI * 2);
-                        ctx.fillStyle = n.category === 'self' ? '#00f0ff' : (n.category === 'famiglia' ? '#ec4899' : '#3b82f6');
+                        ctx.arc(px, py, 2 * scale, 0, Math.PI * 2);
+                        ctx.fillStyle = '#00f0ff';
                         ctx.fill();
-                        ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke();
-
-                        ctx.fillStyle = '#ffffff';
-                        ctx.font = `${Math.max(10, 12 * scale)}px sans-serif`;
-                        ctx.fillText(n.name, px + 15, py + 4);
                     });
 
-                    angle += 0.003;
-                    requestAnimationFrame(render);
+                    requestAnimationFrame(animate);
                 }
-                render();
+                animate();
+            })();
 
-                canvas.onclick = (e) => {
-                    const rect = canvas.getBoundingClientRect();
-                    const mx = e.clientX - rect.left;
-                    const my = e.clientY - rect.top;
+            // Chat Feed Logic
+            const input = document.getElementById('cmd-input');
+            const btn = document.getElementById('send-cmd-btn');
+            const feed = document.getElementById('chat-feed');
 
-                    nexusNodes.forEach(n => {
-                        let dist = Math.hypot(mx - n._renderX, my - n._renderY);
-                        if(dist < 20 * n._scale) {
-                            showContactCard(n);
-                        }
-                    });
-                };
-            }
-
-            function showContactCard(node) {
-                document.getElementById('contact-details').innerHTML = `
-                    <h3 style="font-size: 18px; color: var(--accent-cyan); margin-bottom: 8px;">${node.name}</h3>
-                    <p style="font-size: 12px; background: rgba(0,240,255,0.1); padding: 4px 8px; border-radius: 4px; display:inline-block; margin-bottom: 10px;">Livello: ${node.category.toUpperCase()}</p>
-                    <p style="font-size: 13px; color: var(--text-main); margin-bottom: 10px;"><strong>Note:</strong> ${node.notes}</p>
-                    <p style="font-size: 13px; color: var(--text-dim);"><strong>Eventi associati:</strong><br>${node.events.join('<br>')}</p>
-                `;
-            }
-
-            function filterNexus(cat) {
-                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-                event.target.classList.add('active');
-            }
-
-            form.addEventListener('submit', async (e) => {
-                e.preventDefault();
+            async function sendMessage() {
                 const text = input.value.trim();
                 if(!text) return;
 
-                appendMessage(text, 'user');
+                appendMsg(text, 'user');
                 input.value = '';
-
-                const typingDiv = document.createElement('div');
-                typingDiv.className = 'typing';
-                typingDiv.innerText = '> MULTI_MODEL_PROCESSING...';
-                container.appendChild(typingDiv);
-                container.scrollTop = container.scrollHeight;
 
                 try {
                     const res = await fetch('/chat', {
@@ -312,35 +271,43 @@ def get_dashboard_html() -> str:
                         body: JSON.stringify({ message: text })
                     });
                     const data = await res.json();
-                    container.removeChild(typingDiv);
                     if(data.reply) {
-                        appendMessage(data.reply, 'peter', data.query_used, data.media);
-                        setTimeout(loadBrainSummary, 1200);
+                        appendMsg(data.reply, 'peter', data.query_used, data.media);
+                        loadBrainSummary();
                     }
-                } catch(err) {
-                    container.removeChild(typingDiv);
-                    appendMessage('Errore di connessione al server.', 'peter');
+                } catch(e) {
+                    appendMsg("Errore di comunicazione col server.", "peter");
                 }
-            });
+            }
 
-            function appendMessage(text, sender, toolUsed = null, media = null) {
+            btn.onclick = sendMessage;
+            input.onkeypress = (e) => { if(e.key === 'Enter') sendMessage(); };
+
+            function appendMsg(text, sender, toolUsed=null, media=null) {
                 const div = document.createElement('div');
                 div.className = `msg ${sender}`;
                 let html = '';
-                if(toolUsed) {
-                    html += `<div class="tool-badge">⚡ ${toolUsed}</div><br>`;
-                }
+                if(toolUsed) html += `<div class="tool-badge">⚡ ${toolUsed}</div><br>`;
                 html += text;
-
                 if(media && media.embed_url) {
                     html += `<div class="media-box"><iframe src="${media.embed_url}" allow="autoplay; encrypted-media" allowfullscreen></iframe></div>`;
                 }
-
                 div.innerHTML = html;
-                container.appendChild(div);
-                container.scrollTop = container.scrollHeight;
+                feed.appendChild(div);
+                feed.scrollTop = feed.scrollHeight;
             }
 
+            // Sync Facts & Nexus
+            async function loadBrainSummary() {
+                try {
+                    const res = await fetch('/memories');
+                    const data = await res.json();
+                    if(data.connected && data.long_term_facts) {
+                        document.getElementById('fact-count-badge').innerText = `${data.long_term_facts.length} Facts`;
+                        document.getElementById('memory-facts-preview').innerHTML = data.long_term_facts.slice(0, 3).map(f => `<div>🧠 ${f.fact}</div>`).join('');
+                    }
+                } catch(e){}
+            }
             loadBrainSummary();
         </script>
     </body>
