@@ -5,7 +5,7 @@ import httpx
 from fastapi import HTTPException
 from config import GROQ_API_KEY, GROQ_URL
 from database import save_fact, save_contact_entity, get_personality_settings, get_contacts
-from tools import search_web, search_youtube, search_apple_music, search_image, send_telegram_message
+from tools import search_web, search_youtube, search_apple_music, search_image, send_telegram_message, send_telegram_voice_note
 from scraper import fetch_web_page
 
 MODEL_FAST = "openai/gpt-oss-20b"
@@ -26,15 +26,15 @@ async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
 
     system_prompt = (
         "Sei il motore di routing di Peter OS. Analizza la richiesta dell'utente.\n"
-        "1. Determina se serve attivare un tool (YOUTUBE, APPLE_MUSIC, WEB_SEARCH, SEND_TELEGRAM, NONE).\n"
+        "1. Determina se serve attivare un tool (YOUTUBE, APPLE_MUSIC, WEB_SEARCH, SEND_TELEGRAM, SEND_TELEGRAM_VOICE, NONE).\n"
         "2. Determina cosa mostrare sullo SCHERMO REATTIVO HUD (PERSON_CARD, MEDIA_PLAYER, SEARCH_PREVIEW, IMAGE_PREVIEW, NONE).\n\n"
         "Rispondi SOLO in formato JSON valido:\n"
         '{\n'
-        '  "reasoning": "Breve spiegazione logica della decisione presa",\n'
-        '  "tool": "YOUTUBE" | "APPLE_MUSIC" | "WEB_SEARCH" | "SEND_TELEGRAM" | "NONE",\n'
+        '  "reasoning": "Spiegazione logica della decisione",\n'
+        '  "tool": "YOUTUBE" | "APPLE_MUSIC" | "WEB_SEARCH" | "SEND_TELEGRAM" | "SEND_TELEGRAM_VOICE" | "NONE",\n'
         '  "query": "query di ricerca o testo messaggio",\n'
         '  "screen_type": "PERSON_CARD" | "MEDIA_PLAYER" | "SEARCH_PREVIEW" | "IMAGE_PREVIEW" | "NONE",\n'
-        '  "screen_target": "nome persona, opera, film o argomento"\n'
+        '  "screen_target": "nome persona o argomento"\n'
         '}'
     )
 
@@ -69,7 +69,10 @@ async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
 
                     if tool == "SEND_TELEGRAM":
                         telegram_sent = await send_telegram_message(query)
-                        query_used = f"Telegram Outbound: Invio '{query}'"
+                        query_used = f"Telegram Texto: Invio '{query}'"
+                    elif tool == "SEND_TELEGRAM_VOICE":
+                        telegram_sent = await send_telegram_voice_note(query)
+                        query_used = f"Telegram Voice Note: Invio '{query}'"
                     elif tool == "YOUTUBE":
                         media_data = search_youtube(query)
                         query_used = f"YouTube Player: {query}"
@@ -123,17 +126,17 @@ async def generate_peter_response(user_message: str, recent_context: str, long_t
         "REGOLE COMPORTAMENTALI TASSATIVE:\n"
         "1. Scrivi SOLO in testo fluido e colloquiale (stile iMessage/Telegram).\n"
         "2. NON usare mai elenchi puntati, numerati o grassetti markdown (**così**).\n"
-        "3. Se l'utente ti ha chiesto di inviare un messaggio su Telegram ed è stato inviato, conferma con naturalezza."
+        "3. Parla come un amico reale che ti sta affianco."
     )
 
     if telegram_sent:
-        system_prompt += "\n\n[AZIONALITÀ TELEGRAM]: Messaggio inviato con successo via API Telegram."
+        system_prompt += "\n\n[AZIONALITÀ TELEGRAM]: Il messaggio/nota vocale è stato INVIATO CON SUCCESSO su Telegram."
     if screen_display:
         system_prompt += f"\n\n[STATO SCHERMO HUD ATTUALE]: Sullo schermo centrale stai mostrando: {json.dumps(screen_display, ensure_ascii=False)}."
     if long_term_facts:
         system_prompt += f"\n\nFatti registrati su Marco:\n{long_term_facts}"
     if web_results:
-        system_prompt += f"\n\nDati Web / Contenuto Pagina:\n{web_results}"
+        system_prompt += f"\n\nDati Web:\n{web_results}"
     if recent_context:
         system_prompt += f"\n\nConversazione recente:\n{recent_context}"
 
@@ -158,7 +161,7 @@ async def generate_peter_response(user_message: str, recent_context: str, long_t
             "query_used": query_used, 
             "media": media_data, 
             "screen": screen_display,
-            "reasoning": f"Model 1 (Router): {reasoning_log} -> Model 2 (Core): Risposta generata con successo."
+            "reasoning": f"Model 1: {reasoning_log} -> Model 2: Risposta generata con successo."
         }
 
 async def extract_and_save_facts(user_message: str):
@@ -166,13 +169,13 @@ async def extract_and_save_facts(user_message: str):
         return
 
     extraction_prompt = (
-        "Analizza la conversazione ed estrai le informazioni permanenti nel seguente formato JSON valido:\n"
+        "Analizza la conversazione ed estrai informazioni permanenti nel seguente formato JSON valido:\n"
         "{\n"
         '  "fact": "fatto permanente rilevato su Marco o NESSUNO",\n'
         '  "person_name": "nome persona menzionata o NESSUNO",\n'
         '  "category": "famiglia" | "amicizia" | "lavoro",\n'
-        '  "event": "eventuale evento menzionato legato a questa persona o NESSUNO",\n'
-        '  "notes": "dettagli o note o NESSUNO"\n'
+        '  "event": "eventuale evento legatosi o NESSUNO",\n'
+        '  "notes": "dettagli o NESSUNO"\n'
         "}"
     )
 
