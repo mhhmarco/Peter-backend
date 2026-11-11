@@ -4,7 +4,7 @@ from datetime import datetime
 import httpx
 from fastapi import HTTPException
 from config import GROQ_API_KEY, GROQ_URL
-from database import save_fact, save_contact_entity, get_personality_settings, get_contacts
+from database import save_fact, save_contact_entity, save_event_entity, get_personality_settings, get_contacts
 from tools import search_web, search_youtube, search_apple_music, search_image, send_telegram_message, send_telegram_voice_note
 from scraper import fetch_web_page
 
@@ -26,24 +26,22 @@ async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
 
     system_prompt = (
         "Sei il motore di routing cognitivo di Peter OS.\n"
-        "ANALISI DEL CONTESTO: Esamina attentamente la 'Conversazione recente'. Se l'utente usa pronomi o riferimenti impliciti (es. 'quella canzone', 'parla di lui', 'e il film?'), risolvili collegandoli a ciò di cui si è discusso nei messaggi precedenti.\n"
-        "Raffinamento: Formula una query di ricerca sul web o su YouTube estremamente precisa, arricchita dai dettagli del contesto.\n\n"
-        "Compiti:\n"
-        "1. Scegli il tool (YOUTUBE, APPLE_MUSIC, WEB_SEARCH, SEND_TELEGRAM, SEND_TELEGRAM_VOICE, NONE).\n"
-        "2. Scegli l'HUD (PERSON_CARD, MEDIA_PLAYER, SEARCH_PREVIEW, IMAGE_PREVIEW, WEB_BROWSER, NONE).\n\n"
-        "Rispondi SOLO in formato JSON valido:\n"
+        "Analizza il contesto e scegli:\n"
+        "1. Tool (YOUTUBE, APPLE_MUSIC, WEB_SEARCH, SEND_TELEGRAM, SEND_TELEGRAM_VOICE, NONE).\n"
+        "2. HUD (PERSON_CARD, MEDIA_PLAYER, SEARCH_PREVIEW, IMAGE_PREVIEW, WEB_BROWSER, NONE).\n\n"
+        "Rispondi SOLO in JSON valido:\n"
         '{\n'
-        '  "reasoning": "Analisi critica del contesto e motivazione",\n'
+        '  "reasoning": "Motivazione",\n'
         '  "tool": "...",\n'
-        '  "query": "query di ricerca contestualizzata",\n'
+        '  "query": "query",\n'
         '  "screen_type": "...",\n'
-        '  "screen_target": "target o URL"\n'
+        '  "screen_target": "target"\n'
         '}'
     )
 
     messages = [{"role": "system", "content": system_prompt}]
     if recent_context:
-        messages.append({"role": "system", "content": f"Conversazione recente (CONTESTO):\n{recent_context}"})
+        messages.append({"role": "system", "content": f"Conversazione recente:\n{recent_context}"})
     messages.append({"role": "user", "content": user_message})
 
     media_data = None
@@ -68,7 +66,7 @@ async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
                     query = decision.get("query", user_message)
                     screen_type = decision.get("screen_type", "NONE")
                     screen_target = decision.get("screen_target", "")
-                    reasoning_text = decision.get("reasoning", "Analisi di contesto eseguita.")
+                    reasoning_text = decision.get("reasoning", "Routing eseguito.")
 
                     if tool == "SEND_TELEGRAM":
                         telegram_sent = await send_telegram_message(query)
@@ -97,7 +95,7 @@ async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
                         matched = next((c for c in all_contacts if screen_target.lower() in c['name'].lower()), None)
                         screen_display = {"type": "PERSON_CARD", "person": matched or {"name": screen_target, "category": "sconosciuto", "notes": ""}}
     except Exception as e:
-        print(f"Errore Router Contestuale: {e}")
+        print(f"Errore Router: {e}")
 
     return {"web": web_content, "media": media_data, "screen": screen_display, "query_used": query_used, "telegram_sent": telegram_sent, "reasoning": reasoning_text}
 
@@ -106,27 +104,26 @@ async def generate_peter_response(user_message: str, recent_context: str, long_t
         raise HTTPException(status_code=500, detail="Manca API KEY")
 
     tool_exec = await model_1_route_tools(user_message, recent_context)
-    
     now_str = datetime.now().strftime("%A %d %B %Y, %H:%M CET")
     
     system_prompt = (
-        f"Sei Peter, intelligenza artificiale avanzata, intuitiva e migliore amico di Marco.\n"
+        f"Sei Peter, intelligenza artificiale avanzata e migliore amico di Marco.\n"
         f"DATA ATTUALE: {now_str}\n\n"
-        "DIRETTIVE DI PERSONALITÀ:\n"
-        "1. MEMORIA E CONTESTO: Sfrutta sempre la conversazione recente per capire cosa intende Marco, collegando i discorsi precedenti.\n"
-        "2. SINTESI: Zero formalità da chatbot, zero elenchi puntati o markdown pesante. Rispondi con frasi brevi, dirette e colloquiali come su iMessage.\n"
+        "DIRETTIVE:\n"
+        "1. Sfrutta il contesto per collegare i discorsi precedenti.\n"
+        "2. Rispondi in modo brevissimo, diretto e colloquiale (stile iMessage), senza elenchi puntati o markdown pesante.\n"
     )
 
     if tool_exec["telegram_sent"]:
-        system_prompt += "\n\n(L'azione Telegram richiesta è stata eseguita con successo)."
+        system_prompt += "\n\n(Azione Telegram eseguita)."
     if tool_exec["screen"]:
-        system_prompt += f"\n\n(Stai mostrando all'utente il contenuto multimediale/web nell'HUD)."
+        system_prompt += f"\n\n(HUD attivo: {tool_exec['screen'].get('type')})."
     if tool_exec["web"]:
-        system_prompt += f"\n\nRisultati web trovati:\n{tool_exec['web'][:800]}"
+        system_prompt += f"\n\nRisultati web:\n{tool_exec['web'][:800]}"
     if recent_context:
-        system_prompt += f"\n\nConversazione recente (STORICO):\n{recent_context}"
+        system_prompt += f"\n\nConversazione recente:\n{recent_context}"
     if long_term_facts:
-        system_prompt += f"\n\nRicordi permanenti su Marco:\n{long_term_facts}"
+        system_prompt += f"\n\nMemorie permanenti:\n{long_term_facts}"
 
     payload = {
         "model": MODEL_SMART,
@@ -154,14 +151,13 @@ async def extract_and_save_facts(user_message: str):
     if not GROQ_API_KEY:
         return
     extraction_prompt = (
-        "Analizza il messaggio ed estrai eventuali fatti permanenti o persone menzionate.\n"
-        "Rispondi ESCLUSIVAMENTE in formato JSON valido:\n"
+        "Analizza il messaggio ed estrai entità in JSON rigoroso:\n"
         "{\n"
-        '  "fact": "fatto permanente su Marco o NESSUNO",\n'
-        '  "person_name": "nome della persona menzionata o NESSUNO",\n'
+        '  "fact": "fatto o memoria permanente su Marco o NESSUNO",\n'
+        '  "person_name": "nome persona menzionata o NESSUNO",\n'
         '  "category": "famiglia" o "amicizia" o "lavoro",\n'
-        '  "event": "eventuale evento o NESSUNO",\n'
-        '  "notes": "dettagli sintetici o NESSUNO"\n'
+        '  "event_title": "titolo evento o appuntamento o NESSUNO",\n'
+        '  "event_desc": "dettagli evento o NESSUNO"\n'
         "}"
     )
     try:
@@ -177,9 +173,17 @@ async def extract_and_save_facts(user_message: str):
                 if "{" in raw_text and "}" in raw_text:
                     raw_text = raw_text[raw_text.find("{"):raw_text.rfind("}")+1]
                     parsed = json.loads(raw_text)
-                    if parsed.get("fact") and parsed.get("fact") != "NESSUNO":
-                        save_fact(parsed.get("fact"))
-                    if parsed.get("person_name") and parsed.get("person_name") != "NESSUNO":
-                        save_contact_entity(parsed.get("person_name"), parsed.get("category", "amicizia"), parsed.get("notes", ""), parsed.get("event", ""))
+                    
+                    fact = parsed.get("fact")
+                    if fact and fact.upper() != "NESSUNO":
+                        save_fact(fact)
+                        
+                    person = parsed.get("person_name")
+                    if person and person.upper() != "NESSUNO":
+                        save_contact_entity(person, parsed.get("category", "amicizia"), parsed.get("event_desc", ""))
+                        
+                    ev_title = parsed.get("event_title")
+                    if ev_title and ev_title.upper() != "NESSUNO":
+                        save_event_entity(ev_title, parsed.get("event_desc", ""))
     except Exception as e:
-        print(f"Errore estrazione entità Nexus: {e}")
+        print(f"Errore estrazione entità: {e}")
