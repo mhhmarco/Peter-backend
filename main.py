@@ -6,17 +6,15 @@ from supabase import create_client, Client
 
 app = FastAPI()
 
-# Variabili d'ambiente con pulizia di spazi e virgolette
-SUPABASE_URL = os.getenv("SUPABASE_URL", "").strip('"\' ')
-SUPABASE_KEY = os.getenv("SUPABASE_KEY", "").strip('"\' ')
-FREELLM_API_KEY = os.getenv("FREELLM_API_KEY", "").strip('"\' ')
+# Variabili d'ambiente
+SUPABASE_URL = os.getenv("SUPABASE_URL", "").strip('"\'' )
+SUPABASE_KEY = os.getenv("SUPABASE_KEY", "").strip('"\'' )
+GROQ_API_KEY = os.getenv("FREELLM_API_KEY", "").strip('"\'' )
 
-# URL Groq predefinito pulito
-FREELLM_URL = os.getenv("FREELLM_URL", "https://api.groq.com/openai/v1/chat/completions").strip('"\' ')
-if not FREELLM_URL:
-    FREELLM_URL = "https://api.groq.com/openai/v1/chat/completions"
+# Endpoint Groq fisso
+GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 
-# Supabase Client
+# Inizializzazione Supabase
 supabase: Client = None
 if SUPABASE_URL and SUPABASE_KEY:
     try:
@@ -49,15 +47,16 @@ async def chat_with_peter(req: ChatRequest):
         ]
     }
     
-    headers = {"Content-Type": "application/json"}
-    if FREELLM_API_KEY:
-        headers["Authorization"] = f"Bearer {FREELLM_API_KEY}"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {GROQ_API_KEY}"
+    }
 
     async with httpx.AsyncClient(timeout=30.0) as client:
         try:
-            res = await client.post(FREELLM_URL, json=payload, headers=headers)
+            res = await client.post(GROQ_URL, json=payload, headers=headers)
             res.raise_for_status()
             data = res.json()
             return {"reply": data["choices"][0]["message"]["content"]}
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Errore generazione: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Errore chiamata Groq: {str(e)}")
