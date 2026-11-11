@@ -1,26 +1,29 @@
-# llm.py
 import json
 import re
 import httpx
 from fastapi import HTTPException
 from config import GROQ_API_KEY, GROQ_URL
-from database import save_fact
+from database import (
+    save_fact_deduplicated, 
+    add_or_update_node, 
+    save_diary_entry, 
+    get_recent_memories
+)
 from tools import search_web, search_youtube, search_apple_music
 
 MODEL_FAST = "openai/gpt-oss-20b"        # Model 1: Router & Tool Dispatcher
 MODEL_SMART = "openai/gpt-oss-120b"      # Model 2: Conversational Core Empatico
-MODEL_FACT = "qwen/qwen3.8-27b"          # Model 3: Background Fact Extraction
+MODEL_FACT = "qwen/qwen3.8-27b"          # Model 3: Background Fact & Graph Processor
 
 def clean_json_response(raw_text: str) -> dict:
-    """Estrae e parsing del JSON anche se racchiuso in fenced code blocks markdown."""
+    """Estrae e analizza l'output JSON rimuovendo eventuale sintassi markdown."""
     try:
-        # Cerca il blocco JSON principale
         match = re.search(r'\{.*\}', raw_text, re.DOTALL)
         if match:
             return json.loads(match.group(0))
     except Exception as e:
         print(f"Errore parsing JSON: {e}")
-    return {"tool": "NONE", "query": ""}
+    return {}
 
 async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
     """MODEL 1 (Fast Router): Rileva l'intento ed esegue l'attivazione dei Tool."""
@@ -34,8 +37,8 @@ async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
         "- APPLE_MUSIC: per brani o album su Apple Music.\n"
         "- WEB_SEARCH: per dati in tempo reale, notizie, informazioni aggiornate.\n"
         "- NONE: conversazione normale.\n\n"
-        "Rispondi SCRIVENDO SOLO ED ESCLUSIVAMENTE IL SEGUENTE JSON VALIDO SENZA TESTO EXTRA:\n"
-        '{"tool": "YOUTUBE" | "APPLE_MUSIC" | "WEB_SEARCH" | "NONE", "query": "query di ricerca sintetica"}'
+        "Rispondi SCRIVENDO SOLO ED ESCLUSIVAMENTE IL SEGUENTE JSON VALIDO:\n"
+        '{"tool": "YOUTUBE" | "APPLE_MUSIC" | "WEB_SEARCH" | "NONE", "query": "query sintetica"}'
     )
 
     messages = [{"role": "system", "content": system_prompt}]
@@ -49,11 +52,7 @@ async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
         async with httpx.AsyncClient(timeout=6.0) as client:
             res = await client.post(
                 GROQ_URL,
-                json={
-                    "model": MODEL_FAST,
-                    "messages": messages,
-                    "temperature": 0.0
-                },
+                json={"model": MODEL_FAST, "messages": messages, "temperature": 0.0},
                 headers={"Content-Type": "application/json", "Authorization": f"Bearer {GROQ_API_KEY}"}
             )
 
@@ -93,7 +92,7 @@ async def generate_peter_response(user_message: str, recent_context: str, long_t
         "REGOLE COMPORTAMENTALI:\n"
         "1. Scrivi in testo fluido e naturale (stile iMessage/Telegram).\n"
         "2. Evita elenchi puntati forzati o formattazioni pesanti.\n"
-        "3. Se è stato caricato un contenuto multimediale (video/musica), integralo o menzionalo con naturalezza."
+        "3. Se l'utente richiede un media, integralo con naturalezza nella risposta."
     )
 
     if long_term_facts:
@@ -111,25 +110,26 @@ async def generate_peter_response(user_message: str, recent_context: str, long_t
         ]
     }
 
-    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {GROQ_API_KEY}"}
-
     async with httpx.AsyncClient(timeout=30.0) as client:
-        res = await client.post(GROQ_URL, json=payload, headers=headers)
+        res = await client.post(GROQ_URL, json=payload, headers={"Content-Type": "application/json", "Authorization": f"Bearer {GROQ_API_KEY}"})
         if res.status_code != 200:
             raise HTTPException(status_code=500, detail=f"Errore Groq: {res.text}")
         reply = res.json()["choices"][0]["message"]["content"]
 
         return {"reply": reply, "query_used": query_used, "media": media_data}
 
-async def extract_and_save_facts(user_message: str):
-    """MODEL 3 (Background Fact Processor): Estrazione asincrona fatti permanenti."""
+async def process_background_memory(user_message: str):
+    """MODEL 3 (Fact & Graph Extraction): Analizza asincronamente fatti ed entità dal messaggio."""
     if not GROQ_API_KEY:
         return
 
     extraction_prompt = (
-        "Analizza il messaggio dell'utente. Se contiene un fatto permanente su di lui "
-        "(progetti, preferenze, persone, abitudini, competenze), estrai SOLO quel fatto in una frase sintetica in italiano.\n"
-        "Altrimenti rispondi SOLO 'NESSUNO'."
+        "Analizza il messaggio dell'utente ed estrai informazioni rilevanti in formato JSON:\n"
+        "1. 'fact': un fatto permanente su Marco (preferenze, progetti, abitudini). Ritorna null se assente.\n"
+        "2. 'entity': un nome di persona, luogo o progetto menzionato da aggiungere al grafo. Ritorna null se assente.\n"
+        "3. 'category': categoria dell'entità ('Famiglia', 'Amicizia', 'Lavoro', 'Progetto').\n\n"
+        "Rispondi ESCLUSIVAMENTE con questo formato JSON:\n"
+        '{"fact": "stringa o null", "entity": "stringa o null", "category": "stringa"}'
     )
 
     try:
@@ -148,8 +148,53 @@ async def extract_and_save_facts(user_message: str):
             )
 
             if res.status_code == 200:
-                extracted = res.json()["choices"][0]["message"]["content"].strip()
-                if extracted and extracted.upper() != "NESSUNO" and len(extracted) > 5:
-                    save_fact(extracted)
+                raw_text = res.json()["choices"][0]["message"]["content"].strip()
+                data = clean_json_response(raw_text)
+
+                fact = data.get("fact")
+                entity = data.get("entity")
+                category = data.get("category", "Amicizia")
+
+                if fact and len(fact) > 5 and str(fact).lower() != "null":
+                    save_fact_deduplicated(fact)
+
+                if entity and len(entity) > 2 and str(entity).lower() != "null":
+                    add_or_update_node(entity, category=category)
+
     except Exception as e:
-        print(f"Errore Model 3 Fact Extraction ({MODEL_FACT}): {e}")
+        print(f"Errore Background Processing ({MODEL_FACT}): {e}")
+
+async def generate_daily_reflection():
+    """MODEL 3: Sintetizza la memoria recente per registrare una voce di diario."""
+    if not GROQ_API_KEY:
+        return None
+
+    recent_memories = get_recent_memories(limit=20)
+    if not recent_memories:
+        return None
+
+    prompt = (
+        "Sei Peter. Leggi le ultime conversazioni della giornata e scrivi un breve diario riflessivo "
+        "della giornata di Marco e delle vostre interazioni. Usa un tono personale, empatico e sintetico."
+    )
+
+    try:
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            res = await client.post(
+                GROQ_URL,
+                json={
+                    "model": MODEL_FACT,
+                    "messages": [
+                        {"role": "system", "content": prompt},
+                        {"role": "user", "content": f"Memorie del giorno:\n{recent_memories}"}
+                    ]
+                },
+                headers={"Content-Type": "application/json", "Authorization": f"Bearer {GROQ_API_KEY}"}
+            )
+            if res.status_code == 200:
+                entry = res.json()["choices"][0]["message"]["content"]
+                save_diary_entry(entry, mood_summary="Riflessione automatica")
+                return entry
+    except Exception as e:
+        print(f"Errore generazione diario: {e}")
+    return None
