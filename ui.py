@@ -5,7 +5,7 @@ def get_dashboard_html() -> str:
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>PETER HUD OS v7.0</title>
+        <title>PETER HUD OS v7.1</title>
         <style>
             :root {
                 --bg-main: #060913;
@@ -40,7 +40,7 @@ def get_dashboard_html() -> str:
             #peter-avatar-canvas { width: 140px; height: 140px; border-radius: 50%; cursor: pointer; }
             .avatar-status-tag { font-size: 9px; font-family: monospace; letter-spacing: 1.5px; color: var(--accent-cyan); background: rgba(0,240,255,0.1); padding: 3px 10px; border-radius: 12px; border: 1px solid rgba(0,240,255,0.3); }
 
-            .center-workspace { display: grid; grid-template-rows: 290px 1fr; gap: 16px; height: 100%; overflow: hidden; }
+            .center-workspace { display: grid; grid-template-rows: 320px 1fr; gap: 16px; height: 100%; overflow: hidden; }
             .view-tab { display: none; height: 100%; width: 100%; }
             .view-tab.active { display: flex; }
 
@@ -133,7 +133,7 @@ def get_dashboard_html() -> str:
                             <span style="font-size: 10px; color: var(--accent-green);">● VOICE & CHAT ENABLED</span>
                         </div>
                         <div id="chat-feed">
-                            <div class="msg peter">Ciao Marco! Ho aggiornato il mio avatar visivo e attivato la sintesi vocale ad alta definizione. Ora posso parlare, ascoltare e mandare messaggi su Telegram!</div>
+                            <div class="msg peter">Ciao Marco! Ho aggiornato il mio player multimediale: ora rispetta le proporzioni 16:9 dei video ed integra i permessi completi per bypassare i blocchi degli embed!</div>
                         </div>
                     </section>
                 </div>
@@ -282,6 +282,7 @@ def get_dashboard_html() -> str:
                 } catch(e) { currentAvatarState = 'IDLE'; }
             }
 
+            // GESTIONE DELLA SCHERMATA CENTRALE (PLAYER VIDEO RETTANGOLARE 16:9 E PERMESSI)
             function updateHudScreen(screen) {
                 const container = document.getElementById('hud-screen-content');
                 const badge = document.getElementById('hud-status-badge');
@@ -291,9 +292,17 @@ def get_dashboard_html() -> str:
 
                 if(screen.type === 'MEDIA_PLAYER' && screen.embed_url) {
                     container.innerHTML = `
-                        <div style="width:100%; height:100%; display:flex; flex-direction:column; gap:8px; justify-content:center; align-items:center;">
-                            <iframe src="${screen.embed_url}" style="width:100%; max-width:540px; height:210px; border:none; border-radius:14px; border:1px solid var(--accent-cyan);" allow="autoplay; encrypted-media" allowfullscreen></iframe>
-                            ${screen.watch_url ? `<a href="${screen.watch_url}" target="_blank" style="color:var(--accent-cyan); font-size:11px; text-decoration:none;">🔗 Apri in scheda YouTube</a>` : ''}
+                        <div style="width:100%; height:100%; display:flex; flex-direction:column; gap:12px; justify-content:center; align-items:center;">
+                            <!-- Il container esterno impone il rapporto d'aspetto perfetto 16:9 -->
+                            <div style="width: 100%; max-width: 480px; aspect-ratio: 16 / 9; border-radius: 12px; overflow: hidden; border: 1px solid var(--accent-cyan); box-shadow: 0 4px 24px rgba(0,240,255,0.15);">
+                                <!-- L'iframe si adatta allo spazio, ricevendo i permessi massimi per evitare blocchi dell'embed -->
+                                <iframe src="${screen.embed_url}" 
+                                        style="width: 100%; height: 100%; border: none;" 
+                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
+                                        allowfullscreen>
+                                </iframe>
+                            </div>
+                            ${screen.watch_url ? `<a href="${screen.watch_url}" target="_blank" style="color:var(--accent-cyan); font-size:11px; text-decoration:none; padding: 6px 14px; background: rgba(0,240,255,0.05); border-radius: 20px; border: 1px solid rgba(0,240,255,0.2);">🔗 Apri su YouTube</a>` : ''}
                         </div>
                     `;
                 } else if(screen.type === 'PERSON_CARD' && screen.person) {
@@ -437,3 +446,4 @@ def get_dashboard_html() -> str:
     </body>
     </html>
     """
+    
