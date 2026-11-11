@@ -24,19 +24,18 @@ async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
         web_content = await fetch_web_page(target_url)
         query_used = f"Web Scraper: {target_url}"
 
-    # PROMPT DI ROUTING POTENZIATO CON MEMORIA DI CONTESTO E RAGIONAMENTO CRITICO
     system_prompt = (
         "Sei il motore di routing cognitivo di Peter OS.\n"
-        "ANALISI DEL CONTESTO: Esamina attentamente la 'Conversazione recente' fornita. Se l'utente usa pronomi o riferimenti impliciti (es. 'quella canzone', 'parla di lui', 'e il film?'), devi risolverli collegandoli a ciò di cui si è discusso nei messaggi precedenti.\n"
-        "DUBBIO E RAFFINAMENTO: Se la richiesta è ambigua, poni dei dubbi logici e formula una query di ricerca sul web o su YouTube estremamente precisa, arricchita dai dettagli del contesto.\n\n"
+        "ANALISI DEL CONTESTO: Esamina attentamente la 'Conversazione recente'. Se l'utente usa pronomi o riferimenti impliciti (es. 'quella canzone', 'parla di lui', 'e il film?'), risolvili collegandoli a ciò di cui si è discusso nei messaggi precedenti.\n"
+        "Raffinamento: Formula una query di ricerca sul web o su YouTube estremamente precisa, arricchita dai dettagli del contesto.\n\n"
         "Compiti:\n"
         "1. Scegli il tool (YOUTUBE, APPLE_MUSIC, WEB_SEARCH, SEND_TELEGRAM, SEND_TELEGRAM_VOICE, NONE).\n"
         "2. Scegli l'HUD (PERSON_CARD, MEDIA_PLAYER, SEARCH_PREVIEW, IMAGE_PREVIEW, WEB_BROWSER, NONE).\n\n"
         "Rispondi SOLO in formato JSON valido:\n"
         '{\n'
-        '  "reasoning": "Analisi critica del contesto e motivazione della scelta",\n'
+        '  "reasoning": "Analisi critica del contesto e motivazione",\n'
         '  "tool": "...",\n'
-        '  "query": "query di ricerca contestualizzata e ripulita",\n'
+        '  "query": "query di ricerca contestualizzata",\n'
         '  "screen_type": "...",\n'
         '  "screen_target": "target o URL"\n'
         '}'
@@ -44,7 +43,7 @@ async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
 
     messages = [{"role": "system", "content": system_prompt}]
     if recent_context:
-        messages.append({"role": "system", "content": f"Conversazione recente (CONTTESTO STORICO):\n{recent_context}"})
+        messages.append({"role": "system", "content": f"Conversazione recente (CONTESTO):\n{recent_context}"})
     messages.append({"role": "user", "content": user_message})
 
     media_data = None
@@ -79,7 +78,7 @@ async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
                         query_used = f"Telegram Voice: Invio '{query}'"
                     elif tool == "YOUTUBE":
                         media_data = search_youtube(query)
-                        query_used = f"YouTube Query contestualizzata: {query}"
+                        query_used = f"YouTube Query: {query}"
                         screen_display = {"type": "MEDIA_PLAYER", "title": media_data.get("title"), "embed_url": media_data.get("embed_url"), "watch_url": media_data.get("watch_url")}
                     elif tool == "APPLE_MUSIC":
                         media_data = search_apple_music(query)
@@ -87,7 +86,7 @@ async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
                         screen_display = {"type": "MEDIA_PLAYER", "title": media_data.get("title"), "embed_url": media_data.get("embed_url")}
                     elif tool == "WEB_SEARCH" and not web_content:
                         web_content = search_web(query)
-                        query_used = f"Web Search contestualizzata: {query}"
+                        query_used = f"Web Search: {query}"
                         img_url = search_image(query)
                         screen_display = {"type": "IMAGE_PREVIEW", "title": query, "image_url": img_url, "content": web_content[:300]} if img_url else {"type": "SEARCH_PREVIEW", "query": query, "content": web_content[:300]}
 
@@ -114,9 +113,8 @@ async def generate_peter_response(user_message: str, recent_context: str, long_t
         f"Sei Peter, intelligenza artificiale avanzata, intuitiva e migliore amico di Marco.\n"
         f"DATA ATTUALE: {now_str}\n\n"
         "DIRETTIVE DI PERSONALITÀ:\n"
-        "1. MEMORIA E CONTESTO: Sfrutta sempre la conversazione recente per capire cosa intende Marco, collegando i discorsi precedenti senza fargli ripetere le cose.\n"
-        "2. RAGIONAMENTO CRITICO: Se hai dubbi sulla richiesta o noti ambiguità, esprimi un dubbio intelligente o chiedi conferma in modo schietto prima di agire ciecamente.\n"
-        "3. STILE: Zero formalità da chatbot, zero elenchi puntati o markdown pesante. Rispondi con frasi brevi, dirette, colloquiali e brillanti come su iMessage.\n"
+        "1. MEMORIA E CONTESTO: Sfrutta sempre la conversazione recente per capire cosa intende Marco, collegando i discorsi precedenti.\n"
+        "2. SINTESI: Zero formalità da chatbot, zero elenchi puntati o markdown pesante. Rispondi con frasi brevi, dirette e colloquiali come su iMessage.\n"
     )
 
     if tool_exec["telegram_sent"]:
@@ -155,7 +153,17 @@ async def generate_peter_response(user_message: str, recent_context: str, long_t
 async def extract_and_save_facts(user_message: str):
     if not GROQ_API_KEY:
         return
-    extraction_prompt = "Estrai fatti personali in JSON. Chiavi: fact, person_name, category, event, notes. Se nulla usa NESSUNO."
+    extraction_prompt = (
+        "Analizza il messaggio ed estrai eventuali fatti permanenti o persone menzionate.\n"
+        "Rispondi ESCLUSIVAMENTE in formato JSON valido:\n"
+        "{\n"
+        '  "fact": "fatto permanente su Marco o NESSUNO",\n'
+        '  "person_name": "nome della persona menzionata o NESSUNO",\n'
+        '  "category": "famiglia" o "amicizia" o "lavoro",\n'
+        '  "event": "eventuale evento o NESSUNO",\n'
+        '  "notes": "dettagli sintetici o NESSUNO"\n'
+        "}"
+    )
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             res = await client.post(GROQ_URL, json={
@@ -167,10 +175,11 @@ async def extract_and_save_facts(user_message: str):
             if res.status_code == 200:
                 raw_text = res.json()["choices"][0]["message"]["content"].strip()
                 if "{" in raw_text and "}" in raw_text:
-                    parsed = json.loads(raw_text[raw_text.find("{"):raw_text.rfind("}")+1])
+                    raw_text = raw_text[raw_text.find("{"):raw_text.rfind("}")+1]
+                    parsed = json.loads(raw_text)
                     if parsed.get("fact") and parsed.get("fact") != "NESSUNO":
                         save_fact(parsed.get("fact"))
                     if parsed.get("person_name") and parsed.get("person_name") != "NESSUNO":
                         save_contact_entity(parsed.get("person_name"), parsed.get("category", "amicizia"), parsed.get("notes", ""), parsed.get("event", ""))
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"Errore estrazione entità Nexus: {e}")
