@@ -80,6 +80,14 @@ def save_fact(fact_text: str):
     except Exception:
         pass
 
+def save_telegram_chat_id(chat_id: int):
+    if not supabase:
+        return
+    try:
+        supabase.table("system_settings").upsert({"key": "last_telegram_chat_id", "value": str(chat_id)}).execute()
+    except Exception:
+        pass
+
 def get_telegram_chat_id() -> str:
     if not supabase:
         return ""
