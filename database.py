@@ -23,7 +23,7 @@ def get_recent_memories(limit: int = 8) -> str:
         pass
     return ""
 
-def get_long_term_facts(limit: int = 15) -> str:
+def get_long_term_facts(limit: int = 20) -> str:
     if not supabase:
         return ""
     try:
@@ -42,6 +42,16 @@ def get_all_facts():
         return res.data or []
     except Exception:
         return []
+
+def update_fact_by_id(fact_id: str, new_text: str) -> bool:
+    if not supabase:
+        return False
+    try:
+        supabase.table("user_facts").update({"fact": new_text}).eq("id", fact_id).execute()
+        return True
+    except Exception as e:
+        print(f"Errore aggiornamento fatto: {e}")
+        return False
 
 def delete_fact_by_id(fact_id: str) -> bool:
     if not supabase:
@@ -90,7 +100,6 @@ def get_telegram_chat_id() -> str:
         pass
     return ""
 
-# STRUTTURA NEXUS 3D MAP & ENTITÀ
 def save_contact_entity(name: str, category: str = "amicizia", notes: str = "", event_title: str = ""):
     if not supabase:
         return
@@ -101,7 +110,7 @@ def save_contact_entity(name: str, category: str = "amicizia", notes: str = "", 
                 "name": name,
                 "category": category,
                 "notes": notes,
-                "details": f"Evento collegato: {event_title}" if event_title else ""
+                "details": f"Evento: {event_title}" if event_title else ""
             }]).execute()
         elif event_title or notes:
             existing = res.data[0]
@@ -111,28 +120,20 @@ def save_contact_entity(name: str, category: str = "amicizia", notes: str = "", 
         print(f"Errore salvataggio entità Nexus: {e}")
 
 def get_nexus_graph_data() -> dict:
-    """Genera la struttura nodi e collegamenti per il Grafo 3D Nexus."""
-    nodes = [
-        {"id": "user_self", "name": "Marco", "category": "self", "x": 0, "y": 0, "z": 0, "notes": "Admin di Peter OS", "events": ["Creatore del sistema"]}
-    ]
+    nodes = [{"id": "user_self", "name": "Marco", "category": "self", "x": 0, "y": 0, "z": 0, "notes": "Admin Peter OS"}]
     edges = []
-
     if not supabase:
         return {"nodes": nodes, "edges": edges}
 
     try:
         contacts_res = supabase.table("contacts").select("*").execute()
         contacts = contacts_res.data or []
-
+        import math
         for idx, c in enumerate(contacts):
             node_id = f"contact_{c.get('id', idx)}"
             cat = c.get("category", "amicizia").lower()
-            
-            # Posizionamento orbitale 3D
-            import math
             angle = (idx / max(len(contacts), 1)) * 2 * math.pi
-            radius = 140 if cat == "famiglia" else (180 if cat == "amicizia" else 220)
-            
+            radius = 140 if cat == "famiglia" else 180
             nodes.append({
                 "id": node_id,
                 "name": c.get("name", "Persona"),
@@ -140,13 +141,12 @@ def get_nexus_graph_data() -> dict:
                 "x": math.cos(angle) * radius,
                 "y": math.sin(angle) * radius * 0.5,
                 "z": math.sin(angle) * radius,
-                "notes": c.get("notes", "Nessuna nota"),
+                "notes": c.get("notes", ""),
                 "events": [c.get("details")] if c.get("details") else []
             })
             edges.append({"source": "user_self", "target": node_id})
-
     except Exception as e:
-        print(f"Errore lettura dati Nexus Graph: {e}")
+        print(f"Errore Nexus Graph: {e}")
 
     return {"nodes": nodes, "edges": edges}
 
