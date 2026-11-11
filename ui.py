@@ -209,8 +209,21 @@ def get_dashboard_html() -> str:
                         </div>
                     `;
                 } 
-                else if(screen.type === 'MEDIA_PLAYER' && screen.embed_url) {
-                    container.innerHTML = `<div style="width:100%; max-width:420px; aspect-ratio:16/9; border-radius:10px; overflow:hidden; border:1px solid var(--accent-cyan);"><iframe src="${screen.embed_url}" style="width:100%; height:100%; border:none;" allow="accelerometer; autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>`;
+                else if(screen.type === 'MEDIA_PLAYER') {
+                    let embedLink = screen.embed_url;
+                    if(embedLink && embedLink.includes('watch?v=')) {
+                        const vidId = embedLink.split('watch?v=')[1]?.substring(0, 11);
+                        if(vidId) embedLink = `https://www.youtube-nocookie.com/embed/${vidId}?autoplay=1`;
+                    }
+                    
+                    container.innerHTML = `
+                        <div style="width:100%; height:100%; display:flex; flex-direction:column; gap:8px; justify-content:center; align-items:center;">
+                            <div style="width:100%; max-width:400px; aspect-ratio:16/9; border-radius:10px; overflow:hidden; border:1px solid var(--accent-cyan); background:#000;">
+                                <iframe src="${embedLink}" style="width:100%; height:100%; border:none;" allow="accelerometer; autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+                            </div>
+                            ${screen.watch_url ? `<a href="${screen.watch_url}" target="_blank" style="color:var(--accent-cyan); font-size:11px; text-decoration:none; background:rgba(0,240,255,0.08); padding:4px 10px; border-radius:6px; border:1px solid rgba(0,240,255,0.2);">🔗 Apri video su YouTube</a>` : ''}
+                        </div>
+                    `;
                 } 
                 else if(screen.type === 'PERSON_CARD' && screen.person) {
                     container.innerHTML = `<div style="background:rgba(15,23,42,0.95); border:1px solid var(--accent-cyan); padding:16px; border-radius:14px; text-align:center; max-width:280px;"><div style="font-size:30px; margin-bottom:2px;">👤</div><h3 style="color:var(--accent-cyan); font-size:16px;">${screen.person.name}</h3><p style="font-size:10px; color:var(--text-dim); margin-bottom:6px;">Livello: ${screen.person.category}</p><p style="font-size:11px; line-height:1.3;">${screen.person.notes || 'In Nexus'}</p></div>`;
