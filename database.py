@@ -119,29 +119,77 @@ def save_contact_entity(name: str, category: str = "amicizia", notes: str = "", 
         pass
 
 def get_nexus_graph_data() -> dict:
-    nodes = [{"id": "user_self", "name": "Marco", "category": "self", "x": 0, "y": 0, "z": 0, "notes": "Admin Peter OS"}]
+    nodes = [{"id": "user_self", "name": "Marco (Tu)", "category": "core", "type": "core", "x": 0, "y": 0, "z": 0, "notes": "Admin Peter OS - Centro neurale"}]
     edges = []
     if not supabase:
         return {"nodes": nodes, "edges": edges}
 
+    import math
+    
     try:
+        # 1. Layer Persone (Contacts)
         contacts_res = supabase.table("contacts").select("*").execute()
         contacts = contacts_res.data or []
-        import math
         for idx, c in enumerate(contacts):
             node_id = f"contact_{c.get('id', idx)}"
-            cat = c.get("category", "amicizia").lower()
             angle = (idx / max(len(contacts), 1)) * 2 * math.pi
-            radius = 140 if cat == "famiglia" else 180
+            radius = 160
             nodes.append({
                 "id": node_id,
                 "name": c.get("name", "Persona"),
-                "category": cat,
+                "category": c.get("category", "amicizia"),
+                "type": "person",
                 "x": math.cos(angle) * radius,
-                "y": math.sin(angle) * radius * 0.5,
+                "y": math.sin(angle * 2) * 50,
                 "z": math.sin(angle) * radius,
-                "notes": c.get("notes", ""),
-                "events": [c.get("details")] if c.get("details") else []
+                "notes": c.get("notes", "Nessuna nota registrata"),
+                "details": c.get("details", "")
+            })
+            edges.append({"source": "user_self", "target": node_id})
+    except Exception:
+        pass
+
+    try:
+        # 2. Layer Memorie (User Facts)
+        facts_res = supabase.table("user_facts").select("*").limit(35).execute()
+        facts = facts_res.data or []
+        for idx, f in enumerate(facts):
+            node_id = f"fact_{f.get('id', idx)}"
+            angle = (idx / max(len(facts), 1)) * 2 * math.pi + 0.6
+            radius = 260
+            nodes.append({
+                "id": node_id,
+                "name": f.get("fact", "")[:30] + "...",
+                "category": "memory",
+                "type": "memory",
+                "x": math.cos(angle) * radius,
+                "y": ((idx % 3) - 1) * 90,
+                "z": math.sin(angle) * radius,
+                "notes": f.get("fact", ""),
+                "details": f"Registrato il: {f.get('created_at', '')[:10]}"
+            })
+            edges.append({"source": "user_self", "target": node_id})
+    except Exception:
+        pass
+
+    try:
+        # 3. Layer Eventi (Calendar Events)
+        events_res = supabase.table("calendar_events").select("*").limit(20).execute()
+        events = events_res.data or []
+        for idx, e in enumerate(events):
+            node_id = f"event_{e.get('id', idx)}"
+            angle = (idx / max(len(events), 1)) * 2 * math.pi + 1.2
+            radius = 350
+            nodes.append({
+                "id": node_id,
+                "name": e.get("title", "Evento")[:28],
+                "category": "event",
+                "type": "event",
+                "x": math.cos(angle) * radius,
+                "y": ((idx % 2) * 120) - 60,
+                "z": math.sin(angle) * radius,
+                "notes": e.get("description", "Nessuna descrizione"),
+                "details": f"Data: {e.get('start_time', '')}"
             })
             edges.append({"source": "user_self", "target": node_id})
     except Exception:
