@@ -6,3 +6,4 @@ duckduckgo-search
 beautifulsoup4
 python-multipart
 edge-tts
+pillow
