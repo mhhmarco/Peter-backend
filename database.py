@@ -146,3 +146,43 @@ def add_edge(source_id: str, target_id: str, relation_label: str = "collegato") 
 def delete_node_by_id(node_id: str) -> bool:
     """Elimina un'entità e tutti i suoi collegamenti associati."""
     if not supabase:
+        return False
+    try:
+        supabase.table("edges").delete().or_(f"source_id.eq.{node_id},target_id.eq.{node_id}").execute()
+        supabase.table("nodes").delete().eq("id", node_id).execute()
+        return True
+    except Exception as e:
+        print(f"Errore eliminazione nodo: {e}")
+        return False
+
+def delete_edge_by_id(edge_id: str) -> bool:
+    """Elimina una relazione specifica dal grafo."""
+    if not supabase:
+        return False
+    try:
+        supabase.table("edges").delete().eq("id", edge_id).execute()
+        return True
+    except Exception as e:
+        return False
+
+# === LIVELLO 4: MEMORIA RIFLESSIVA (STORICO DIARI) ===
+def save_diary_entry(entry_text: str, mood_summary: str = "neutro"):
+    """Archivia una riflessione stilizzata nel diario."""
+    if not supabase or not entry_text:
+        return
+    try:
+        supabase.table("diaries").insert([
+            {"content": entry_text, "summary": mood_summary}
+        ]).execute()
+    except Exception as e:
+        print(f"Errore salvataggio diario: {e}")
+
+def get_recent_diaries(limit: int = 5):
+    """Restituisce le ultime voci di diario caricate."""
+    if not supabase:
+        return []
+    try:
+        res = supabase.table("diaries").select("*").order("created_at", desc=True).limit(limit).execute()
+        return res.data or []
+    except Exception as e:
+        return []
