@@ -35,7 +35,6 @@ def get_long_term_facts(limit: int = 20) -> str:
     return ""
 
 def get_all_facts():
-    """Restituisce l'elenco completo di tutti i fatti salvati per la gestione in dashboard."""
     if not supabase:
         return []
     try:
@@ -183,4 +182,10 @@ def get_personality_settings() -> dict:
         pass
     return default_settings
 
-def save
+def save_personality_settings(settings: dict):
+    if not supabase:
+        return
+    try:
+        supabase.table("system_settings").upsert({"key": "personality", "value": settings}).execute()
+    except Exception:
+        pass
