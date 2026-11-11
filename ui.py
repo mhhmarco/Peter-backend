@@ -5,11 +5,11 @@ def get_dashboard_html() -> str:
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>PETER COMMAND CENTER v5.0</title>
+        <title>PETER COMMAND CENTER v6.0</title>
         <style>
             :root {
                 --bg-main: #030712;
-                --panel-bg: rgba(10, 20, 38, 0.85);
+                --panel-bg: rgba(10, 20, 38, 0.88);
                 --panel-border: rgba(0, 240, 255, 0.2);
                 --accent-cyan: #00f0ff;
                 --accent-blue: #1d4ed8;
@@ -29,44 +29,55 @@ def get_dashboard_html() -> str:
             .status-dot { width: 6px; height: 6px; background: var(--accent-green); border-radius: 50%; box-shadow: 0 0 8px var(--accent-green); }
             .clock-display { font-family: monospace; font-size: 15px; color: var(--accent-cyan); letter-spacing: 1px; }
 
-            .command-grid { flex: 1; display: grid; grid-template-columns: 240px 1fr 340px; gap: 14px; padding: 14px; height: calc(100vh - 114px); overflow: hidden; }
+            .command-grid { flex: 1; display: grid; grid-template-columns: 240px 1fr 360px; gap: 14px; padding: 14px; height: calc(100vh - 114px); overflow: hidden; }
 
-            .sidebar-panel { background: var(--panel-bg); border: 1px solid var(--panel-border); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 16px; backdrop-filter: blur(10px); }
+            .sidebar-panel { background: var(--panel-bg); border: 1px solid var(--panel-border); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 14px; backdrop-filter: blur(10px); }
             .nav-menu { display: flex; flex-direction: column; gap: 6px; }
-            .nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; color: var(--text-dim); text-decoration: none; cursor: pointer; transition: all 0.2s; }
+            .nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; color: var(--text-dim); cursor: pointer; transition: all 0.2s; }
             .nav-item.active, .nav-item:hover { background: rgba(0, 240, 255, 0.08); color: var(--accent-cyan); border-left: 3px solid var(--accent-cyan); }
             
-            .voice-widget { margin-top: auto; background: rgba(0, 240, 255, 0.03); border: 1px solid var(--panel-border); border-radius: 12px; padding: 16px; text-align: center; }
-            .mic-btn { width: 56px; height: 56px; border-radius: 50%; border: 2px solid var(--accent-cyan); background: rgba(0,240,255,0.1); color: var(--accent-cyan); font-size: 20px; display: flex; align-items: center; justify-content: center; margin: 10px auto; cursor: pointer; box-shadow: 0 0 20px rgba(0,240,255,0.2); transition: all 0.3s; }
+            /* GROQ MODEL MATRIX MONITOR */
+            .model-matrix { background: rgba(0,0,0,0.4); border: 1px solid var(--panel-border); border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 6px; }
+            .model-badge { display: flex; justify-content: space-between; align-items: center; font-size: 10px; font-family: monospace; padding: 4px 6px; border-radius: 4px; background: rgba(255,255,255,0.03); }
+            .model-badge.active { border: 1px solid var(--accent-cyan); background: rgba(0,240,255,0.1); }
+            .model-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent-green); }
+
+            .voice-widget { margin-top: auto; background: rgba(0, 240, 255, 0.03); border: 1px solid var(--panel-border); border-radius: 12px; padding: 14px; text-align: center; }
+            .mic-btn { width: 52px; height: 52px; border-radius: 50%; border: 2px solid var(--accent-cyan); background: rgba(0,240,255,0.1); color: var(--accent-cyan); font-size: 20px; display: flex; align-items: center; justify-content: center; margin: 8px auto; cursor: pointer; box-shadow: 0 0 20px rgba(0,240,255,0.2); }
             .mic-btn.recording { background: #ef4444; border-color: #f87171; box-shadow: 0 0 30px #ef4444; }
 
-            .center-workspace { display: grid; grid-template-rows: 320px 1fr; gap: 14px; height: 100%; overflow: hidden; }
+            .center-workspace { display: grid; grid-template-rows: 300px 1fr; gap: 14px; height: 100%; overflow: hidden; }
             .view-tab { display: none; height: 100%; width: 100%; }
             .view-tab.active { display: flex; }
 
-            /* SCHERMO REATTIVO HUD */
             .hud-screen { background: var(--panel-bg); border: 1px solid var(--panel-border); border-radius: 14px; position: relative; overflow: hidden; display: flex; flex-direction: column; width: 100%; }
             .hud-screen-header { padding: 8px 16px; background: rgba(0,0,0,0.4); border-bottom: 1px solid var(--panel-border); font-size: 10px; font-family: monospace; color: var(--accent-cyan); display: flex; justify-content: space-between; }
-            #hud-screen-content { flex: 1; padding: 14px; overflow-y: auto; display: flex; align-items: center; justify-content: center; position: relative; }
+            #hud-screen-content { flex: 1; padding: 12px; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative; }
             #core-canvas { width: 100%; height: 100%; position: absolute; top:0; left:0; pointer-events: none; opacity: 0.3; }
 
             .feed-panel { background: var(--panel-bg); border: 1px solid var(--panel-border); border-radius: 14px; display: flex; flex-direction: column; overflow: hidden; width: 100%; }
-            .panel-header { padding: 12px 16px; border-bottom: 1px solid var(--panel-border); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--accent-cyan); display: flex; justify-content: space-between; align-items: center; }
+            .panel-header { padding: 10px 16px; border-bottom: 1px solid var(--panel-border); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--accent-cyan); display: flex; justify-content: space-between; align-items: center; }
             
-            #chat-feed { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; scroll-behavior: smooth; }
-            .msg { max-width: 80%; padding: 10px 14px; border-radius: 12px; font-size: 13px; line-height: 1.5; word-wrap: break-word; }
+            #chat-feed { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; scroll-behavior: smooth; }
+            .msg { max-width: 80%; padding: 10px 14px; border-radius: 12px; font-size: 13px; line-height: 1.45; word-wrap: break-word; }
             .msg.user { align-self: flex-end; background: linear-gradient(135deg, #1d4ed8, #2563eb); color: #fff; border-bottom-right-radius: 2px; }
             .msg.peter { align-self: flex-start; background: rgba(15, 25, 45, 0.9); border: 1px solid var(--panel-border); border-bottom-left-radius: 2px; }
             
             .right-sidebar { display: flex; flex-direction: column; gap: 14px; height: 100%; overflow-y: auto; }
-            .widget-card { background: var(--panel-bg); border: 1px solid var(--panel-border); border-radius: 14px; padding: 16px; backdrop-filter: blur(10px); }
+            .widget-card { background: var(--panel-bg); border: 1px solid var(--panel-border); border-radius: 14px; padding: 14px; backdrop-filter: blur(10px); }
             
+            .fact-item { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 11px; }
+            .fact-actions { display: flex; gap: 4px; }
+            .fact-btn { background: transparent; border: none; color: var(--text-dim); cursor: pointer; font-size: 11px; }
+            .fact-btn:hover { color: var(--accent-cyan); }
+
+            .reasoning-box { background: rgba(0,0,0,0.5); border: 1px solid rgba(0,240,255,0.15); border-radius: 8px; padding: 8px; font-size: 10px; font-family: monospace; color: var(--accent-cyan); max-height: 90px; overflow-y: auto; }
+
             .bottom-command-bar { height: 60px; border-top: 1px solid var(--panel-border); padding: 0 24px; display: flex; align-items: center; gap: 16px; background: rgba(3, 7, 18, 0.98); }
             .cmd-input-container { flex: 1; display: flex; align-items: center; background: rgba(15, 25, 45, 0.8); border: 1px solid var(--panel-border); border-radius: 30px; padding: 4px 6px 4px 16px; }
             .cmd-input { flex: 1; background: transparent; border: none; outline: none; color: #fff; font-size: 13px; }
             .cmd-btn { padding: 10px 24px; background: var(--accent-cyan); color: #000; border: none; border-radius: 24px; font-weight: 800; font-size: 12px; cursor: pointer; }
 
-            /* NEXUS 3D GRAPH CANVAS CONTAINER */
             #nexus-graph-canvas { width: 100%; height: 100%; display: block; background: #030712; cursor: grab; }
 
             .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 200; align-items: center; justify-content: center; }
@@ -98,15 +109,22 @@ def get_dashboard_html() -> str:
                     <div class="nav-item" onclick="openSettingsModal()">⚙️ Impostazioni</div>
                 </div>
 
+                <div class="model-matrix">
+                    <div style="font-size: 9px; font-weight: 700; color: var(--accent-cyan); letter-spacing: 1px; margin-bottom: 4px;">GROQ ENGINE MATRIX</div>
+                    <div class="model-badge active"><span>Model 1: gpt-oss-20b</span><div class="dot"></div></div>
+                    <div class="model-badge active"><span>Model 2: gpt-oss-120b</span><div class="dot"></div></div>
+                    <div class="model-badge active"><span>Model 3: qwen3.8-27b</span><div class="dot"></div></div>
+                    <div class="model-badge"><span>STT: whisper-v3-turbo</span><div class="dot"></div></div>
+                </div>
+
                 <div class="voice-widget">
-                    <div style="font-size: 11px; font-weight: 700; color: var(--accent-cyan); letter-spacing: 1px;">VOICE ENGINE</div>
+                    <div style="font-size: 10px; font-weight: 700; color: var(--accent-cyan); letter-spacing: 1px;">VOICE ENGINE</div>
                     <div id="mic-btn" class="mic-btn" onclick="toggleVoiceSession()">🎙️</div>
-                    <div id="voice-status-text" style="font-size: 10px; color: var(--text-dim);">Tap to Start Voice Chat</div>
+                    <div id="voice-status-text" style="font-size: 9px; color: var(--text-dim);">Tap to Start Voice Chat</div>
                 </div>
             </aside>
 
             <main class="center-workspace">
-                <!-- VIEW 1: HUD & CHAT -->
                 <div id="view-hud" class="view-tab active" style="flex-direction: column; gap: 14px;">
                     <div class="hud-screen">
                         <div class="hud-screen-header">
@@ -116,8 +134,8 @@ def get_dashboard_html() -> str:
                         <div id="hud-screen-content">
                             <canvas id="core-canvas"></canvas>
                             <div id="hud-default-overlay" style="text-align: center; z-index: 2;">
-                                <h2 style="font-size: 22px; font-weight: 900; letter-spacing: 4px; text-shadow: 0 0 16px var(--accent-cyan);">PETER AI CORE</h2>
-                                <p style="font-size: 11px; font-family: monospace; color: var(--accent-cyan); letter-spacing: 2px;">READY // VISUAL MONITORING ACTIVE</p>
+                                <h2 style="font-size: 20px; font-weight: 900; letter-spacing: 4px; text-shadow: 0 0 16px var(--accent-cyan);">PETER AI CORE</h2>
+                                <p style="font-size: 10px; font-family: monospace; color: var(--accent-cyan); letter-spacing: 2px;">READY // VISUAL MONITORING ACTIVE</p>
                             </div>
                         </div>
                     </div>
@@ -128,25 +146,29 @@ def get_dashboard_html() -> str:
                             <span style="font-size: 10px; color: var(--accent-green);">● INTERACTION READY</span>
                         </div>
                         <div id="chat-feed">
-                            <div class="msg peter">Sistemi operativi attivi. Ho agganciato la risposta veloce e il Grafo 3D Nexus.</div>
+                            <div class="msg peter">Sistemi operativi attivi, Marco. Groq Multi-Model Engine in funzione.</div>
                         </div>
                     </section>
                 </div>
 
-                <!-- VIEW 2: FULL NEXUS 3D GRAPH VIEW -->
                 <div id="view-nexus" class="view-tab" style="position: relative; overflow: hidden; border-radius: 14px; border: 1px solid var(--panel-border);">
                     <canvas id="nexus-graph-canvas"></canvas>
                     <div style="position: absolute; top: 16px; left: 16px; background: rgba(10,20,38,0.85); padding: 10px 14px; border-radius: 8px; border: 1px solid var(--accent-cyan); font-size: 11px;">
                         <strong style="color:var(--accent-cyan);">NEXUS 3D GALAXIES</strong><br>
-                        <span style="color:var(--text-dim);">Trascina per ruotare // Clicca su un nodo per dettagli</span>
+                        <span style="color:var(--text-dim);">Trascina per ruotare // Clicca nodi per dettagli</span>
                     </div>
                 </div>
             </main>
 
             <aside class="right-sidebar">
+                <div class="widget-card" style="flex: 1; display: flex; flex-direction: column;">
+                    <div class="panel-header" style="padding: 0 0 8px 0; border: none;">MEMORIA A LUNGO TERMINE (EDITABLE)</div>
+                    <div id="facts-preview" style="flex: 1; overflow-y: auto;">Caricamento fatti Supabase...</div>
+                </div>
+
                 <div class="widget-card">
-                    <div class="panel-header" style="padding: 0 0 10px 0; border: none;">MEMORIA A LUNGO TERMINE</div>
-                    <div id="facts-preview" style="font-size: 11px; color: var(--text-dim); max-height: 240px; overflow-y: auto;">Caricamento memorie...</div>
+                    <div class="panel-header" style="padding: 0 0 6px 0; border: none;">PETER REASONING STREAM</div>
+                    <div id="reasoning-preview" class="reasoning-box">> Model 1 Router in attesa di input...</div>
                 </div>
             </aside>
         </div>
@@ -158,7 +180,6 @@ def get_dashboard_html() -> str:
             </div>
         </footer>
 
-        <!-- MODALE IMPOSTAZIONI -->
         <div id="settings-modal" class="modal-overlay">
             <div class="modal-box">
                 <h3 style="color:var(--accent-cyan); margin-bottom:12px;">Impostazioni & Personalità</h3>
@@ -245,7 +266,6 @@ def get_dashboard_html() -> str:
                     const cx = canvas.width / 2;
                     const cy = canvas.height / 2;
 
-                    // Archi
                     ctx.strokeStyle = 'rgba(0, 240, 255, 0.2)';
                     ctx.lineWidth = 1.5;
                     nexusGraphData.edges.forEach(e => {
@@ -261,7 +281,6 @@ def get_dashboard_html() -> str:
                         }
                     });
 
-                    // Nodi 3D
                     nexusGraphData.nodes.forEach(n => {
                         let cosA = Math.cos(nexusAngle), sinA = Math.sin(nexusAngle);
                         let rotX = n.x * cosA - n.z * sinA;
@@ -288,6 +307,7 @@ def get_dashboard_html() -> str:
                 renderNexus();
             }
 
+            // CORREZIONE VISUALE PLAYER YOUTUBE E SCHEDA PERSONA
             function updateHudScreen(screen) {
                 const container = document.getElementById('hud-screen-content');
                 const badge = document.getElementById('hud-status-badge');
@@ -297,18 +317,18 @@ def get_dashboard_html() -> str:
 
                 if(screen.type === 'MEDIA_PLAYER' && screen.embed_url) {
                     container.innerHTML = `
-                        <div style="width:100%; height:100%; display:flex; flex-direction:column; gap:6px;">
-                            <iframe src="${screen.embed_url}" style="width:100%; height:210px; border:none; border-radius:8px;" allow="autoplay; encrypted-media" allowfullscreen></iframe>
-                            ${screen.watch_url ? `<a href="${screen.watch_url}" target="_blank" style="color:var(--accent-cyan); font-size:11px; text-decoration:none;">🔗 Apri direttamente su YouTube</a>` : ''}
+                        <div style="width:100%; height:100%; display:flex; flex-direction:column; gap:6px; justify-content:center; align-items:center;">
+                            <iframe src="${screen.embed_url}" style="width:100%; max-width:480px; height:220px; border:none; border-radius:10px; border:1px solid var(--accent-cyan);" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+                            ${screen.watch_url ? `<a href="${screen.watch_url}" target="_blank" style="color:var(--accent-cyan); font-size:11px; text-decoration:none;">🔗 Apri in YouTube</a>` : ''}
                         </div>
                     `;
                 } else if(screen.type === 'PERSON_CARD' && screen.person) {
                     container.innerHTML = `
-                        <div style="background:rgba(10,20,38,0.95); border:1px solid var(--accent-cyan); padding:20px; border-radius:12px; text-align:center; max-width:320px; z-index:5;">
-                            <div style="font-size:36px; margin-bottom:6px;">👤</div>
-                            <h3 style="color:var(--accent-cyan); font-size:18px;">${screen.person.name}</h3>
-                            <p style="font-size:11px; color:var(--text-dim); margin-bottom:8px;">Livello: ${screen.person.category || 'Amicizia'}</p>
-                            <p style="font-size:12px;">${screen.person.notes || 'Registrato nel Grafo Nexus'}</p>
+                        <div style="background:rgba(10,20,38,0.95); border:1px solid var(--accent-cyan); padding:16px; border-radius:12px; text-align:center; max-width:320px; z-index:5; box-shadow: 0 0 20px rgba(0,240,255,0.2);">
+                            <div style="font-size:32px; margin-bottom:4px;">👤</div>
+                            <h3 style="color:var(--accent-cyan); font-size:16px;">${screen.person.name}</h3>
+                            <p style="font-size:10px; color:var(--text-dim); margin-bottom:6px;">Livello: ${screen.person.category || 'Amicizia'}</p>
+                            <p style="font-size:11px; line-height:1.4;">${screen.person.notes || 'Registrato nel Grafo Nexus'}</p>
                         </div>
                     `;
                 }
@@ -334,6 +354,7 @@ def get_dashboard_html() -> str:
                     if(data.reply) {
                         appendMsg(data.reply, 'peter');
                         if(data.screen) updateHudScreen(data.screen);
+                        if(data.reasoning) document.getElementById('reasoning-preview').innerText = `> ${data.reasoning}`;
                         loadBrainSummary();
                     }
                 } catch(e) {
@@ -351,16 +372,88 @@ def get_dashboard_html() -> str:
                 feed.scrollTop = feed.scrollHeight;
             }
 
+            // GESTIONE EDITING MEMORIE IN-PLACE
             async function loadBrainSummary() {
                 try {
                     const res = await fetch('/memories');
                     const data = await res.json();
                     if(data.connected && data.long_term_facts) {
-                        document.getElementById('facts-preview').innerHTML = data.long_term_facts.slice(0, 8).map(f => `
-                            <div style="padding:4px 0; border-bottom:1px solid rgba(255,255,255,0.05);">🧠 ${f.fact}</div>
+                        document.getElementById('facts-preview').innerHTML = data.long_term_facts.map(f => `
+                            <div class="fact-item">
+                                <span id="fact-text-${f.id}">🧠 ${f.fact}</span>
+                                <div class="fact-actions">
+                                    <button class="fact-btn" onclick="editFact('${f.id}', '${f.fact.replace(/'/g, "\\'")}')">✏️</button>
+                                    <button class="fact-btn" onclick="deleteFact('${f.id}')">🗑️</button>
+                                </div>
+                            </div>
                         `).join('');
                     }
                 } catch(e){}
+            }
+
+            async function editFact(id, oldText) {
+                const newText = prompt("Modifica fatto permanente:", oldText);
+                if(newText && newText !== oldText) {
+                    await fetch(`/api/facts/${id}`, {
+                        method: 'PUT',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ fact: newText })
+                    });
+                    loadBrainSummary();
+                }
+            }
+
+            async function deleteFact(id) {
+                if(confirm("Eliminare questo fatto dalla memoria a lungo termine?")) {
+                    await fetch(`/api/facts/${id}`, { method: 'DELETE' });
+                    loadBrainSummary();
+                }
+            }
+
+            // WEBSOCKET VOICE STREAMING FULL DUPLEX (STT + TTS NATIVO)
+            let ws = null;
+            let mediaRecorder = null;
+            let isRecording = false;
+
+            function toggleVoiceSession() {
+                const micBtn = document.getElementById('mic-btn');
+                const statusText = document.getElementById('voice-status-text');
+
+                if(!isRecording) {
+                    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                    ws = new WebSocket(`${protocol}//${window.location.host}/ws/voice`);
+                    
+                    ws.onopen = () => {
+                        navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+                            mediaRecorder = new MediaRecorder(stream);
+                            mediaRecorder.ondataavailable = e => { if(ws.readyState === WebSocket.OPEN) ws.send(e.data); };
+                            mediaRecorder.start(2000);
+                            isRecording = true;
+                            micBtn.classList.add('recording');
+                            statusText.innerText = 'Ascolto continuo...';
+                        });
+                    };
+
+                    ws.onmessage = async (event) => {
+                        if(typeof event.data === 'string') {
+                            const data = JSON.parse(event.data);
+                            appendMsg(data.user_text, 'user');
+                            appendMsg(data.reply_text, 'peter');
+                            if(data.screen) updateHudScreen(data.screen);
+                            if(data.reasoning) document.getElementById('reasoning-preview').innerText = `> ${data.reasoning}`;
+                        } else {
+                            const blob = new Blob([event.data], { type: 'audio/mp3' });
+                            const audio = new Audio(URL.createObjectURL(blob));
+                            audio.play();
+                        }
+                    };
+                } else {
+                    if(mediaRecorder) mediaRecorder.stop();
+                    if(ws) ws.close();
+                    isRecording = false;
+                    micBtn.classList.remove('recording');
+                    statusText.innerText = 'Tap to Start Voice Chat';
+                }
             }
 
             function openSettingsModal() { document.getElementById('settings-modal').style.display = 'flex'; }
