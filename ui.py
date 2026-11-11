@@ -5,12 +5,12 @@ def get_dashboard_html() -> str:
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>PETER HUD OS v8.3 - Second Brain</title>
+        <title>PETER HUD OS v8.4 - Neural Galaxy</title>
         <style>
             :root { 
-                --bg-main: #060913; 
-                --panel-bg: rgba(13, 22, 41, 0.82); 
-                --glass-border: rgba(0, 240, 255, 0.18); 
+                --bg-main: #04060d; 
+                --panel-bg: rgba(10, 17, 32, 0.85); 
+                --glass-border: rgba(0, 240, 255, 0.22); 
                 --accent-cyan: #00f0ff; 
                 --accent-purple: #8b5cf6; 
                 --accent-green: #10b981; 
@@ -19,25 +19,24 @@ def get_dashboard_html() -> str:
                 --text-dim: #94a3b8; 
             }
             * { box-sizing: border-box; margin: 0; padding: 0; font-family: "Inter", sans-serif; }
-            body { background: radial-gradient(circle at 50% 20%, #0f172a 0%, #060913 100%); color: var(--text-bright); height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+            body { background: radial-gradient(circle at 50% 20%, #0c162d 0%, #04060d 100%); color: var(--text-bright); height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
             
-            header { height: 56px; border-bottom: 1px solid var(--glass-border); padding: 0 24px; display: flex; align-items: center; justify-content: space-between; background: rgba(6, 9, 19, 0.9); backdrop-filter: blur(20px); z-index: 100; flex-shrink: 0; }
+            header { height: 56px; border-bottom: 1px solid var(--glass-border); padding: 0 24px; display: flex; align-items: center; justify-content: space-between; background: rgba(4, 6, 13, 0.92); backdrop-filter: blur(20px); z-index: 100; flex-shrink: 0; }
             .header-brand { display: flex; align-items: center; gap: 12px; }
-            .logo-orb { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple)); display: flex; align-items: center; justify-content: center; box-shadow: 0 0 15px rgba(0, 240, 255, 0.4); font-weight: 900; font-size: 13px; color: #000; }
+            .logo-orb { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple)); display: flex; align-items: center; justify-content: center; box-shadow: 0 0 20px rgba(0, 240, 255, 0.5); font-weight: 900; font-size: 13px; color: #000; }
             .header-title { font-size: 13px; font-weight: 800; letter-spacing: 3px; text-transform: uppercase; background: linear-gradient(90deg, #fff, var(--accent-cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
             
-            .sys-badge { display: flex; align-items: center; gap: 8px; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); padding: 4px 14px; border-radius: 30px; font-size: 11px; color: var(--accent-green); font-weight: 600; letter-spacing: 1px; }
+            .sys-badge { display: flex; align-items: center; gap: 8px; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.3); padding: 4px 14px; border-radius: 30px; font-size: 11px; color: var(--accent-green); font-weight: 600; letter-spacing: 1px; }
             .clock-display { font-family: monospace; font-size: 14px; color: var(--accent-cyan); letter-spacing: 2px; }
 
-            /* GRIGLIA RESPONSIVE (DESKTOP / MOBILE) */
             .command-grid { flex: 1; display: grid; grid-template-columns: 260px 1fr 340px; gap: 16px; padding: 16px; height: calc(100vh - 120px); overflow: hidden; }
 
-            .sidebar-panel { background: var(--panel-bg); border: 1px solid var(--glass-border); border-radius: 20px; padding: 18px; display: flex; flex-direction: column; gap: 16px; backdrop-filter: blur(24px); box-shadow: 0 8px 32px rgba(0,0,0,0.3); height: 100%; overflow: hidden; }
+            .sidebar-panel { background: var(--panel-bg); border: 1px solid var(--glass-border); border-radius: 20px; padding: 18px; display: flex; flex-direction: column; gap: 16px; backdrop-filter: blur(24px); box-shadow: 0 8px 32px rgba(0,0,0,0.4); height: 100%; overflow: hidden; }
             .nav-menu { display: flex; flex-direction: column; gap: 8px; }
             .nav-item { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 12px; font-size: 12px; font-weight: 600; color: var(--text-dim); cursor: pointer; transition: all 0.25s ease; }
-            .nav-item.active, .nav-item:hover { background: linear-gradient(90deg, rgba(0, 240, 255, 0.12), transparent); color: var(--accent-cyan); border-left: 3px solid var(--accent-cyan); transform: translateX(2px); }
+            .nav-item.active, .nav-item:hover { background: linear-gradient(90deg, rgba(0, 240, 255, 0.15), transparent); color: var(--accent-cyan); border-left: 3px solid var(--accent-cyan); transform: translateX(2px); }
 
-            .peter-avatar-card { background: rgba(0,0,0,0.4); border: 1px solid var(--glass-border); border-radius: 16px; padding: 14px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 8px; flex-shrink: 0; }
+            .peter-avatar-card { background: rgba(0,0,0,0.5); border: 1px solid var(--glass-border); border-radius: 16px; padding: 14px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 8px; flex-shrink: 0; }
             #peter-avatar-canvas { width: 130px; height: 130px; border-radius: 50%; cursor: pointer; }
             .avatar-status-tag { font-size: 9px; font-family: monospace; letter-spacing: 1.5px; color: var(--accent-cyan); background: rgba(0,240,255,0.1); padding: 3px 10px; border-radius: 12px; border: 1px solid rgba(0,240,255,0.3); }
 
@@ -58,34 +57,33 @@ def get_dashboard_html() -> str:
             .msg.peter { align-self: flex-start; background: rgba(15, 23, 42, 0.85); border: 1px solid var(--glass-border); border-bottom-left-radius: 4px; }
             
             .right-sidebar { display: flex; flex-direction: column; gap: 16px; height: 100%; overflow: hidden; }
-            .widget-card { background: var(--panel-bg); border: 1px solid var(--glass-border); border-radius: 20px; padding: 16px; backdrop-filter: blur(20px); box-shadow: 0 8px 32px rgba(0,0,0,0.3); display: flex; flex-direction: column; overflow: hidden; }
+            .widget-card { background: var(--panel-bg); border: 1px solid var(--glass-border); border-radius: 20px; padding: 16px; backdrop-filter: blur(20px); box-shadow: 0 8px 32px rgba(0,0,0,0.4); display: flex; flex-direction: column; overflow: hidden; }
             .widget-card.flex-grow { flex: 1; min-height: 0; }
             .widget-card.fixed-small { height: 160px; flex-shrink: 0; }
             
             #facts-preview { flex: 1; overflow-y: auto; min-height: 0; padding-right: 4px; }
-            .fact-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 11px; }
+            .fact-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 11px; }
             .fact-btn { background: transparent; border: none; color: var(--text-dim); cursor: pointer; font-size: 12px; transition: color 0.2s; }
             .fact-btn:hover { color: var(--accent-cyan); }
 
-            .reasoning-box { background: rgba(0,0,0,0.4); border: 1px solid rgba(0,240,255,0.15); border-radius: 10px; padding: 8px; font-size: 10px; font-family: monospace; color: var(--accent-cyan); flex: 1; overflow-y: auto; }
+            .reasoning-box { background: rgba(0,0,0,0.5); border: 1px solid rgba(0,240,255,0.2); border-radius: 10px; padding: 8px; font-size: 10px; font-family: monospace; color: var(--accent-cyan); flex: 1; overflow-y: auto; }
 
-            .bottom-command-bar { height: 64px; border-top: 1px solid var(--glass-border); padding: 0 24px; display: flex; align-items: center; gap: 16px; background: rgba(6, 9, 19, 0.95); backdrop-filter: blur(20px); flex-shrink: 0; }
-            .cmd-input-container { flex: 1; display: flex; align-items: center; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--glass-border); border-radius: 30px; padding: 6px 8px 6px 20px; transition: border-color 0.3s; }
-            .cmd-input-container:focus-within { border-color: var(--accent-cyan); box-shadow: 0 0 15px rgba(0,240,255,0.15); }
+            .bottom-command-bar { height: 64px; border-top: 1px solid var(--glass-border); padding: 0 24px; display: flex; align-items: center; gap: 16px; background: rgba(4, 6, 13, 0.95); backdrop-filter: blur(20px); flex-shrink: 0; }
+            .cmd-input-container { flex: 1; display: flex; align-items: center; background: rgba(15, 23, 42, 0.7); border: 1px solid var(--glass-border); border-radius: 30px; padding: 6px 8px 6px 20px; transition: border-color 0.3s; }
+            .cmd-input-container:focus-within { border-color: var(--accent-cyan); box-shadow: 0 0 15px rgba(0,240,255,0.2); }
             .cmd-input { flex: 1; background: transparent; border: none; outline: none; color: #fff; font-size: 13px; }
             .cmd-btn { padding: 10px 24px; background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue)); color: #000; border: none; border-radius: 24px; font-weight: 800; font-size: 12px; cursor: pointer; transition: transform 0.2s; }
             .cmd-btn:hover { transform: scale(1.03); }
 
-            /* NEXUS OBSIDIAN BRAIN 3D ZOOMABILE E DRAGGABILE */
-            #nexus-graph-canvas { width: 100%; height: 100%; display: block; background: #060913; cursor: grab; }
+            /* NEURAL GALAXY 3D (OBSIDIAN STYLE) */
+            #nexus-graph-canvas { width: 100%; height: 100%; display: block; background: #04060d; cursor: grab; }
             #nexus-graph-canvas:active { cursor: grabbing; }
-            .nexus-toolbar { position: absolute; top: 16px; left: 16px; display: flex; gap: 6px; z-index: 10; background: rgba(13,22,41,0.88); padding: 8px 12px; border-radius: 12px; border: 1px solid var(--glass-border); backdrop-filter: blur(10px); flex-wrap: wrap; }
-            .nexus-filter-btn { background: rgba(0,240,255,0.1); border: 1px solid rgba(0,240,255,0.3); color: var(--text-bright); padding: 4px 10px; border-radius: 8px; font-size: 10px; font-weight: 700; cursor: pointer; transition: all 0.2s; }
-            .nexus-filter-btn.active, .nexus-filter-btn:hover { background: var(--accent-cyan); color: #000; box-shadow: 0 0 10px rgba(0,240,255,0.4); }
+            .nexus-toolbar { position: absolute; top: 16px; left: 16px; display: flex; gap: 6px; z-index: 10; background: rgba(10,17,32,0.9); padding: 8px 12px; border-radius: 12px; border: 1px solid var(--glass-border); backdrop-filter: blur(12px); flex-wrap: wrap; }
+            .nexus-filter-btn { background: rgba(0,240,255,0.1); border: 1px solid rgba(0,240,255,0.3); color: var(--text-bright); padding: 5px 12px; border-radius: 8px; font-size: 10px; font-weight: 700; cursor: pointer; transition: all 0.2s; }
+            .nexus-filter-btn.active, .nexus-filter-btn:hover { background: var(--accent-cyan); color: #000; box-shadow: 0 0 12px rgba(0,240,255,0.5); }
             
-            .nexus-inspector { position: absolute; bottom: 16px; right: 16px; width: 280px; background: rgba(13,22,41,0.95); border: 1px solid var(--accent-cyan); border-radius: 14px; padding: 14px; display: none; z-index: 10; backdrop-filter: blur(15px); box-shadow: 0 8px 25px rgba(0,0,0,0.6); }
+            .nexus-inspector { position: absolute; bottom: 16px; right: 16px; width: 300px; background: rgba(10,17,32,0.96); border: 1px solid var(--accent-cyan); border-radius: 14px; padding: 16px; display: none; z-index: 10; backdrop-filter: blur(18px); box-shadow: 0 10px 30px rgba(0,0,0,0.7); }
 
-            /* RESPONSIVE PER MOBILE */
             @media (max-width: 900px) {
                 .command-grid { grid-template-columns: 1fr; grid-template-rows: auto 1fr; height: auto; overflow-y: auto; }
                 body { height: auto; overflow: auto; }
@@ -105,7 +103,7 @@ def get_dashboard_html() -> str:
             <aside class="sidebar-panel">
                 <div class="nav-menu">
                     <div class="nav-item active" onclick="switchMainView('hud')">🌐 Dashboard AI</div>
-                    <div class="nav-item" onclick="switchMainView('nexus')">🕸️ Nexus Second Brain</div>
+                    <div class="nav-item" onclick="switchMainView('nexus')">🕸️ Second Brain 3D</div>
                 </div>
                 <div class="peter-avatar-card">
                     <canvas id="peter-avatar-canvas" title="Clicca per parlare a voce con Peter"></canvas>
@@ -131,12 +129,12 @@ def get_dashboard_html() -> str:
                     <section class="feed-panel">
                         <div class="panel-header"><span>LIVE DIALOG FEED</span><span style="font-size: 10px; color: var(--accent-green);">● READY</span></div>
                         <div id="chat-feed">
-                            <div class="msg peter">Nexus Second Brain operativo: usa i filtri in alto, zoomma con la rotellina e trascina il grafo per esplorare liberamente le galassie di memorie, persone ed eventi!</div>
+                            <div class="msg peter">Second Brain 3D rigenerato con grafica galattica e layer separati per persone, memorie ed eventi. Esplora liberamente!</div>
                         </div>
                     </section>
                 </div>
 
-                <!-- VISTA NEXUS OBSIDIAN BRAIN 3D INTERATTIVA -->
+                <!-- VISTA SECOND BRAIN 3D -->
                 <div id="view-nexus" class="view-tab" style="position: relative; overflow: hidden; border-radius: 20px; border: 1px solid var(--glass-border); height: 100%;">
                     <div class="nexus-toolbar">
                         <button class="nexus-filter-btn active" onclick="filterNexusLayer('all', this)">TUTTO</button>
@@ -148,10 +146,10 @@ def get_dashboard_html() -> str:
                     <div id="nexus-inspector" class="nexus-inspector">
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
                             <span id="inspector-type" style="font-size:9px; font-family:monospace; color:var(--accent-cyan); text-transform:uppercase;">NODO</span>
-                            <span onclick="document.getElementById('nexus-inspector').style.display='none'" style="cursor:pointer; font-size:12px; color:var(--text-dim);">✕</span>
+                            <span onclick="document.getElementById('nexus-inspector').style.display='none'" style="cursor:pointer; font-size:14px; color:var(--text-dim);">✕</span>
                         </div>
-                        <h4 id="inspector-title" style="font-size:14px; color:#fff; margin-bottom:4px;">Nome</h4>
-                        <p id="inspector-desc" style="font-size:11px; color:var(--text-dim); line-height:1.4;">Dettagli...</p>
+                        <h4 id="inspector-title" style="font-size:15px; color:#fff; margin-bottom:6px;">Nome</h4>
+                        <p id="inspector-desc" style="font-size:11px; color:var(--text-dim); line-height:1.45; word-break:break-word;">Dettagli...</p>
                     </div>
                 </div>
             </main>
@@ -330,7 +328,7 @@ def get_dashboard_html() -> str:
                 }
             }
 
-            // MOTORE GRAFICO OBSIDIAN SECOND BRAIN CON PAN & ZOOM MANUALE
+            // MOTORE GRAFICO SECOND BRAIN 3D // ALTA QUALITÀ VISIVA (OBSIDIAN STYLE)
             async function loadNexus3D() {
                 const canvas = document.getElementById('nexus-graph-canvas');
                 if(!canvas) return;
@@ -366,10 +364,10 @@ def get_dashboard_html() -> str:
 
                     canvas.onwheel = (e) => {
                         e.preventDefault();
-                        const zoomFactor = 1.1;
+                        const zoomFactor = 1.12;
                         if(e.deltaY < 0) zoom *= zoomFactor;
                         else zoom /= zoomFactor;
-                        zoom = Math.max(0.4, Math.min(3.5, zoom));
+                        zoom = Math.max(0.3, Math.min(4.0, zoom));
                     };
 
                     canvas.onclick = (e) => {
@@ -379,7 +377,7 @@ def get_dashboard_html() -> str:
                         
                         for(let pn of projectedNodes) {
                             const dist = Math.hypot(pn.px - clickX, pn.py - clickY);
-                            if(dist < (pn.node.type === 'core' ? 22 : 14 * zoom)) {
+                            if(dist < (pn.node.type === 'core' ? 24 : 16 * zoom)) {
                                 showInspector(pn.node);
                                 break;
                             }
@@ -392,44 +390,58 @@ def get_dashboard_html() -> str:
 
                         const filteredNodes = nexusNodesCache.filter(n => activeNexusFilter === 'all' || n.type === activeNexusFilter || n.type === 'core');
 
-                        // Connessioni
-                        ctx.lineWidth = 1;
+                        // Linee di connessione laser
+                        ctx.lineWidth = 1.2;
                         filteredNodes.forEach((n) => {
                             if(n.type === 'core') return;
                             let px = panX + (n.x * zoom);
                             let py = panY + (n.y * zoom);
 
-                            ctx.strokeStyle = n.type === 'person' ? 'rgba(0, 240, 255, 0.25)' : n.type === 'memory' ? 'rgba(139, 92, 246, 0.25)' : 'rgba(236, 72, 153, 0.25)';
+                            if(n.type === 'person') ctx.strokeStyle = 'rgba(0, 240, 255, 0.35)';
+                            else if(n.type === 'memory') ctx.strokeStyle = 'rgba(139, 92, 246, 0.35)';
+                            else ctx.strokeStyle = 'rgba(236, 72, 153, 0.35)';
+
                             ctx.beginPath();
                             ctx.moveTo(panX, panY);
                             ctx.lineTo(px, py);
                             ctx.stroke();
                         });
 
-                        // Nodi
+                        // Nodi sferici tridimensionali con bagliore
                         filteredNodes.forEach((n) => {
                             let px = panX + (n.x * zoom);
                             let py = panY + (n.y * zoom);
 
                             projectedNodes.push({ px, py, node: n });
 
+                            let radius = (n.type === 'core' ? 16 : 8) * zoom;
+
+                            // Bagliore esterno
                             ctx.beginPath();
-                            let radius = (n.type === 'core' ? 14 : 7) * zoom;
+                            ctx.arc(px, py, radius * 1.6, 0, Math.PI * 2);
+                            if(n.type === 'core') ctx.fillStyle = 'rgba(16, 185, 129, 0.25)';
+                            else if(n.type === 'person') ctx.fillStyle = 'rgba(0, 240, 255, 0.25)';
+                            else if(n.type === 'memory') ctx.fillStyle = 'rgba(139, 92, 246, 0.25)';
+                            else ctx.fillStyle = 'rgba(236, 72, 153, 0.25)';
+                            ctx.fill();
+
+                            // Sfera principale
+                            ctx.beginPath();
                             ctx.arc(px, py, radius, 0, Math.PI * 2);
+                            if(n.type === 'core') ctx.fillStyle = '#10b981'; // Verde Core
+                            else if(n.type === 'person') ctx.fillStyle = '#00f0ff'; // Ciano Persone
+                            else if(n.type === 'memory') ctx.fillStyle = '#8b5cf6'; // Viola Memorie
+                            else if(n.type === 'event') ctx.fillStyle = '#ec4899'; // Rosa Eventi
                             
-                            if(n.type === 'core') ctx.fillStyle = '#10b981'; // Verde
-                            else if(n.type === 'person') ctx.fillStyle = '#00f0ff'; // Ciano
-                            else if(n.type === 'memory') ctx.fillStyle = '#8b5cf6'; // Viola
-                            else if(n.type === 'event') ctx.fillStyle = '#ec4899'; // Rosa
-                            
-                            ctx.shadowBlur = 10;
+                            ctx.shadowBlur = 14;
                             ctx.shadowColor = ctx.fillStyle;
                             ctx.fill();
                             ctx.shadowBlur = 0;
 
+                            // Etichetta testuale leggibile
                             ctx.fillStyle = '#f8fafc';
-                            ctx.font = `${Math.max(9, 10 * zoom)}px Inter`;
-                            ctx.fillText(n.name, px + (radius + 4), py + 4);
+                            ctx.font = `bold ${Math.max(10, 11 * zoom)}px Inter`;
+                            ctx.fillText(n.name, px + radius + 6, py + 4);
                         });
 
                         requestAnimationFrame(drawGraph);
