@@ -4,7 +4,7 @@ from datetime import datetime
 import httpx
 from fastapi import HTTPException
 from config import GROQ_API_KEY, GROQ_URL
-from database import save_fact, get_personality_settings, get_contacts
+from database import save_fact, save_contact_entity, get_personality_settings, get_contacts
 from tools import search_web, search_youtube, search_apple_music, search_image, send_telegram_message
 from scraper import fetch_web_page
 
@@ -47,7 +47,7 @@ async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
     telegram_sent = False
 
     try:
-        async with httpx.AsyncClient(timeout=6.0) as client:
+        async with httpx.AsyncClient(timeout=5.0) as client:
             res = await client.post(GROQ_URL, json={
                 "model": MODEL_FAST,
                 "messages": messages,
@@ -66,7 +66,7 @@ async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
 
                     if tool == "SEND_TELEGRAM":
                         telegram_sent = await send_telegram_message(query)
-                        query_used = f"Telegram Outbound: Sent '{query}'"
+                        query_used = f"Telegram Outbound: Invio '{query}'"
                     elif tool == "YOUTUBE":
                         media_data = search_youtube(query)
                         query_used = f"YouTube Player: {query}"
@@ -84,18 +84,13 @@ async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
                         else:
                             screen_display = {"type": "SEARCH_PREVIEW", "query": query, "content": web_content[:300]}
 
-                    if screen_type == "IMAGE_PREVIEW" and screen_target and not screen_display:
-                        img_url = search_image(screen_target)
-                        if img_url:
-                            screen_display = {"type": "IMAGE_PREVIEW", "title": screen_target, "image_url": img_url, "content": ""}
-
                     if screen_type == "PERSON_CARD" and screen_target:
                         all_contacts = get_contacts()
                         matched = next((c for c in all_contacts if screen_target.lower() in c['name'].lower()), None)
                         if matched:
                             screen_display = {"type": "PERSON_CARD", "person": matched}
                         else:
-                            screen_display = {"type": "PERSON_CARD", "person": {"name": screen_target, "category": "amicizia", "notes": "Menzionato in conversazione"}}
+                            screen_display = {"type": "PERSON_CARD", "person": {"name": screen_target, "category": "amicizia", "notes": "Menzionato nella storia"}}
     except Exception as e:
         print(f"Errore Model 1 Router: {e}")
 
@@ -148,7 +143,7 @@ async def generate_peter_response(user_message: str, recent_context: str, long_t
 
     headers = {"Content-Type": "application/json", "Authorization": f"Bearer {GROQ_API_KEY}"}
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(timeout=25.0) as client:
         res = await client.post(GROQ_URL, json=payload, headers=headers)
         if res.status_code != 200:
             raise HTTPException(status_code=500, detail=f"Errore Groq: {res.text}")
@@ -157,13 +152,19 @@ async def generate_peter_response(user_message: str, recent_context: str, long_t
         return {"reply": reply, "query_used": query_used, "media": media_data, "screen": screen_display}
 
 async def extract_and_save_facts(user_message: str):
+    """MODEL 3 (Background): Estrazione strutturata di Fatti, Persone ed Eventi per la mappa Nexus 3D."""
     if not GROQ_API_KEY:
         return
 
     extraction_prompt = (
-        "Analizza il messaggio dell'utente. Se contiene un fatto permanente su di lui "
-        "(progetti, preferenze, persone, abitudini, competenze), estrai SOLO quel fatto in una frase sintetica in italiano. "
-        "Altrimenti rispondi SOLO 'NESSUNO'."
+        "Analizza la conversazione dell'utente ed estrai le informazioni permanenti nel seguente formato JSON valido:\n"
+        "{\n"
+        '  "fact": "fatto permanente rilevato su Marco o NESSUNO",\n'
+        '  "person_name": "nome di una persona menzionata o NESSUNO",\n'
+        '  "category": "famiglia" | "amicizia" | "lavoro",\n'
+        '  "event": "eventuale evento menzionato legato a questa persona o NESSUNO",\n'
+        '  "notes": "dettagli o note sulla persona o NESSUNO"\n'
+        "}"
     )
 
     try:
@@ -178,8 +179,20 @@ async def extract_and_save_facts(user_message: str):
             }, headers={"Content-Type": "application/json", "Authorization": f"Bearer {GROQ_API_KEY}"})
             
             if res.status_code == 200:
-                extracted = res.json()["choices"][0]["message"]["content"].strip()
-                if extracted and extracted.upper() != "NESSUNO":
-                    save_fact(extracted)
+                raw_text = res.json()["choices"][0]["message"]["content"].strip()
+                if "{" in raw_text and "}" in raw_text:
+                    raw_text = raw_text[raw_text.find("{"):raw_text.rfind("}")+1]
+                    parsed = json.loads(raw_text)
+
+                    fact = parsed.get("fact", "")
+                    if fact and fact.upper() != "NESSUNO":
+                        save_fact(fact)
+
+                    person = parsed.get("person_name", "")
+                    if person and person.upper() != "NESSUNO":
+                        category = parsed.get("category", "amicizia")
+                        event = parsed.get("event", "") if parsed.get("event") != "NESSUNO" else ""
+                        notes = parsed.get("notes", "") if parsed.get("notes") != "NESSUNO" else ""
+                        save_contact_entity(person, category, notes, event)
     except Exception as e:
-        print(f"Errore Model 3 Fact Extraction: {e}")
+        print(f"Errore Model 3 Fact & Entity Extraction: {e}")
