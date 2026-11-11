@@ -71,14 +71,13 @@ def save_fact(fact_text: str):
     except Exception:
         pass
 
-# GESTIONE TELEGRAM CHAT ID
 def save_telegram_chat_id(chat_id: int):
     if not supabase:
         return
     try:
         supabase.table("system_settings").upsert({"key": "last_telegram_chat_id", "value": str(chat_id)}).execute()
-    except Exception as e:
-        print(f"Errore salvataggio Telegram Chat ID: {e}")
+    except Exception:
+        pass
 
 def get_telegram_chat_id() -> str:
     if not supabase:
@@ -91,14 +90,73 @@ def get_telegram_chat_id() -> str:
         pass
     return ""
 
-# CONTATTI & CALENDARIO
+# STRUTTURA NEXUS 3D MAP & ENTITÀ
+def save_contact_entity(name: str, category: str = "amicizia", notes: str = "", event_title: str = ""):
+    if not supabase:
+        return
+    try:
+        res = supabase.table("contacts").select("*").ilike("name", name).execute()
+        if not res.data:
+            supabase.table("contacts").insert([{
+                "name": name,
+                "category": category,
+                "notes": notes,
+                "details": f"Evento collegato: {event_title}" if event_title else ""
+            }]).execute()
+        elif event_title or notes:
+            existing = res.data[0]
+            updated_notes = (existing.get("notes", "") + f" | {notes}").strip(" |")
+            supabase.table("contacts").update({"notes": updated_notes}).eq("id", existing["id"]).execute()
+    except Exception as e:
+        print(f"Errore salvataggio entità Nexus: {e}")
+
+def get_nexus_graph_data() -> dict:
+    """Genera la struttura nodi e collegamenti per il Grafo 3D Nexus."""
+    nodes = [
+        {"id": "user_self", "name": "Marco", "category": "self", "x": 0, "y": 0, "z": 0, "notes": "Admin di Peter OS", "events": ["Creatore del sistema"]}
+    ]
+    edges = []
+
+    if not supabase:
+        return {"nodes": nodes, "edges": edges}
+
+    try:
+        contacts_res = supabase.table("contacts").select("*").execute()
+        contacts = contacts_res.data or []
+
+        for idx, c in enumerate(contacts):
+            node_id = f"contact_{c.get('id', idx)}"
+            cat = c.get("category", "amicizia").lower()
+            
+            # Posizionamento orbitale 3D
+            import math
+            angle = (idx / max(len(contacts), 1)) * 2 * math.pi
+            radius = 140 if cat == "famiglia" else (180 if cat == "amicizia" else 220)
+            
+            nodes.append({
+                "id": node_id,
+                "name": c.get("name", "Persona"),
+                "category": cat,
+                "x": math.cos(angle) * radius,
+                "y": math.sin(angle) * radius * 0.5,
+                "z": math.sin(angle) * radius,
+                "notes": c.get("notes", "Nessuna nota"),
+                "events": [c.get("details")] if c.get("details") else []
+            })
+            edges.append({"source": "user_self", "target": node_id})
+
+    except Exception as e:
+        print(f"Errore lettura dati Nexus Graph: {e}")
+
+    return {"nodes": nodes, "edges": edges}
+
 def save_contacts_batch(contacts: list):
     if not supabase or not contacts:
         return
     try:
         supabase.table("contacts").insert(contacts).execute()
-    except Exception as e:
-        print(f"Errore salvataggio batch contatti: {e}")
+    except Exception:
+        pass
 
 def get_contacts():
     if not supabase:
@@ -114,14 +172,14 @@ def save_calendar_events_batch(events: list):
         return
     try:
         supabase.table("calendar_events").insert(events).execute()
-    except Exception as e:
-        print(f"Errore salvataggio batch calendari: {e}")
+    except Exception:
+        pass
 
 def get_personality_settings() -> dict:
     default_settings = {
         "tone": "Schietto, empatico, naturale, colto e ironico.",
         "initiative_level": "Alto (Suggerimenti proattivi)",
-        "custom_instructions": "Tratta Marco come un amico fidato alla pari. Fai riferimenti espliciti a quello che vede sullo Schermo HUD."
+        "custom_instructions": "Tratta Marco come un amico fidato alla pari."
     }
     if not supabase:
         return default_settings
@@ -138,5 +196,5 @@ def save_personality_settings(settings: dict):
         return
     try:
         supabase.table("system_settings").upsert({"key": "personality", "value": settings}).execute()
-    except Exception as e:
-        print(f"Errore salvataggio personalità: {e}")
+    except Exception:
+        pass
