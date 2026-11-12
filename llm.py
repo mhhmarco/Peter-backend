@@ -14,7 +14,7 @@ from scraper import fetch_web_page
 
 MODEL_FAST = "openai/gpt-oss-20b"
 MODEL_SMART = "openai/gpt-oss-120b"
-MODEL_FACT = "qwen/qwen3.8-27b"
+MODEL_VISION = "qwen/qwen3.8-27b"  # Modello multimodale ufficiale su Groq per immagini e OCR
 
 async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
     if not GROQ_API_KEY:
@@ -130,9 +130,8 @@ async def generate_peter_response(user_message: str, recent_context: str, long_t
         f"DATA E ORA: {now_str}\n\n"
         "=== AUTOCOSCIENZA E STATO DI SISTEMA ===\n"
         f"- La tua personalità attuale impostata nei parametri è: '{current_tone}'\n"
-        "- Architettura: FastAPI + Groq LPU (gpt-oss-120b / gpt-oss-20b / qwen3.8-27b) + Supabase PostgreSQL + WebGL 3D Nexus + Sintesi Vocale Neurale.\n"
-        "- Capacità attive: Riproduzione YouTube/Apple Music sull'HUD, ricerca web, invio messaggi/vocali Telegram, estrazione automatica di persone/eventi/interessi nel Grafo 3D.\n"
-        "- Se Marco ti chiede come stai, come è impostata la tua personalità o cosa puoi fare, rispondi con piena consapevolezza citando il tuo tono attuale e le tue funzionalità.\n\n"
+        "- Architettura: FastAPI + Groq LPU (gpt-oss-120b / qwen3.8-27b) + Supabase PostgreSQL + WebGL 3D Nexus + Sintesi Vocale Neurale.\n"
+        "- Capacità attive: Riproduzione YouTube/Apple Music sull'HUD, ricerca web, invio messaggi/vocali Telegram, analisi immagini Vision, estrazione automatica nel Grafo 3D.\n\n"
         "DIRETTIVE DI RISPOSTA:\n"
         "1. Sii naturale, brillante, diretto e conciso (stile chat veloce), senza elenchi puntati lunghi.\n"
         "2. Usa le memorie e le passioni di Marco come contesto naturale."
@@ -150,12 +149,15 @@ async def generate_peter_response(user_message: str, recent_context: str, long_t
     if long_term_facts:
         system_prompt += f"\n\nMemorie su Marco:\n{long_term_facts}"
 
+    # Se c'è un'immagine usiamo il modello vision Qwen, altrimenti il modello smart standard
+    model_to_use = MODEL_VISION if image_data_url else MODEL_SMART
     messages = [{"role": "system", "content": system_prompt}]
+    
     if image_data_url:
         messages.append({
             "role": "user",
             "content": [
-                {"type": "text", "text": user_message if user_message else "Analizza questa immagine."},
+                {"type": "text", "text": user_message if user_message else "Analizza questa immagine ed estrai le informazioni."},
                 {"type": "image_url", "image_url": {"url": image_data_url}}
             ]
         })
@@ -163,17 +165,17 @@ async def generate_peter_response(user_message: str, recent_context: str, long_t
         messages.append({"role": "user", "content": user_message})
 
     try:
-        async with httpx.AsyncClient(timeout=20.0) as client:
+        async with httpx.AsyncClient(timeout=25.0) as client:
             res = await client.post(GROQ_URL, json={
-                "model": MODEL_SMART,
+                "model": model_to_use,
                 "messages": messages,
-                "temperature": 0.65
+                "temperature": 0.5
             }, headers={"Content-Type": "application/json", "Authorization": f"Bearer {GROQ_API_KEY}"})
             
             if res.status_code != 200:
                 print(f"Groq Error {res.status_code}: {res.text}")
                 return {
-                    "reply": f"Errore dal modello ({res.status_code}), controlla i modelli attivi su Groq.",
+                    "reply": f"Errore dal modello ({res.status_code}): {res.text[:100]}",
                     "query_used": "", "media": None, "screen": None,
                     "reasoning": f"> Errore API {res.status_code}"
                 }
@@ -202,13 +204,13 @@ async def extract_and_save_facts(user_message: str, image_data_url: str = None):
         "Sei il modulo di memoria di Peter. L'utente principale è MARCO BARBIERO TORRES (detto Marco o Barbi, maschio, nato nel 2006).\n"
         "REGOLE FONDAMENTALI:\n"
         "1. NON inserire MAI Marco / Barbi nell'array 'people'! Marco è già il nodo centrale.\n"
-        "2. Estrai TUTTE le ALTRE persone menzionate (es. genitori, amici, partner) nell'array 'people', deducendo il genere ('M' o 'F') dal nome, l'anno di nascita (stimato se non detto, es. genitore ~1975) e il tipo di relazione ('famiglia', 'amicizia', 'amore', 'lavoro').\n"
+        "2. Estrai TUTTE le ALTRE persone menzionate o presenti nell'immagine (es. genitori, amici, partner) nell'array 'people', deducendo il genere ('M' o 'F') dal nome, l'anno di nascita (stimato se non detto) e il tipo di relazione ('famiglia', 'amicizia', 'amore', 'lavoro').\n"
         "3. Estrai eventuali fatti su Marco in 'fact', eventi in 'event' e passioni in 'interest'.\n\n"
         "Rispondi SOLO con questo JSON:\n"
         "{\n"
         '  "fact": "fatto permanente o NESSUNO",\n'
         '  "people": [\n'
-        '    {"name": "Nome Cognome", "gender": "M/F", "birth_year": 1975, "relation_type": "famiglia/amicizia/amore/lavoro", "notes": "chi è rispetto a Marco"}\n'
+        '    {"name": "Nome Cognome", "gender": "M/F", "birth_year": 1975, "relation_type": "famiglia/amicizia/amore/lavoro", "notes": "chi è"}\n'
         '  ],\n'
         '  "event_title": "titolo evento o NESSUNO",\n'
         '  "event_desc": "dettagli evento o NESSUNO",\n'
@@ -218,11 +220,13 @@ async def extract_and_save_facts(user_message: str, image_data_url: str = None):
     )
 
     messages = [{"role": "system", "content": extraction_prompt}]
+    model_to_use = MODEL_VISION if image_data_url else MODEL_SMART
+    
     if image_data_url:
         messages.append({
             "role": "user",
             "content": [
-                {"type": "text", "text": user_message if user_message else "Estrai tutte le persone (tranne Marco), eventi o interessi."},
+                {"type": "text", "text": user_message if user_message else "Estrai le persone, i nodi o i dati da questa immagine."},
                 {"type": "image_url", "image_url": {"url": image_data_url}}
             ]
         })
@@ -230,9 +234,9 @@ async def extract_and_save_facts(user_message: str, image_data_url: str = None):
         messages.append({"role": "user", "content": user_message})
 
     try:
-        async with httpx.AsyncClient(timeout=12.0) as client:
+        async with httpx.AsyncClient(timeout=15.0) as client:
             res = await client.post(GROQ_URL, json={
-                "model": MODEL_FACT,
+                "model": model_to_use,
                 "messages": messages,
                 "temperature": 0.1
             }, headers={"Content-Type": "application/json", "Authorization": f"Bearer {GROQ_API_KEY}"})
