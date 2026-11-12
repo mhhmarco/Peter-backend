@@ -33,6 +33,11 @@ class ICalRequest(BaseModel):
 
 @app.get("/ping")
 def ping():
+    """Endpoint di Keep-Alive per mantenere attivo il server su Render."""
+    return {"status": "alive"}
+
+@app.get("/ping")
+def ping():
     return {"status": "alive"}
 
 @app.get("/", response_class=HTMLResponse)
