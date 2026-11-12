@@ -4,12 +4,13 @@ from datetime import datetime
 import httpx
 from fastapi import HTTPException
 from config import GROQ_API_KEY, GROQ_URL
-from database import save_fact, save_contact_entity, save_event_entity, get_contacts
+from database import save_fact, save_contact_entity, save_event_entity, save_interest_entity, get_contacts
 from tools import search_web, search_youtube, search_apple_music, search_image, send_telegram_message, send_telegram_voice_note
 from scraper import fetch_web_page
 
 MODEL_FAST = "openai/gpt-oss-20b"
 MODEL_SMART = "openai/gpt-oss-120b"
+MODEL_VISION = "meta-llama/llama-3.2-11b-vision-preview"
 MODEL_FACT = "qwen/qwen3.8-27b"
 
 async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
@@ -25,9 +26,9 @@ async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
         query_used = f"Web Scraper: {target_url}"
 
     system_prompt = (
-        "Sei il motore di routing di Peter OS.\n"
-        "Scegli il tool (YOUTUBE, APPLE_MUSIC, WEB_SEARCH, SEND_TELEGRAM, SEND_TELEGRAM_VOICE, NONE) "
-        "e l'HUD (PERSON_CARD, MEDIA_PLAYER, SEARCH_PREVIEW, IMAGE_PREVIEW, WEB_BROWSER, NONE).\n\n"
+        "Sei il router cognitivo di Peter OS.\n"
+        "Scegli tool (YOUTUBE, APPLE_MUSIC, WEB_SEARCH, SEND_TELEGRAM, SEND_TELEGRAM_VOICE, NONE) "
+        "e HUD (PERSON_CARD, MEDIA_PLAYER, SEARCH_PREVIEW, IMAGE_PREVIEW, WEB_BROWSER, NONE).\n\n"
         "Rispondi SOLO in JSON:\n"
         '{\n'
         '  "reasoning": "Motivazione",\n'
@@ -98,7 +99,7 @@ async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
 
     return {"web": web_content, "media": media_data, "screen": screen_display, "query_used": query_used, "telegram_sent": telegram_sent, "reasoning": reasoning_text}
 
-async def generate_peter_response(user_message: str, recent_context: str, long_term_facts: str) -> dict:
+async def generate_peter_response(user_message: str, recent_context: str, long_term_facts: str, image_data_url: str = None) -> dict:
     if not GROQ_API_KEY:
         raise HTTPException(status_code=500, detail="Manca API KEY")
 
@@ -122,20 +123,34 @@ async def generate_peter_response(user_message: str, recent_context: str, long_t
     if recent_context:
         system_prompt += f"\n\nConversazione recente:\n{recent_context}"
     if long_term_facts:
-        system_prompt+= f"\n\nMemorie permanenti:\n{long_term_facts}"
+        system_prompt += f"\n\nMemorie permanenti:\n{long_term_facts}"
+
+    # Se l'utente ha allegato un'immagine, usiamo il modello Vision
+    model_to_use = MODEL_SMART
+    user_content = user_message
+
+    messages = [{"role": "system", "content": system_prompt}]
+    if image_data_url:
+        model_to_use = MODEL_VISION
+        messages.append({
+            "role": "user",
+            "content": [
+                {"type": "text", "text": user_message if user_message else "Analizza questa immagine e dammi dettagli."},
+                {"type": "image_url", "image_url": {"url": image_data_url}}
+            ]
+        })
+    else:
+        messages.append({"role": "user", "content": user_message})
 
     payload = {
-        "model": MODEL_SMART,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_message}
-        ]
+        "model": model_to_use,
+        "messages": messages
     }
 
-    async with httpx.AsyncClient(timeout=25.0) as client:
+    async with httpx.AsyncClient(timeout=30.0) as client:
         res = await client.post(GROQ_URL, json=payload, headers={"Content-Type": "application/json", "Authorization": f"Bearer {GROQ_API_KEY}"})
         if res.status_code != 200:
-            raise HTTPException(status_code=500, detail="Errore Groq Core")
+            raise HTTPException(status_code=500, detail="Errore Groq Core / Vision")
         reply = res.json()["choices"][0]["message"]["content"]
         
         return {
@@ -143,29 +158,45 @@ async def generate_peter_response(user_message: str, recent_context: str, long_t
             "query_used": tool_exec["query_used"], 
             "media": tool_exec["media"], 
             "screen": tool_exec["screen"],
-            "reasoning": f"> Analisi contesto: {tool_exec['reasoning']}"
+            "reasoning": f"> Analisi contesto e multimodale: {tool_exec['reasoning']}"
         }
 
-async def extract_and_save_facts(user_message: str):
+async def extract_and_save_facts(user_message: str, image_data_url: str = None):
     if not GROQ_API_KEY:
         return
+    
     extraction_prompt = (
-        "Analizza il messaggio ed estrai entità in JSON rigoroso:\n"
+        "Analizza il messaggio o l'immagine fornita ed estrai entità strutturate in JSON rigoroso:\n"
         "{\n"
-        '  "fact": "fatto o memoria permanente su Marco o NESSUNO",\n'
-        '  "person_name": "nome della persona menzionata (es. Beatrice, Salmez, Takuro) o NESSUNO",\n'
-        '  "category": "famiglia" o "amicizia" o "fidanzata" o "lavoro",\n'
-        '  "birthday": "data di compleanno o nascita se menzionata (es. 20 dicembre 2004) o NESSUNO",\n'
-        '  "notes": "dettagli o relazioni associate alla persona o NESSUNO",\n'
-        '  "event_title": "titolo evento o appuntamento o NESSUNO",\n'
-        '  "event_desc": "dettagli evento o NESSUNO"\n'
+        '  "fact": "fatto o memoria di chat permanente o NESSUNO",\n'
+        '  "person_name": "nome persona o NESSUNO",\n'
+        '  "category": "famiglia / amicizia / amore / lavoro / altro",\n'
+        '  "birthday": "compleanno o data se presente o NESSUNO",\n'
+        '  "notes": "dettagli o legami relazionali o NESSUNO",\n'
+        '  "event_title": "evento personale o NESSUNO",\n'
+        '  "event_desc": "dettagli evento o NESSUNO",\n'
+        '  "interest_name": "interesse ricorrente o NESSUNO",\n'
+        '  "interest_desc": "descrizione interesse o NESSUNO"\n'
         "}"
     )
+
+    messages = [{"role": "system", "content": extraction_prompt}]
+    if image_data_url:
+        messages.append({
+            "role": "user",
+            "content": [
+                {"type": "text", "text": user_message if user_message else "Estrai contatti, eventi o interessi da questa immagine."},
+                {"type": "image_url", "image_url": {"url": image_data_url}}
+            ]
+        })
+    else:
+        messages.append({"role": "user", "content": user_message})
+
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=15.0) as client:
             res = await client.post(GROQ_URL, json={
                 "model": MODEL_FACT,
-                "messages": [{"role": "system", "content": extraction_prompt}, {"role": "user", "content": user_message}],
+                "messages": messages,
                 "temperature": 0.1
             }, headers={"Content-Type": "application/json", "Authorization": f"Bearer {GROQ_API_KEY}"})
             
@@ -175,21 +206,21 @@ async def extract_and_save_facts(user_message: str):
                     raw_text = raw_text[raw_text.find("{"):raw_text.rfind("}")+1]
                     parsed = json.loads(raw_text)
                     
-                    fact = parsed.get("fact")
-                    if fact and fact.upper() != "NESSUNO":
-                        save_fact(fact)
+                    if parsed.get("fact") and parsed.get("fact") != "NESSUNO":
+                        save_fact(parsed.get("fact"))
                         
-                    person = parsed.get("person_name")
-                    if person and person.upper() != "NESSUNO":
+                    if parsed.get("person_name") and parsed.get("person_name") != "NESSUNO":
                         save_contact_entity(
-                            name=person,
+                            name=parsed.get("person_name"),
                             category=parsed.get("category", "amicizia"),
                             notes=parsed.get("notes", ""),
                             birthday=parsed.get("birthday", "")
                         )
                         
-                    ev_title = parsed.get("event_title")
-                    if ev_title and ev_title.upper() != "NESSUNO":
-                        save_event_entity(ev_title, parsed.get("event_desc", ""))
+                    if parsed.get("event_title") and parsed.get("event_title") != "NESSUNO":
+                        save_event_entity(parsed.get("event_title"), parsed.get("event_desc", ""))
+
+                    if parsed.get("interest_name") and parsed.get("interest_name") != "NESSUNO":
+                        save_interest_entity(parsed.get("interest_name"), parsed.get("interest_desc", ""))
     except Exception as e:
-        print(f"Errore estrazione entità: {e}")
+        print(f"Errore estrazione multimodale: {e}")
