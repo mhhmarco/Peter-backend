@@ -11,6 +11,22 @@ if SUPABASE_URL and SUPABASE_KEY:
     except Exception as e:
         supabase_error_log = str(e)
 
+def save_telegram_chat_id(chat_id: int):
+    if not supabase: return
+    try:
+        supabase.table("system_settings").upsert({"key": "last_telegram_chat_id", "value": str(chat_id)}).execute()
+    except Exception:
+        pass
+
+def get_telegram_chat_id() -> str:
+    if not supabase: return ""
+    try:
+        res = supabase.table("system_settings").select("value").eq("key", "last_telegram_chat_id").execute()
+        if res.data: return res.data[0]["value"]
+    except Exception:
+        pass
+    return ""
+
 def get_recent_memories(limit: int = 8) -> str:
     if not supabase: return ""
     try:
