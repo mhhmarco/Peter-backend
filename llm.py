@@ -111,14 +111,6 @@ async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
 
     return {"web": web_content, "media": media_data, "screen": screen_display, "query_used": query_used, "telegram_sent": telegram_sent, "reasoning": reasoning_text}
 
-from database import merge_contact_aliases
-
-# All'interno di extract_and_save_facts o nel router:
-# Se l'utente dice che due persone sono la stessa persona:
-if "sono la stessa persona" in user_message.lower() or "è lo stesso" in user_message.lower():
-    # Estrae i due nomi e chiama merge_contact_aliases(alias, target)
-    pass
-
 
 async def generate_peter_response(user_message: str, recent_context: str, long_term_facts: str, image_data_url: str = None) -> dict:
     if not GROQ_API_KEY:
