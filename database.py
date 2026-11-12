@@ -122,6 +122,13 @@ def save_episodic_memory(content: str):
     except Exception as e:
         print(f"Errore salvataggio memoria episodica: {e}")
 
+def save_fact(fact_text: str):
+    if not supabase or not fact_text: return
+    try:
+        supabase.table("user_facts").insert({"fact": fact_text}).execute()
+    except Exception as e:
+        print(f"Errore salvataggio fact: {e}")
+
 def delete_fact_by_id(fact_id: str) -> bool:
     if not supabase: return False
     try:
