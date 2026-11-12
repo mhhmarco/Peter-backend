@@ -1,7 +1,4 @@
-import math
-
 def calculate_galaxy_layout(supabase_client) -> dict:
-    # Il nodo centrale (Tu)
     nodes = [{
         "id": "user_self", 
         "name": "Marco (Tu)", 
@@ -16,14 +13,17 @@ def calculate_galaxy_layout(supabase_client) -> dict:
     if not supabase_client:
         return {"nodes": nodes, "edges": edges}
 
-    # 1. ZONA PERSONE
+    # 1. ZONA PERSONE (Escludendo eventuali doppioni dell'utente stesso)
     try:
         contacts = supabase_client.table("contacts").select("*").execute().data or []
         for idx, c in enumerate(contacts):
+            c_name = c.get("name", "Persona").strip()
+            if c_name.lower() in ["marco", "barbi", "marco barbiero", "marco barbiero torres"]:
+                continue
             node_id = f"contact_{c.get('id', idx)}"
             nodes.append({
                 "id": node_id,
-                "name": c.get("name", "Persona"),
+                "name": c_name,
                 "category": c.get("category", "amicizia"),
                 "type": "person",
                 "notes": c.get("notes", "Nessuna nota"),
@@ -32,8 +32,11 @@ def calculate_galaxy_layout(supabase_client) -> dict:
                 "birth_year": c.get("birth_year"),
                 "relation_type": c.get("relation_type", "neutrale")
             })
-            # La relazione dà il colore alla linea
-            edges.append({"source": "user_self", "target": node_id, "relation_type": c.get("relation_type", "neutrale")})
+            edges.append({
+                "source": "user_self", 
+                "target": node_id, 
+                "relation_type": c.get("relation_type", "neutrale")
+            })
     except Exception as e:
         print(f"Errore graph contatti: {e}")
 
@@ -44,7 +47,7 @@ def calculate_galaxy_layout(supabase_client) -> dict:
             node_id = f"fact_{f.get('id', idx)}"
             nodes.append({
                 "id": node_id,
-                "name": f.get("fact", "")[:28] + "...",
+                "name": f.get("fact", "")[:32] + "...",
                 "category": "memory",
                 "type": "memory",
                 "notes": f.get("fact", ""),
@@ -61,7 +64,7 @@ def calculate_galaxy_layout(supabase_client) -> dict:
             node_id = f"event_{e.get('id', idx)}"
             nodes.append({
                 "id": node_id,
-                "name": e.get("title", "Evento")[:24],
+                "name": e.get("title", "Evento")[:26],
                 "category": "event",
                 "type": "event",
                 "notes": e.get("description", "Nessuna descrizione"),
@@ -82,7 +85,7 @@ def calculate_galaxy_layout(supabase_client) -> dict:
                 "category": "interest",
                 "type": "interest",
                 "notes": i.get("description", "Interesse ricorrente dell'utente"),
-                "details": "Categoria: Interessi & Skill"
+                "details": "Passione / Attitudine"
             })
             edges.append({"source": "user_self", "target": node_id, "relation_type": "passione"})
     except Exception:
