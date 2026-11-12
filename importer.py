@@ -2,7 +2,6 @@ import httpx
 from icalendar import Calendar
 
 def parse_vcard(vcf_text: str) -> list:
-    """Analizza un file vCard (.vcf) e restituisce contatti puliti senza duplicati."""
     contacts = []
     current_contact = {}
     for line in vcf_text.splitlines():
@@ -22,7 +21,6 @@ def parse_vcard(vcf_text: str) -> list:
     return contacts
 
 async def fetch_and_parse_ical(url: str) -> list:
-    """Scarica e analizza un calendario pubblico Google tramite URL iCal (.ics)."""
     events = []
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
