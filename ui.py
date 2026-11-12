@@ -5,7 +5,7 @@ def get_dashboard_html() -> str:
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>PETER HUD OS v11 - Neural Command Center</title>
+        <title>PETER HUD OS v12 - Neural Command Center</title>
         
         <script src="https://unpkg.com/3d-force-graph"></script>
 
@@ -160,7 +160,7 @@ def get_dashboard_html() -> str:
                     <section class="feed-panel">
                         <div class="panel-header"><span>LIVE DIALOG FEED</span><span style="font-size: 10px; color: var(--accent-green);">● READY</span></div>
                         <div id="chat-feed">
-                            <div class="msg peter">Peter OS v11 online. Autocoscienza, estrazione multi-persona, player multimediale e conversazione vocale attivi.</div>
+                            <div class="msg peter">Peter OS v12 online. Autocoscienza, estrazione multi-persona, player multimediale e sincronizzazione contatti attivi.</div>
                         </div>
                     </section>
                 </div>
@@ -190,9 +190,23 @@ def get_dashboard_html() -> str:
                     <div class="settings-container">
                         <div class="settings-group">
                             <h3>Parametri & Personalità di Peter</h3>
-                            <label class="settings-label">Tone of Voice (Come Peter pensa e si rivolge a te)</label>
+                            <label class="settings-label">Tone of Voice (Come Peter si rivolge a te)</label>
                             <input type="text" class="settings-input" id="setting-tone" value="Schietto, empatico, naturale, colto e ironico.">
-                            <button class="nexus-filter-btn" onclick="savePersonality()">💾 Salva Personalità</button>
+                            
+                            <label class="settings-label">Fuso Orario (Timezone)</label>
+                            <input type="text" class="settings-input" id="setting-timezone" value="Europe/Rome">
+
+                            <label class="settings-label">URL Calendario Pubblico Google (.ics)</label>
+                            <input type="text" class="settings-input" id="setting-calendar-url" placeholder="https://calendar.google.com/calendar/ical/.../basic.ics">
+
+                            <button class="nexus-filter-btn" onclick="saveSettings()">💾 Salva Impostazioni</button>
+                        </div>
+
+                        <div class="settings-group">
+                            <h3>Sincronizzazione Contatti (File .vcf)</h3>
+                            <label class="settings-label">Carica rubrica vCard</label>
+                            <input type="file" class="settings-input" id="vcf-file-input" accept=".vcf" />
+                            <button class="nexus-filter-btn" onclick="uploadVCard()">📂 Importa Contatti</button>
                         </div>
                         
                         <div class="settings-group">
@@ -253,7 +267,7 @@ def get_dashboard_html() -> str:
                 if(view === 'hud') document.getElementById('view-hud').classList.add('active');
                 else if(view === 'settings') {
                     document.getElementById('view-settings').classList.add('active');
-                    loadPersonality();
+                    loadSettings();
                 }
                 else if(view === 'nexus') { 
                     document.getElementById('view-nexus').classList.add('active'); 
@@ -338,21 +352,14 @@ def get_dashboard_html() -> str:
                 }
             }
 
-            // --- PLAYER MULTIMEDIALE & HUD ---
+            // --- PLAYER MULTIMEDIALE ROBUSTO ---
             function updateHudScreen(screen) {
                 const container = document.getElementById('hud-screen-content');
                 const badge = document.getElementById('hud-status-badge');
                 if(!screen || screen.type === 'NONE') return;
                 badge.innerText = `ACTIVE // ${screen.type}`;
 
-                if(screen.type === 'WEB_BROWSER' && screen.url) {
-                    container.innerHTML = `
-                        <div style="width:100%; max-width:380px; background:rgba(15,23,42,0.95); border:1px solid var(--accent-cyan); border-radius:14px; padding:14px; text-align:center;">
-                            <h3 style="color:var(--accent-cyan); font-size:12px; margin-bottom:10px; word-break:break-all;">${screen.url}</h3>
-                            <a href="${screen.url}" target="_blank" style="background:linear-gradient(135deg, var(--accent-cyan), var(--accent-purple)); color:#000; text-decoration:none; padding:8px 14px; border-radius:8px; font-weight:800; font-size:11px; display:inline-block;">Apri Link ↗</a>
-                        </div>`;
-                } 
-                else if(screen.type === 'MEDIA_PLAYER') {
+                if(screen.type === 'MEDIA_PLAYER') {
                     let embedLink = screen.embed_url || "";
                     if(embedLink.includes('watch?v=')) {
                         const vidId = embedLink.split('watch?v=')[1]?.substring(0, 11);
@@ -360,7 +367,7 @@ def get_dashboard_html() -> str:
                     }
                     container.innerHTML = `
                         <div style="width:100%; height:100%; display:flex; flex-direction:column; justify-content:center; align-items:center;">
-                            <div style="width:100%; max-width:360px; height:195px; border-radius:10px; overflow:hidden; border:1px solid var(--accent-cyan); background:#000;">
+                            <div style="width:100%; max-width:380px; height:200px; border-radius:12px; overflow:hidden; border:1px solid var(--accent-cyan); background:#000;">
                                 <iframe src="${embedLink}" style="width:100%; height:100%; border:none;" allow="accelerometer; autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
                             </div>
                         </div>`;
@@ -374,16 +381,6 @@ def get_dashboard_html() -> str:
                                 ${screen.content || ''}
                             </div>
                         </div>`;
-                }
-                else if(screen.type === 'SEARCH_PREVIEW') {
-                    container.innerHTML = `
-                        <div style="padding:12px; background:rgba(15,23,42,0.9); border:1px solid var(--accent-cyan); border-radius:12px; max-width:90%; font-size:11px; color:var(--text-bright);">
-                            <strong style="color:var(--accent-cyan); display:block; margin-bottom:6px;">🔍 ${screen.query}</strong>
-                            ${screen.content || ''}
-                        </div>`;
-                }
-                else if(screen.type === 'PERSON_CARD' && screen.person) {
-                    container.innerHTML = `<div style="background:rgba(15,23,42,0.95); border:1px solid var(--accent-cyan); padding:14px; border-radius:14px; text-align:center; max-width:260px;"><h3 style="color:var(--accent-cyan); font-size:15px;">👤 ${screen.person.name}</h3><p style="font-size:10px; color:var(--text-dim); margin:4px 0;">Relazione: ${screen.person.relation_type || screen.person.category}</p><p style="font-size:11px;">${screen.person.notes || 'In Nexus'}</p></div>`;
                 }
             }
 
@@ -450,23 +447,44 @@ def get_dashboard_html() -> str:
                 }
             }
 
-            // --- PERSONALITÀ & SETTINGS ---
-            async function loadPersonality() {
+            // --- SETTINGS & IMPORTAZIONE ---
+            async function loadSettings() {
                 try {
-                    const res = await fetch('/api/personality');
+                    const res = await fetch('/api/settings');
                     const data = await res.json();
                     if(data.tone) document.getElementById('setting-tone').value = data.tone;
+                    if(data.timezone) document.getElementById('setting-timezone').value = data.timezone;
+                    if(data.public_calendar_url) document.getElementById('setting-calendar-url').value = data.public_calendar_url;
                 } catch(e){}
             }
 
-            async function savePersonality() {
+            async function saveSettings() {
                 const tone = document.getElementById('setting-tone').value.trim();
-                await fetch('/api/personality', {
+                const timezone = document.getElementById('setting-timezone').value.trim();
+                const public_calendar_url = document.getElementById('setting-calendar-url').value.trim();
+                
+                await fetch('/api/settings', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ tone: tone, initiative_level: "Alto" })
+                    body: JSON.stringify({ tone, timezone, public_calendar_url })
                 });
-                alert("Personalità di Peter aggiornata!");
+                alert("Impostazioni salvate con successo!");
+            }
+
+            async function uploadVCard() {
+                const fileInput = document.getElementById('vcf-file-input');
+                if(!fileInput.files[0]) {
+                    alert("Seleziona prima un file .vcf!");
+                    return;
+                }
+                const formData = new FormData();
+                formData.append('file', fileInput.files[0]);
+                const res = await fetch('/api/import/vcard', { method: 'POST', body: formData });
+                if(res.ok) {
+                    alert("Contatti importati e sincronizzati senza duplicati!");
+                } else {
+                    alert("Errore durante l'importazione del file vCard.");
+                }
             }
 
             // --- GRAFO 3D WEBGL CENTRATO E INTERATTIVO ---
@@ -491,15 +509,15 @@ def get_dashboard_html() -> str:
             }
 
             function getNodeColor(node) {
-                if (node.type === 'core') return '#10b981'; // Verde Marco
+                if (node.type === 'core') return '#10b981';
                 if (node.type === 'person') {
-                    if(node.gender && node.gender.toUpperCase() === 'M') return '#3b82f6'; // Blu Uomo
-                    if(node.gender && node.gender.toUpperCase() === 'F') return '#ec4899'; // Rosa Donna
-                    return '#00f0ff'; // Ciano Altro
+                    if(node.gender && node.gender.toUpperCase() === 'M') return '#3b82f6';
+                    if(node.gender && node.gender.toUpperCase() === 'F') return '#ec4899';
+                    return '#00f0ff';
                 }
-                if (node.type === 'memory') return '#8b5cf6'; // Viola Memorie
-                if (node.type === 'event') return '#f43f5e'; // Rosso Eventi
-                if (node.type === 'interest') return '#f59e0b'; // Ambra Interessi
+                if (node.type === 'memory') return '#8b5cf6';
+                if (node.type === 'event') return '#f43f5e';
+                if (node.type === 'interest') return '#f59e0b';
                 return '#ffffff';
             }
 
