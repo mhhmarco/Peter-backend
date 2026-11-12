@@ -26,12 +26,15 @@ try:
     from importer import parse_vcard, fetch_and_parse_ical
     from tools import search_image_result, search_youtube, youtube_api_status
     from config import GROQ_API_KEY
+    from nexus_views import router as nexus_views_router
+    from relationship_extractor import extract_and_save_relationships
 except Exception:
     print("CRITICAL IMPORT/STARTUP ERROR:", file=sys.stderr)
     traceback.print_exc(file=sys.stderr)
     sys.exit(1)
 
 app = FastAPI(title="Peter OS Backend v10 - WebGL Edition")
+app.include_router(nexus_views_router)
 
 
 class TTSRequest(BaseModel):
@@ -219,6 +222,8 @@ async def chat_endpoint(message: str = Form(""), file: UploadFile = File(None),
     save_episodic_memory(message if message else "[Immagine]", reply)
     if background_tasks:
         background_tasks.add_task(extract_and_save_facts, message, image_data_url)
+        # This second pass writes only explicitly stated person-to-person / parent links.
+        background_tasks.add_task(extract_and_save_relationships, message)
     return {"reply": reply, "query_used": result.get("query_used"), "media": result.get("media"),
             "screen": result.get("screen"), "reasoning": result.get("reasoning")}
 
@@ -257,6 +262,7 @@ async def websocket_voice_endpoint(websocket: WebSocket):
             reply_text = llm_res["reply"]
             save_episodic_memory(user_text, reply_text)
             await extract_and_save_facts(user_text)
+            await extract_and_save_relationships(user_text)
             with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_mp3:
                 tmp_mp3_path = tmp_mp3.name
             try:
