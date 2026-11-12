@@ -3,7 +3,7 @@ from config import SUPABASE_URL, SUPABASE_KEY
 from graph import calculate_galaxy_layout
 
 supabase: Client = None
-supabase_error_log = None  <-- AGGIUNGI QUESTA RIGA
+supabase_error_log = None
 
 if SUPABASE_URL and SUPABASE_KEY:
     try:
@@ -63,7 +63,6 @@ def save_contacts_batch(contacts: list):
         )
 
 def merge_contact_aliases(alias_name: str, target_name: str) -> bool:
-    """Fonde due identità (es. Spiderman e Buja) senza duplicati."""
     if not supabase: return False
     try:
         alias_res = supabase.table("contacts").select("*").ilike("name", alias_name).execute()
@@ -116,7 +115,14 @@ def wipe_table_data(table_type: str) -> bool:
     if not supabase: return False
     try:
         dummy_uuid = "00000000-0000-0000-0000-000000000000"
-        if table_type == "all":
+        if table_type == "memories":
+            supabase.table("memories").delete().neq("id", dummy_uuid).execute()
+            supabase.table("user_facts").delete().neq("id", dummy_uuid).execute()
+        elif table_type == "contacts":
+            supabase.table("contacts").delete().neq("id", dummy_uuid).execute()
+        elif table_type == "events":
+            supabase.table("calendar_events").delete().neq("id", dummy_uuid).execute()
+        elif table_type == "all":
             supabase.table("memories").delete().neq("id", dummy_uuid).execute()
             supabase.table("user_facts").delete().neq("id", dummy_uuid).execute()
             supabase.table("contacts").delete().neq("id", dummy_uuid).execute()
