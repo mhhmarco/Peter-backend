@@ -103,6 +103,22 @@ def get_long_term_facts(limit: int = 30) -> str:
     except Exception: pass
     return ""
 
+def delete_fact_by_id(fact_id: str) -> bool:
+    if not supabase: return False
+    try:
+        supabase.table("user_facts").delete().eq("id", fact_id).execute()
+        return True
+    except Exception:
+        return False
+
+def update_fact_by_id(fact_id: str, new_text: str) -> bool:
+    if not supabase: return False
+    try:
+        supabase.table("user_facts").update({"fact": new_text}).eq("id", fact_id).execute()
+        return True
+    except Exception:
+        return False
+
 def get_contacts():
     if not supabase: return []
     try: return supabase.table("contacts").select("*").limit(50).execute().data or []
