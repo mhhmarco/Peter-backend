@@ -62,6 +62,18 @@ def save_contacts_batch(contacts: list):
             relation_type=c.get("relation_type", "neutrale")
         )
 
+def save_calendar_events_batch(events: list):
+    if not supabase or not events: return
+    try:
+        for ev in events:
+            supabase.table("calendar_events").upsert({
+                "title": ev.get("title"),
+                "description": ev.get("description", ""),
+                "start_time": ev.get("start_time")
+            }, on_conflict="title,start_time").execute()
+    except Exception as e:
+        print(f"Errore salvataggio eventi calendario: {e}")
+
 def merge_contact_aliases(alias_name: str, target_name: str) -> bool:
     if not supabase: return False
     try:
