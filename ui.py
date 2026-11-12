@@ -1,626 +1,125 @@
 def get_dashboard_html() -> str:
-    return """
-    <!DOCTYPE html>
-    <html lang="it">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>PETER HUD OS v12 - Neural Command Center</title>
-        
-        <script src="https://unpkg.com/3d-force-graph"></script>
-
-        <style>
-            :root { 
-                --bg-main: #04060d; 
-                --panel-bg: rgba(10, 17, 32, 0.88); 
-                --glass-border: rgba(0, 240, 255, 0.22); 
-                --accent-cyan: #00f0ff; 
-                --accent-purple: #8b5cf6; 
-                --accent-green: #10b981; 
-                --accent-pink: #ec4899;
-                --accent-yellow: #f59e0b;
-                --accent-red: #ef4444;
-                --text-bright: #f8fafc; 
-                --text-dim: #94a3b8; 
-            }
-            * { box-sizing: border-box; margin: 0; padding: 0; font-family: "Inter", -apple-system, sans-serif; }
-            body { background: radial-gradient(circle at 50% 20%, #0c162d 0%, #04060d 100%); color: var(--text-bright); height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
-            
-            header { height: 56px; border-bottom: 1px solid var(--glass-border); padding: 0 20px; display: flex; align-items: center; justify-content: space-between; background: rgba(4, 6, 13, 0.94); backdrop-filter: blur(20px); z-index: 100; flex-shrink: 0; }
-            .header-brand { display: flex; align-items: center; gap: 12px; }
-            .logo-orb { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple)); display: flex; align-items: center; justify-content: center; box-shadow: 0 0 20px rgba(0, 240, 255, 0.5); font-weight: 900; font-size: 13px; color: #000; }
-            .header-title { font-size: 13px; font-weight: 800; letter-spacing: 2.5px; text-transform: uppercase; background: linear-gradient(90deg, #fff, var(--accent-cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-            
-            .sys-badge { display: flex; align-items: center; gap: 8px; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.3); padding: 4px 12px; border-radius: 30px; font-size: 11px; color: var(--accent-green); font-weight: 600; letter-spacing: 1px; }
-            .clock-display { font-family: monospace; font-size: 14px; color: var(--accent-cyan); letter-spacing: 2px; }
-
-            .command-grid { flex: 1; display: grid; grid-template-columns: 240px 1fr 310px; gap: 14px; padding: 14px; height: calc(100vh - 120px); overflow: hidden; }
-
-            .sidebar-panel { background: var(--panel-bg); border: 1px solid var(--glass-border); border-radius: 20px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between; gap: 12px; backdrop-filter: blur(24px); box-shadow: 0 8px 32px rgba(0,0,0,0.4); height: 100%; overflow: hidden; }
-            .nav-menu { display: flex; flex-direction: column; gap: 8px; }
-            .nav-item { display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-radius: 12px; font-size: 12px; font-weight: 600; color: var(--text-dim); cursor: pointer; transition: all 0.2s ease; }
-            .nav-item.active, .nav-item:hover { background: linear-gradient(90deg, rgba(0, 240, 255, 0.16), transparent); color: var(--accent-cyan); border-left: 3px solid var(--accent-cyan); }
-
-            .peter-avatar-card { background: rgba(0,0,0,0.5); border: 1px solid var(--glass-border); border-radius: 16px; padding: 12px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 6px; flex-shrink: 0; }
-            #peter-avatar-canvas { width: 120px; height: 120px; border-radius: 50%; cursor: pointer; }
-            .avatar-status-tag { font-size: 9px; font-family: monospace; letter-spacing: 1.5px; color: var(--accent-cyan); background: rgba(0,240,255,0.1); padding: 3px 10px; border-radius: 12px; border: 1px solid rgba(0,240,255,0.3); }
-
-            .center-workspace { display: flex; flex-direction: column; gap: 14px; height: 100%; overflow: hidden; min-width: 0; }
-            .view-tab { display: none; flex-direction: column; gap: 14px; height: 100%; width: 100%; overflow: hidden; }
-            .view-tab.active { display: flex; }
-
-            .hud-screen { background: var(--panel-bg); border: 1px solid var(--glass-border); border-radius: 20px; height: 240px; flex-shrink: 0; position: relative; overflow: hidden; display: flex; flex-direction: column; backdrop-filter: blur(20px); }
-            .hud-screen-header { padding: 8px 16px; background: rgba(0,0,0,0.35); border-bottom: 1px solid var(--glass-border); font-size: 10px; font-family: monospace; color: var(--accent-cyan); display: flex; justify-content: space-between; flex-shrink: 0; }
-            #hud-screen-content { flex: 1; padding: 12px; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative; }
-
-            .feed-panel { background: var(--panel-bg); border: 1px solid var(--glass-border); border-radius: 20px; flex: 1; display: flex; flex-direction: column; overflow: hidden; backdrop-filter: blur(20px); min-height: 0; }
-            .panel-header { padding: 10px 16px; border-bottom: 1px solid var(--glass-border); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--accent-cyan); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
-            
-            #chat-feed { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; scroll-behavior: smooth; min-height: 0; }
-            .msg { max-width: 82%; padding: 10px 14px; border-radius: 14px; font-size: 13px; line-height: 1.45; word-wrap: break-word; flex-shrink: 0; }
-            .msg.user { align-self: flex-end; background: linear-gradient(135deg, var(--accent-purple), #3b82f6); color: #fff; border-bottom-right-radius: 4px; box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3); }
-            .msg.peter { align-self: flex-start; background: rgba(15, 23, 42, 0.9); border: 1px solid var(--glass-border); border-bottom-left-radius: 4px; }
-            
-            .right-sidebar { display: flex; flex-direction: column; gap: 14px; height: 100%; overflow: hidden; }
-            .widget-card { background: var(--panel-bg); border: 1px solid var(--glass-border); border-radius: 20px; padding: 16px; backdrop-filter: blur(20px); box-shadow: 0 8px 32px rgba(0,0,0,0.4); display: flex; flex-direction: column; overflow: hidden; }
-            .widget-card.flex-grow { flex: 1; min-height: 0; }
-            .widget-card.fixed-small { height: 150px; flex-shrink: 0; }
-            
-            #facts-preview { flex: 1; overflow-y: auto; min-height: 0; padding-right: 4px; }
-            .fact-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 11px; line-height: 1.35; }
-            .fact-btn { background: transparent; border: none; color: var(--text-dim); cursor: pointer; font-size: 12px; transition: color 0.2s; flex-shrink: 0; }
-            .fact-btn:hover { color: var(--accent-cyan); }
-
-            .reasoning-box { background: rgba(0,0,0,0.5); border: 1px solid rgba(0,240,255,0.2); border-radius: 10px; padding: 8px; font-size: 10px; font-family: monospace; color: var(--accent-cyan); flex: 1; overflow-y: auto; }
-
-            .bottom-command-bar { height: 64px; border-top: 1px solid var(--glass-border); padding: 0 20px; display: flex; align-items: center; gap: 12px; background: rgba(4, 6, 13, 0.96); backdrop-filter: blur(20px); flex-shrink: 0; }
-            .cmd-input-container { flex: 1; display: flex; align-items: center; background: rgba(15, 23, 42, 0.75); border: 1px solid var(--glass-border); border-radius: 30px; padding: 4px 8px 4px 16px; transition: border-color 0.3s; gap: 8px; }
-            .cmd-input-container:focus-within { border-color: var(--accent-cyan); box-shadow: 0 0 15px rgba(0,240,255,0.2); }
-            .cmd-input { flex: 1; background: transparent; border: none; outline: none; color: #fff; font-size: 13px; }
-            .file-upload-btn { background: transparent; border: none; color: var(--text-dim); cursor: pointer; font-size: 16px; transition: color 0.2s; }
-            .file-upload-btn:hover { color: var(--accent-cyan); }
-            .cmd-btn { padding: 10px 20px; background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple)); color: #000; border: none; border-radius: 24px; font-weight: 800; font-size: 12px; cursor: pointer; transition: transform 0.2s; }
-            .cmd-btn:hover { transform: scale(1.03); }
-
-            #nexus-3d-container { width: 100%; height: 100%; border-radius: 20px; border: 1px solid var(--glass-border); overflow: hidden; position: relative; }
-            .nexus-toolbar { position: absolute; top: 14px; left: 14px; display: flex; gap: 6px; z-index: 10; background: rgba(10,17,32,0.92); padding: 8px 10px; border-radius: 12px; border: 1px solid var(--glass-border); backdrop-filter: blur(12px); flex-wrap: wrap; }
-            .nexus-filter-btn { background: rgba(0,240,255,0.1); border: 1px solid rgba(0,240,255,0.3); color: var(--text-bright); padding: 5px 10px; border-radius: 8px; font-size: 10px; font-weight: 700; cursor: pointer; transition: all 0.2s; }
-            .nexus-filter-btn.active, .nexus-filter-btn:hover { background: var(--accent-cyan); color: #000; box-shadow: 0 0 12px rgba(0,240,255,0.5); }
-            
-            .nexus-inspector { position: absolute; bottom: 16px; right: 16px; width: 280px; background: rgba(10,17,32,0.96); border: 1px solid var(--accent-cyan); border-radius: 14px; padding: 14px; display: none; z-index: 10; backdrop-filter: blur(18px); box-shadow: 0 10px 30px rgba(0,0,0,0.7); }
-
-            .settings-container { padding: 20px; background: var(--panel-bg); border: 1px solid var(--glass-border); border-radius: 20px; height: 100%; overflow-y: auto; }
-            .settings-group { margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.06); }
-            .settings-group h3 { color: var(--accent-cyan); font-size: 13px; text-transform: uppercase; margin-bottom: 10px; letter-spacing: 1px; }
-            .settings-label { font-size: 12px; color: var(--text-dim); margin-bottom: 6px; display: block; }
-            .settings-input { width: 100%; background: rgba(0,0,0,0.4); border: 1px solid var(--glass-border); color: #fff; padding: 10px; border-radius: 8px; font-size: 13px; margin-bottom: 12px; }
-            .danger-btn { background: rgba(239, 68, 68, 0.12); border: 1px solid var(--accent-red); color: var(--accent-red); padding: 9px 14px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 11px; transition: all 0.2s; margin-right: 6px; margin-bottom: 6px; }
-            .danger-btn:hover { background: var(--accent-red); color: #000; }
-
-            /* RESPONSIVE DESIGN PER TABLET & MOBILE */
-            @media (max-width: 1024px) {
-                .command-grid { grid-template-columns: 200px 1fr; }
-                .right-sidebar { display: none; }
-            }
-            @media (max-width: 768px) {
-                body { height: auto; min-height: 100vh; overflow-y: auto; }
-                .header-title { font-size: 11px; letter-spacing: 1.5px; }
-                .sys-badge { display: none; }
-                .command-grid { grid-template-columns: 1fr; height: auto; overflow: visible; padding: 10px; gap: 10px; }
-                .sidebar-panel { flex-direction: row; align-items: center; height: auto; padding: 10px; }
-                .nav-menu { flex-direction: row; flex-wrap: wrap; gap: 4px; }
-                .nav-item { padding: 8px 10px; font-size: 11px; border-left: none; border-bottom: 2px solid transparent; }
-                .nav-item.active { border-left: none; border-bottom: 2px solid var(--accent-cyan); }
-                .peter-avatar-card { padding: 6px; flex-direction: row; }
-                #peter-avatar-canvas { width: 48px; height: 48px; }
-                .center-workspace { height: 70vh; }
-                .hud-screen { height: 190px; }
-                .bottom-command-bar { position: sticky; bottom: 0; z-index: 99; padding: 0 12px; }
-            }
-        </style>
-    </head>
-    <body>
-        <header>
-            <div class="header-brand"><div class="logo-orb">P</div><div class="header-title">PETER HUD COMMAND CENTER</div></div>
-            <div class="sys-badge"><span style="width: 6px; height: 6px; border-radius: 50%; background: var(--accent-green); box-shadow: 0 0 8px var(--accent-green);"></span>PETER AGENT: ONLINE</div>
-            <div id="live-clock" class="clock-display">00:00:00</div>
-        </header>
-
-        <div class="command-grid">
-            <aside class="sidebar-panel">
-                <div class="nav-menu">
-                    <div class="nav-item active" onclick="switchMainView('hud', this)">🌐 Dashboard AI</div>
-                    <div class="nav-item" onclick="switchMainView('nexus', this)">🕸️ True 3D Nexus</div>
-                    <div class="nav-item" onclick="switchMainView('settings', this)">⚙️ Settings & Data</div>
-                </div>
-                <div class="peter-avatar-card">
-                    <canvas id="peter-avatar-canvas" width="120" height="120" title="Clicca per parlare a voce con Peter"></canvas>
-                    <div>
-                        <div id="avatar-status-badge" class="avatar-status-tag">STATUS // IDLE</div>
-                        <div style="font-size: 9px; color: var(--text-dim); margin-top: 4px;">Clicca per Voice Call</div>
-                    </div>
-                </div>
-            </aside>
-
-            <main class="center-workspace">
-                <!-- TAB 1: DASHBOARD -->
-                <div id="view-hud" class="view-tab active">
-                    <div class="hud-screen">
-                        <div class="hud-screen-header">
-                            <span>REACTIVE VISUAL HUD</span>
-                            <span id="hud-status-badge">STANDBY // CORE</span>
-                        </div>
-                        <div id="hud-screen-content">
-                            <div id="hud-default-overlay" style="text-align: center;">
-                                <h2 style="font-size: 18px; font-weight: 900; letter-spacing: 3px; background: linear-gradient(90deg, #fff, var(--accent-cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">PETER COMPANION CORE</h2>
-                            </div>
-                        </div>
-                    </div>
-
-                    <section class="feed-panel">
-                        <div class="panel-header"><span>LIVE DIALOG FEED</span><span style="font-size: 10px; color: var(--accent-green);">● READY</span></div>
-                        <div id="chat-feed">
-                            <div class="msg peter">Peter OS v12 online. Autocoscienza, estrazione multi-persona, player multimediale e sincronizzazione contatti attivi.</div>
-                        </div>
-                    </section>
-                </div>
-
-                <!-- TAB 2: NEXUS 3D -->
-                <div id="view-nexus" class="view-tab" style="position: relative; height: 100%;">
-                    <div class="nexus-toolbar">
-                        <button class="nexus-filter-btn active" onclick="filterNexusLayer3D('all', this)">TUTTO</button>
-                        <button class="nexus-filter-btn" onclick="filterNexusLayer3D('person', this)">👥 Persone</button>
-                        <button class="nexus-filter-btn" onclick="filterNexusLayer3D('memory', this)">🧠 Memorie</button>
-                        <button class="nexus-filter-btn" onclick="filterNexusLayer3D('event', this)">📅 Eventi</button>
-                        <button class="nexus-filter-btn" onclick="filterNexusLayer3D('interest', this)">⚡ Interessi</button>
-                    </div>
-                    <div id="nexus-3d-container"></div>
-                    <div id="nexus-inspector" class="nexus-inspector">
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                            <span id="inspector-type" style="font-size:9px; font-family:monospace; color:var(--accent-cyan); text-transform:uppercase;">NODO</span>
-                            <span onclick="document.getElementById('nexus-inspector').style.display='none'" style="cursor:pointer; font-size:14px; color:var(--text-dim);">✕</span>
-                        </div>
-                        <h4 id="inspector-title" style="font-size:15px; color:#fff; margin-bottom:6px;">Nome</h4>
-                        <p id="inspector-desc" style="font-size:11px; color:var(--text-dim); line-height:1.45; word-break:break-word;">Dettagli...</p>
-                    </div>
-                </div>
-
-                <!-- TAB 3: SETTINGS & DANGER ZONE -->
-                <div id="view-settings" class="view-tab">
-                    <div class="settings-container">
-                        <div class="settings-group">
-                            <h3>Parametri & Personalità di Peter</h3>
-                            <label class="settings-label">Tone of Voice (Come Peter si rivolge a te)</label>
-                            <input type="text" class="settings-input" id="setting-tone" value="Schietto, empatico, naturale, colto e ironico.">
-                            
-                            <label class="settings-label">Fuso Orario (Timezone)</label>
-                            <input type="text" class="settings-input" id="setting-timezone" value="Europe/Rome">
-
-                            <label class="settings-label">URL Calendario Pubblico Google (.ics)</label>
-                            <input type="text" class="settings-input" id="setting-calendar-url" placeholder="https://calendar.google.com/calendar/ical/.../basic.ics">
-
-                            <button class="nexus-filter-btn" onclick="saveSettings()">💾 Salva Impostazioni</button>
-                        </div>
-
-                        <div class="settings-group">
-                            <h3>Sincronizzazione Contatti (File .vcf)</h3>
-                            <label class="settings-label">Carica rubrica vCard</label>
-                            <input type="file" class="settings-input" id="vcf-file-input" accept=".vcf" />
-                            <button class="nexus-filter-btn" onclick="uploadVCard()">📂 Importa Contatti</button>
-                        </div>
-                        
-                        <div class="settings-group">
-                            <h3 style="color: var(--accent-red);">Danger Zone (Pulizia Database Supabase)</h3>
-                            <p style="font-size:11px; color:var(--text-dim); margin-bottom:12px;">Elimina permanentemente i record dalle tabelle di Supabase.</p>
-                            <button class="danger-btn" onclick="wipeData('memories')">Svuota Memorie Chat</button>
-                            <button class="danger-btn" onclick="wipeData('contacts')">Cancella Persone</button>
-                            <button class="danger-btn" onclick="wipeData('events')">Cancella Eventi</button>
-                            <button class="danger-btn" onclick="wipeData('all')">⚠️ WIPE TOTALE (Hard Reset)</button>
-                        </div>
-                    </div>
-                </div>
-            </main>
-
-            <aside class="right-sidebar">
-                <div class="widget-card flex-grow">
-                    <div class="panel-header" style="padding: 0 0 10px 0; border: none;">MEMORIA (EDITABLE)</div>
-                    <div id="facts-preview">Caricamento memorie...</div>
-                </div>
-                <div class="widget-card fixed-small">
-                    <div class="panel-header" style="padding: 0 0 6px 0; border: none;">REASONING STREAM</div>
-                    <div id="reasoning-preview" class="reasoning-box">> In ascolto...</div>
-                </div>
-            </aside>
-        </div>
-
-        <footer class="bottom-command-bar">
-            <div class="cmd-input-container">
-                <input type="file" id="file-input" style="display:none" accept="image/*" />
-                <button type="button" class="file-upload-btn" onclick="document.getElementById('file-input').click()" title="Allega immagine">📎</button>
-                <input type="text" id="cmd-input" class="cmd-input" placeholder="Parla con Peter o carica un'immagine..." autocomplete="off" />
-                <button type="button" id="send-cmd-btn" class="cmd-btn">INVIA</button>
+    return r'''<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#050914">
+  <title>PETER // JARVIS COMMAND</title>
+  <script src="https://unpkg.com/3d-force-graph"></script>
+  <style>
+    :root{color-scheme:dark;--bg:#050914;--panel:#0a1220;--panel2:#0d1929;--line:rgba(69,211,255,.2);--cyan:#54e8ff;--blue:#478cff;--violet:#a687ff;--green:#32e6ac;--amber:#ffc66e;--red:#ff667e;--text:#e9f4ff;--muted:#8da2b8;--radius:16px;--glow:0 0 28px rgba(49,203,255,.08)}
+    *{box-sizing:border-box}html,body{height:100%;margin:0}body{font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;background:radial-gradient(ellipse at 50% -20%,#12304a 0,#07111e 38%,var(--bg) 78%);color:var(--text);overflow:hidden}button,input,textarea,select{font:inherit}button{color:inherit}.app{height:100%;display:grid;grid-template-rows:66px minmax(0,1fr) 70px;gap:12px;padding:12px;max-width:1920px;margin:auto}.topbar,.panel,.commandbar{border:1px solid var(--line);background:linear-gradient(145deg,rgba(13,25,42,.94),rgba(7,14,26,.94));box-shadow:var(--glow);backdrop-filter:blur(16px)}.topbar{border-radius:var(--radius);display:flex;align-items:center;justify-content:space-between;padding:0 18px;gap:16px}.brand{display:flex;align-items:center;gap:12px;min-width:220px}.brandmark{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;color:#03101b;font-weight:900;background:radial-gradient(circle at 30% 25%,#d1ffff,var(--cyan) 36%,var(--blue) 72%,#151f57);box-shadow:0 0 24px #35d7ff70}.brandname{font-size:13px;font-weight:850;letter-spacing:.22em}.brandname small{display:block;color:var(--muted);font-size:9px;font-weight:600;letter-spacing:.18em;margin-top:3px}.system-state{display:flex;align-items:center;gap:9px;color:var(--green);font:700 10px ui-monospace,monospace;letter-spacing:.14em}.pulse{width:8px;height:8px;background:var(--green);border-radius:100%;box-shadow:0 0 12px var(--green);animation:pulse 1.8s infinite}@keyframes pulse{50%{opacity:.35;box-shadow:0 0 3px var(--green)}}.top-right{display:flex;align-items:center;gap:18px}.clock{font:600 14px ui-monospace,monospace;letter-spacing:.14em;color:var(--cyan)}.icon-btn,.btn,.nav-btn,.filter-btn{border:1px solid var(--line);background:rgba(17,34,52,.75);border-radius:10px;padding:8px 11px;cursor:pointer;transition:.18s;color:var(--text)}button:hover,.nav-btn:hover,.filter-btn:hover{border-color:var(--cyan);color:var(--cyan);transform:translateY(-1px)}button:disabled{opacity:.45;cursor:not-allowed;transform:none}.layout{min-height:0;display:grid;grid-template-columns:220px minmax(360px,1fr) 280px;gap:12px}.panel{border-radius:var(--radius);min-height:0;overflow:hidden}.sidebar{padding:14px;display:flex;flex-direction:column;gap:14px}.section-label{color:var(--muted);font:700 9px ui-monospace,monospace;letter-spacing:.2em;text-transform:uppercase;padding:4px 8px}.nav{display:grid;gap:5px}.nav-btn{width:100%;border:1px solid transparent;text-align:left;background:transparent;padding:11px 10px;border-radius:10px;color:var(--muted);font-size:12px;cursor:pointer}.nav-btn.active{color:var(--cyan);border-color:#41dfff40;background:linear-gradient(90deg,#28d8ff19,transparent)}.nav-btn .nav-icon{display:inline-block;width:25px;font-size:15px}.sidebar-spacer{flex:1}.mini-core{border:1px solid var(--line);border-radius:14px;padding:12px;text-align:center;background:#050d18}.core-orb{width:76px;height:76px;margin:2px auto 10px;border-radius:50%;border:1px solid #50dfff66;display:grid;place-items:center;color:var(--cyan);font-size:28px;box-shadow:inset 0 0 20px #44dfff22,0 0 24px #2acfff20;animation:orbit 8s linear infinite}@keyframes orbit{to{transform:rotate(360deg)}}.status-chip{display:inline-flex;border:1px solid var(--line);padding:4px 8px;border-radius:99px;color:var(--cyan);font:9px ui-monospace,monospace;letter-spacing:.1em}.core-hint{margin-top:8px;color:var(--muted);font-size:10px}.center{min-height:0;position:relative}.view{height:100%;display:none;min-height:0}.view.active{display:flex;flex-direction:column;gap:12px}.view-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:2px 3px}.view-heading h1{font-size:14px;letter-spacing:.16em;margin:0}.eyebrow{font:9px ui-monospace,monospace;letter-spacing:.18em;color:var(--cyan)}.dashboard-grid{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(230px,.75fr);gap:12px;min-height:0;flex:1}.chat-panel{display:flex;flex-direction:column;min-height:0}.panel-head{padding:12px 15px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:10px}.panel-head h2{margin:0;font:700 10px ui-monospace,monospace;letter-spacing:.16em;color:var(--cyan)}.chat-feed{overflow:auto;min-height:0;flex:1;padding:14px;display:flex;flex-direction:column;gap:10px;scroll-behavior:smooth}.msg{max-width:88%;padding:10px 12px;border:1px solid var(--line);border-radius:13px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;line-height:1.55}.msg.user{align-self:flex-end;background:#4d68ff20;border-color:#9388ff55}.msg.peter{align-self:flex-start;background:#0d1d2c}.msg.system{align-self:center;color:var(--muted);font-size:10px;border-style:dashed}.side-stack{display:flex;flex-direction:column;gap:12px;min-height:0}.hud-card{display:flex;flex-direction:column;min-height:250px;flex:1}.hud-content{flex:1;min-height:180px;padding:12px;display:flex;align-items:center;justify-content:center;overflow:hidden}.hud-idle{text-align:center;color:var(--muted);font-size:11px;line-height:1.7}.hud-idle strong{display:block;color:var(--cyan);font:700 10px ui-monospace,monospace;letter-spacing:.18em;margin-bottom:8px}.reasoning{min-height:100px;max-height:180px;overflow:auto;padding:12px;color:var(--cyan);font:11px/1.5 ui-monospace,monospace;white-space:pre-wrap}.metrics{display:grid;grid-template-columns:1fr 1fr;gap:8px}.metric{padding:12px;border:1px solid var(--line);border-radius:12px;background:#08121f}.metric span{display:block;color:var(--muted);font:9px ui-monospace,monospace;letter-spacing:.12em}.metric b{display:block;margin-top:7px;font-size:18px;color:var(--cyan)}.graph-view{position:relative;flex:1;min-height:0;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;background:radial-gradient(ellipse,#0c1b2b,#050a12 70%)}#nexus-3d-container{position:absolute;inset:0}.graph-toolbar{position:absolute;z-index:3;top:12px;left:12px;right:12px;display:flex;align-items:center;gap:7px;flex-wrap:wrap;pointer-events:none}.graph-toolbar>*{pointer-events:auto}.graph-search{width:min(230px,40vw)}.control-input,.control-select,.control-textarea{width:100%;border:1px solid var(--line);border-radius:9px;background:#07111eea;color:var(--text);padding:9px 10px;outline:none}.control-input:focus,.control-select:focus,.control-textarea:focus{border-color:var(--cyan);box-shadow:0 0 0 2px #52dfff16}.filter-btn{font-size:10px;padding:7px 9px;border-radius:9px}.filter-btn.active{background:#45dcff24;border-color:#45dcff90;color:var(--cyan)}.graph-bottom{position:absolute;z-index:3;left:12px;bottom:12px;display:flex;gap:7px;flex-wrap:wrap}.graph-legend{position:absolute;z-index:3;left:12px;top:64px;display:grid;gap:6px;padding:10px;background:#07111edb;border:1px solid var(--line);border-radius:10px;font-size:10px;color:var(--muted)}.legend-row{display:flex;align-items:center;gap:7px}.dot{width:8px;height:8px;border-radius:50%}.inspector{position:absolute;z-index:4;right:12px;top:12px;bottom:12px;width:min(285px,42%);padding:14px;border:1px solid #4bdcff77;border-radius:14px;background:#07111fee;backdrop-filter:blur(14px);overflow:auto;display:none}.inspector.open{display:block}.inspector h3{margin:8px 0;font-size:16px}.inspector p{font-size:11px;line-height:1.6;color:var(--muted);white-space:pre-wrap;overflow-wrap:anywhere}.settings-view,.memory-view,.contacts-view{overflow:auto;padding:15px}.settings-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.settings-card{padding:15px;border:1px solid var(--line);border-radius:13px;background:#08121f}.settings-card h3{font-size:11px;color:var(--cyan);letter-spacing:.1em;margin:0 0 12px}.field{display:grid;gap:6px;margin:10px 0}.field label{font-size:10px;color:var(--muted)}.settings-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.btn.primary{background:linear-gradient(120deg,#38dafa,#7688ff);border:0;color:#04111d;font-weight:800}.btn.danger{color:var(--red);border-color:#ff667e70}.facts-list,.contacts-list{display:grid;gap:8px}.fact-row,.contact-row{padding:11px;border:1px solid var(--line);border-radius:10px;background:#08121f;font-size:11px;line-height:1.5;overflow-wrap:anywhere}.fact-row{display:flex;justify-content:space-between;gap:10px}.contact-row strong{color:var(--cyan)}.commandbar{border-radius:var(--radius);display:flex;align-items:center;gap:10px;padding:10px 14px}.commandbar input{flex:1;min-width:0;background:transparent;border:0;outline:0;color:var(--text);font-size:13px}.attach{display:none}.commandbar .icon-btn{font-size:16px;padding:7px 9px}.commandbar .btn{min-width:84px}.commandbar-note{position:absolute;right:28px;bottom:4px;color:var(--muted);font-size:8px}.toast{position:fixed;z-index:20;right:18px;top:86px;padding:11px 14px;border:1px solid var(--line);border-radius:10px;background:#0a1929;color:var(--text);font-size:11px;box-shadow:var(--glow);display:none}.toast.show{display:block}.empty{color:var(--muted);font-size:11px;padding:14px;text-align:center}.range-row{display:flex;gap:8px;align-items:center}.range-row input{flex:1;accent-color:var(--cyan)}.mobile-menu{display:none}
+    @media(max-width:1100px){.layout{grid-template-columns:190px minmax(300px,1fr)}.right-rail{display:none}.dashboard-grid{grid-template-columns:1fr minmax(210px,.7fr)}}
+    @media(max-width:760px){body{overflow:auto}.app{height:auto;min-height:100%;grid-template-rows:58px minmax(75vh,1fr) 64px;padding:7px;gap:8px}.topbar{padding:0 10px}.brand{min-width:0}.brandname{font-size:11px}.system-state{display:none}.top-right{gap:7px}.clock{font-size:11px}.layout{grid-template-columns:1fr;grid-template-rows:auto minmax(65vh,1fr);gap:8px}.sidebar{padding:7px;flex-direction:row;align-items:center;overflow:auto}.sidebar .section-label,.mini-core,.sidebar-spacer{display:none}.nav{display:flex;min-width:max-content}.nav-btn{width:auto;padding:8px;font-size:10px}.nav-btn .nav-icon{width:auto;margin-right:4px}.dashboard-grid{grid-template-columns:1fr;overflow:auto}.side-stack{display:grid;grid-template-columns:1fr 1fr}.hud-card{min-height:210px}.metrics{align-content:start}.graph-view{min-height:65vh}.graph-toolbar{top:7px;left:7px;right:7px}.graph-legend{top:auto;bottom:55px;left:7px}.inspector{width:min(250px,75%);top:auto;max-height:46%;right:7px;bottom:7px}.settings-grid{grid-template-columns:1fr}.commandbar{position:sticky;bottom:5px}.commandbar input{font-size:12px}}
+    @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;scroll-behavior:auto!important;transition-duration:.01ms!important}}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand"><div class="brandmark">P</div><div class="brandname">PETER // JARVIS<small>PERSONAL COMMAND INTERFACE</small></div></div>
+      <div class="system-state"><i class="pulse"></i><span id="system-status">SYSTEM ONLINE</span></div>
+      <div class="top-right"><span class="clock" id="clock">--:--:--</span><button class="icon-btn" id="refresh-all" title="Aggiorna dati">⟳</button></div>
+    </header>
+    <div class="layout">
+      <aside class="panel sidebar">
+        <div class="section-label">Navigation</div>
+        <nav class="nav">
+          <button class="nav-btn active" data-view="dashboard"><span class="nav-icon">◈</span>Command Deck</button>
+          <button class="nav-btn" data-view="nexus"><span class="nav-icon">✳</span>Neural Nexus</button>
+          <button class="nav-btn" data-view="memory"><span class="nav-icon">▤</span>Memory Core</button>
+          <button class="nav-btn" data-view="contacts"><span class="nav-icon">◎</span>Contacts</button>
+          <button class="nav-btn" data-view="settings"><span class="nav-icon">⚙</span>System Config</button>
+        </nav>
+        <div class="sidebar-spacer"></div>
+        <div class="mini-core"><div class="core-orb">✧</div><div class="status-chip" id="avatar-status-badge">CORE // READY</div><div class="core-hint">Click core for voice session</div></div>
+        <canvas id="peter-avatar-canvas" width="120" height="120" title="Avvia o termina la sessione vocale" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none"></canvas>
+        <div class="section-label">Secure · Render ready</div>
+      </aside>
+      <main class="center">
+        <section class="view active" id="view-dashboard">
+          <div class="view-heading"><div><div class="eyebrow">PETER OS / LIVE SESSION</div><h1>COMMAND DECK</h1></div><span class="status-chip" id="connection-chip">READY</span></div>
+          <div class="dashboard-grid">
+            <section class="panel chat-panel"><div class="panel-head"><h2>LIVE CONVERSATION</h2><button class="icon-btn" id="clear-chat" title="Pulisci conversazione visibile">⌫</button></div><div class="chat-feed" id="chat-feed"><div class="msg peter">Peter online. Dimmi cosa ti serve o allega un'immagine.</div></div></section>
+            <div class="side-stack">
+              <section class="panel hud-card"><div class="panel-head"><h2>VISUAL HUD</h2><span class="eyebrow" id="hud-status-badge">STANDBY</span></div><div class="hud-content" id="hud-screen-content"><div class="hud-idle"><strong>NEURAL DISPLAY READY</strong>Richiedi una ricerca, un video o una scheda contatto.</div></div></section>
+              <section class="panel"><div class="panel-head"><h2>SYSTEM TELEMETRY</h2><span class="pulse"></span></div><div style="padding:10px" class="metrics"><div class="metric"><span>MEMORIES</span><b id="memory-count">—</b></div><div class="metric"><span>CONTACTS</span><b id="contact-count">—</b></div><div class="metric"><span>GRAPH NODES</span><b id="node-count">—</b></div><div class="metric"><span>GRAPH LINKS</span><b id="edge-count">—</b></div></div></section>
+              <section class="panel"><div class="panel-head"><h2>REASONING STREAM</h2></div><div class="reasoning" id="reasoning-preview">> In ascolto del comando…</div></section>
             </div>
-        </footer>
-
-        <script>
-            let currentAvatarState = 'IDLE';
-            let attachedFile = null;
-            let Graph = null;
-            let graphDataCache = { nodes: [], links: [] };
-
-            document.getElementById('file-input').onchange = (e) => {
-                attachedFile = e.target.files[0];
-                if(attachedFile) {
-                    document.getElementById('cmd-input').placeholder = `Immagine allegata: ${attachedFile.name}`;
-                }
-            };
-
-            setInterval(() => {
-                document.getElementById('live-clock').innerText = new Date().toTimeString().split(' ')[0];
-            }, 1000);
-
-            function switchMainView(view, el) {
-                document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-                document.querySelectorAll('.view-tab').forEach(v => v.classList.remove('active'));
-                if(el) el.classList.add('active');
-                
-                if(view === 'hud') document.getElementById('view-hud').classList.add('active');
-                else if(view === 'settings') {
-                    document.getElementById('view-settings').classList.add('active');
-                    loadSettings();
-                }
-                else if(view === 'nexus') { 
-                    document.getElementById('view-nexus').classList.add('active'); 
-                    setTimeout(initOrRefresh3DGraph, 50);
-                }
-            }
-
-            // --- AVATAR & VOICE CALL ---
-            (function initPeterAvatar() {
-                const canvas = document.getElementById('peter-avatar-canvas');
-                const ctx = canvas.getContext('2d');
-                let angle = 0;
-                function renderAvatar() {
-                    ctx.clearRect(0, 0, 120, 120);
-                    angle += (currentAvatarState === 'THINKING' ? 0.08 : 0.02);
-                    let auraColor = '#00f0ff';
-                    if(currentAvatarState === 'SPEAKING') auraColor = '#8b5cf6';
-                    if(currentAvatarState === 'LISTENING') auraColor = '#ec4899';
-                    if(currentAvatarState === 'THINKING') auraColor = '#f59e0b';
-                    document.getElementById('avatar-status-badge').innerText = `STATUS // ${currentAvatarState}`;
-                    document.getElementById('avatar-status-badge').style.borderColor = auraColor;
-
-                    let radiusPulse = 34 + Math.sin(angle * 3) * (currentAvatarState === 'SPEAKING' ? 6 : 2);
-                    ctx.beginPath(); ctx.arc(60, 60, radiusPulse, 0, Math.PI * 2);
-                    ctx.strokeStyle = auraColor; ctx.lineWidth = 2; ctx.stroke();
-
-                    for(let i = 0; i < 3; i++) {
-                        ctx.save(); ctx.translate(60, 60); ctx.rotate(angle * (i % 2 === 0 ? 1 : -1) + (i * Math.PI / 3));
-                        ctx.beginPath(); ctx.ellipse(0, 0, 26 + i * 4, 9, 0, 0, Math.PI * 2);
-                        ctx.strokeStyle = auraColor; ctx.globalAlpha = 0.45; ctx.stroke(); ctx.restore();
-                    }
-                    ctx.beginPath(); ctx.arc(60, 60, 11 + Math.cos(angle * 2) * 2, 0, Math.PI * 2);
-                    ctx.fillStyle = auraColor; ctx.shadowBlur = 15; ctx.shadowColor = auraColor; ctx.fill(); ctx.shadowBlur = 0;
-                    requestAnimationFrame(renderAvatar);
-                }
-                renderAvatar();
-                canvas.onclick = toggleVoiceSession;
-            })();
-
-            let ws = null;
-            let mediaRecorder = null;
-            let isRecording = false;
-
-            function toggleVoiceSession() {
-                if(!isRecording) {
-                    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-                    ws = new WebSocket(`${protocol}//${window.location.host}/ws/voice`);
-                    ws.onopen = () => {
-                        navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
-                            mediaRecorder = new MediaRecorder(stream);
-                            mediaRecorder.ondataavailable = e => { if(ws && ws.readyState === WebSocket.OPEN && e.data.size > 0) ws.send(e.data); };
-                            mediaRecorder.start(2500);
-                            isRecording = true;
-                            currentAvatarState = 'LISTENING';
-                            appendMsg("🎙️ Microfono aperto. Parla pure con Peter...", "peter");
-                        }).catch(err => {
-                            alert("Permesso microfono negato dal browser.");
-                        });
-                    };
-                    ws.onmessage = async (event) => {
-                        if(typeof event.data === 'string') {
-                            const data = JSON.parse(event.data);
-                            appendMsg(data.user_text, 'user');
-                            appendMsg(data.reply_text, 'peter');
-                            if(data.screen) updateHudScreen(data.screen);
-                            if(data.reasoning) document.getElementById('reasoning-preview').innerText = data.reasoning;
-                        } else {
-                            currentAvatarState = 'SPEAKING';
-                            const blob = new Blob([event.data], { type: 'audio/mp3' });
-                            const audio = new Audio(URL.createObjectURL(blob));
-                            audio.onended = () => { currentAvatarState = isRecording ? 'LISTENING' : 'IDLE'; };
-                            audio.play();
-                        }
-                    };
-                    ws.onclose = () => { isRecording = false; currentAvatarState = 'IDLE'; };
-                } else {
-                    if(mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
-                    if(ws) ws.close();
-                    isRecording = false;
-                    currentAvatarState = 'IDLE';
-                    appendMsg("🔇 Conversazione vocale terminata.", "peter");
-                }
-            }
-
-            // --- PLAYER MULTIMEDIALE ROBUSTO ---
-            function updateHudScreen(screen) {
-                const container = document.getElementById('hud-screen-content');
-                const badge = document.getElementById('hud-status-badge');
-                if(!screen || screen.type === 'NONE') return;
-                badge.innerText = `ACTIVE // ${screen.type}`;
-
-                if(screen.type === 'MEDIA_PLAYER') {
-                    let embedLink = screen.embed_url || "";
-                    if(embedLink.includes('watch?v=')) {
-                        const vidId = embedLink.split('watch?v=')[1]?.substring(0, 11);
-                        if(vidId) embedLink = `https://www.youtube-nocookie.com/embed/${vidId}?autoplay=1`;
-                    }
-                    container.innerHTML = `
-                        <div style="width:100%; height:100%; display:flex; flex-direction:column; justify-content:center; align-items:center;">
-                            <div style="width:100%; max-width:380px; height:200px; border-radius:12px; overflow:hidden; border:1px solid var(--accent-cyan); background:#000;">
-                                <iframe src="${embedLink}" style="width:100%; height:100%; border:none;" allow="accelerometer; autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
-                            </div>
-                        </div>`;
-                } 
-                else if(screen.type === 'IMAGE_PREVIEW' && screen.image_url) {
-                    container.innerHTML = `
-                        <div style="display:flex; gap:12px; align-items:center; max-width:95%;">
-                            <img src="${screen.image_url}" style="height:170px; border-radius:10px; border:1px solid var(--accent-cyan); object-fit:cover;" />
-                            <div style="font-size:11px; color:var(--text-dim); max-height:170px; overflow-y:auto;">
-                                <strong style="color:var(--accent-cyan); display:block; margin-bottom:4px;">${screen.title || 'Ricerca'}</strong>
-                                ${screen.content || ''}
-                            </div>
-                        </div>`;
-                }
-            }
-
-            // --- CHAT & MEMORIA ---
-            const input = document.getElementById('cmd-input');
-            const btn = document.getElementById('send-cmd-btn');
-            const feed = document.getElementById('chat-feed');
-
-            async function sendMessage() {
-                const text = input.value.trim();
-                if(!text && !attachedFile) return;
-                appendMsg(text || '[Immagine allegata]', 'user');
-                input.value = '';
-                currentAvatarState = 'THINKING';
-
-                const formData = new FormData();
-                formData.append('message', text);
-                if(attachedFile) {
-                    formData.append('file', attachedFile);
-                    attachedFile = null;
-                    document.getElementById('cmd-input').placeholder = "Parla con Peter o carica un'immagine...";
-                }
-
-                try {
-                    const res = await fetch('/chat', { method: 'POST', body: formData });
-                    const data = await res.json();
-                    if(data.reply) {
-                        appendMsg(data.reply, 'peter');
-                        if(data.screen) updateHudScreen(data.screen);
-                        if(data.reasoning) document.getElementById('reasoning-preview').innerText = data.reasoning;
-                        currentAvatarState = 'IDLE';
-                        setTimeout(loadBrainSummary, 1500);
-                    }
-                } catch(e) {
-                    appendMsg("Errore di rete temporaneo, riprova.", "peter");
-                    currentAvatarState = 'IDLE';
-                }
-            }
-            btn.onclick = sendMessage;
-            input.onkeypress = (e) => { if(e.key === 'Enter') sendMessage(); };
-
-            function appendMsg(text, sender) {
-                const div = document.createElement('div');
-                div.className = `msg ${sender}`; div.innerText = text;
-                feed.appendChild(div); feed.scrollTop = feed.scrollHeight;
-            }
-            
-            async function loadBrainSummary() {
-                try {
-                    const res = await fetch('/memories');
-                    const data = await res.json();
-                    if(data.connected && data.long_term_facts) {
-                        document.getElementById('facts-preview').innerHTML = data.long_term_facts.map(f => `
-                            <div class="fact-item"><span>🧠 ${f.fact}</span>
-                            <button class="fact-btn" onclick="deleteFact('${f.id}')">🗑️</button></div>`).join('');
-                    }
-                } catch(e){}
-            }
-
-            async function deleteFact(id) {
-                if(confirm("Eliminare questa memoria?")) {
-                    await fetch(`/api/facts/${id}`, { method: 'DELETE' });
-                    loadBrainSummary();
-                }
-            }
-
-            // --- SETTINGS & IMPORTAZIONE ---
-            async function loadSettings() {
-                try {
-                    const res = await fetch('/api/settings');
-                    const data = await res.json();
-                    if(data.tone) document.getElementById('setting-tone').value = data.tone;
-                    if(data.timezone) document.getElementById('setting-timezone').value = data.timezone;
-                    if(data.public_calendar_url) document.getElementById('setting-calendar-url').value = data.public_calendar_url;
-                } catch(e){}
-            }
-
-            async function saveSettings() {
-                const tone = document.getElementById('setting-tone').value.trim();
-                const timezone = document.getElementById('setting-timezone').value.trim();
-                const public_calendar_url = document.getElementById('setting-calendar-url').value.trim();
-                
-                await fetch('/api/settings', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ tone, timezone, public_calendar_url })
-                });
-                alert("Impostazioni salvate con successo!");
-            }
-
-            async function uploadVCard() {
-                const fileInput = document.getElementById('vcf-file-input');
-                if(!fileInput.files[0]) {
-                    alert("Seleziona prima un file .vcf!");
-                    return;
-                }
-                const formData = new FormData();
-                formData.append('file', fileInput.files[0]);
-                const res = await fetch('/api/import/vcard', { method: 'POST', body: formData });
-                if(res.ok) {
-                    alert("Contatti importati e sincronizzati senza duplicati!");
-                } else {
-                    alert("Errore durante l'importazione del file vCard.");
-                }
-            }
-
-            // --- GRAFO 3D WEBGL CENTRATO E INTERATTIVO ---
-            async function fetchGraphData() {
-                try {
-                    const res = await fetch('/api/nexus');
-                    const data = await res.json();
-                    graphDataCache = {
-                        nodes: data.nodes.map(n => ({ 
-                            id: n.id, 
-                            name: n.name, 
-                            type: n.type, 
-                            val: n.type === 'core' ? 12 : (n.type === 'person' ? 6 : 4), 
-                            ...n 
-                        })),
-                        links: data.edges.map(e => ({ source: e.source, target: e.target, relation: e.relation_type || 'neutro' }))
-                    };
-                    return graphDataCache;
-                } catch (e) {
-                    return {nodes:[], links:[]};
-                }
-            }
-
-            function getNodeColor(node) {
-                if (node.type === 'core') return '#10b981';
-                if (node.type === 'person') {
-                    if(node.gender && node.gender.toUpperCase() === 'M') return '#3b82f6';
-                    if(node.gender && node.gender.toUpperCase() === 'F') return '#ec4899';
-                    return '#00f0ff';
-                }
-                if (node.type === 'memory') return '#8b5cf6';
-                if (node.type === 'event') return '#f43f5e';
-                if (node.type === 'interest') return '#f59e0b';
-                return '#ffffff';
-            }
-
-            function getLinkColor(link) {
-                let rel = (link.relation || '').toLowerCase();
-                if(rel.includes('amore') || rel.includes('fidanzat')) return '#ec4899';
-                if(rel.includes('famiglia') || rel.includes('parent') || rel.includes('figli')) return '#10b981';
-                if(rel.includes('lavoro')) return '#f59e0b';
-                if(rel.includes('amiciz')) return '#3b82f6';
-                return 'rgba(0, 240, 255, 0.35)';
-            }
-
-            async function initOrRefresh3DGraph() {
-                const container = document.getElementById('nexus-3d-container');
-                if (!container) return;
-
-                const data = await fetchGraphData();
-
-                if (!Graph) {
-                    Graph = ForceGraph3D()(container)
-                        .width(container.clientWidth)
-                        .height(container.clientHeight)
-                        .backgroundColor('#04060d')
-                        .showNavInfo(false)
-                        .nodeResolution(16)
-                        .nodeColor(getNodeColor)
-                        .linkColor(getLinkColor)
-                        .linkOpacity(0.6)
-                        .linkWidth(1.5)
-                        .nodeLabel('name')
-                        .onNodeClick(node => {
-                            showInspector(node);
-                            const distance = 90;
-                            const distRatio = 1 + distance/Math.hypot(node.x || 1, node.y || 1, node.z || 1);
-                            Graph.cameraPosition(
-                                { x: (node.x || 0) * distRatio, y: (node.y || 0) * distRatio, z: (node.z || 0) * distRatio }, 
-                                node, 
-                                1200
-                            );
-                        });
-                } else {
-                    Graph.width(container.clientWidth).height(container.clientHeight);
-                }
-                
-                Graph.graphData(data);
-                setTimeout(() => { Graph.zoomToFit(600, 40); }, 400);
-            }
-
-            window.addEventListener('resize', () => {
-                const container = document.getElementById('nexus-3d-container');
-                if (Graph && container && container.clientWidth > 0) {
-                    Graph.width(container.clientWidth).height(container.clientHeight);
-                }
-            });
-
-            function filterNexusLayer3D(layer, btn) {
-                document.querySelectorAll('.nexus-filter-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                if (!Graph) return;
-
-                const filteredNodes = graphDataCache.nodes.filter(n => layer === 'all' || n.type === layer || n.type === 'core');
-                const validIds = new Set(filteredNodes.map(n => n.id));
-                const filteredLinks = graphDataCache.links.filter(l => {
-                    const sId = typeof l.source === 'object' ? l.source.id : l.source;
-                    const tId = typeof l.target === 'object' ? l.target.id : l.target;
-                    return validIds.has(sId) && validIds.has(tId);
-                });
-                
-                Graph.graphData({ nodes: filteredNodes, links: filteredLinks });
-                setTimeout(() => { Graph.zoomToFit(500, 40); }, 300);
-            }
-
-            function showInspector(node) {
-                const inspector = document.getElementById('nexus-inspector');
-                document.getElementById('inspector-type').innerText = `LAYER // ${node.type.toUpperCase()}`;
-                let title = node.name;
-                if(node.type === 'person') {
-                    if(node.gender === 'M') title += " ♂️";
-                    if(node.gender === 'F') title += " ♀️";
-                    if(node.birth_year) title += ` (${node.birth_year})`;
-                }
-                document.getElementById('inspector-title').innerText = title;
-                let desc = `${node.notes || ''} \n\n${node.details || ''}`;
-                if(node.relation_type && node.relation_type !== 'neutrale') {
-                    desc += `\nLegame: ${node.relation_type.toUpperCase()}`;
-                }
-                document.getElementById('inspector-desc').innerText = desc.trim();
-                inspector.style.display = 'block';
-            }
-
-            async function wipeData(type) {
-                if(confirm(`Sei SICURO di voler eliminare i dati (${type})? L'azione è irreversibile.`)) {
-                    const res = await fetch(`/api/wipe/${type}`, { method: 'DELETE' });
-                    if(res.ok) {
-                        alert("Dati eliminati.");
-                        loadBrainSummary();
-                        if(Graph) initOrRefresh3DGraph();
-                    }
-                }
-            }
-
-            loadBrainSummary();
-        </script>
-    </body>
-    </html>
-    """
+          </div>
+        </section>
+        <section class="view" id="view-nexus">
+          <div class="view-heading"><div><div class="eyebrow">KNOWLEDGE GRAPH / FORCE-DIRECTED 3D</div><h1>NEURAL NEXUS</h1></div><span class="status-chip" id="graph-status">NOT LOADED</span></div>
+          <div class="graph-view"><div id="nexus-3d-container"></div>
+            <div class="graph-toolbar"><input id="graph-search" class="control-input graph-search" placeholder="Cerca nodo…" aria-label="Cerca nodo nel grafo"><button class="btn" id="graph-refresh">⟳ Aggiorna</button><button class="btn" id="graph-fit">◎ Inquadra</button><button class="btn" id="graph-export">⇩ JSON</button>
+              <button class="filter-btn active" data-filter="all">TUTTO</button><button class="filter-btn" data-filter="person">PERSONE</button><button class="filter-btn" data-filter="memory">MEMORIE</button><button class="filter-btn" data-filter="event">EVENTI</button><button class="filter-btn" data-filter="interest">INTERESSI</button>
+            </div>
+            <div class="graph-legend"><div class="legend-row"><i class="dot" style="background:#32e6ac"></i>Core</div><div class="legend-row"><i class="dot" style="background:#478cff"></i>Persone</div><div class="legend-row"><i class="dot" style="background:#a687ff"></i>Memorie</div><div class="legend-row"><i class="dot" style="background:#ff667e"></i>Eventi</div><div class="legend-row"><i class="dot" style="background:#ffc66e"></i>Interessi</div></div>
+            <div class="graph-bottom"><button class="filter-btn" id="graph-rotate">⟳ Rotazione: OFF</button><button class="filter-btn" id="graph-physics">⚡ Fisica: ON</button><label class="filter-btn range-row">Forza <input id="graph-charge" type="range" min="-180" max="-15" value="-70" aria-label="Forza repulsiva"></label></div>
+            <aside class="inspector" id="nexus-inspector"><div style="display:flex;justify-content:space-between;align-items:center"><span class="eyebrow" id="inspector-type">NODE</span><button class="icon-btn" id="inspector-close">×</button></div><h3 id="inspector-title">Seleziona un nodo</h3><div class="status-chip" id="inspector-meta">—</div><p id="inspector-desc">Fai click su un nodo per ispezionarlo; usa la ricerca per trovarlo rapidamente.</p><button class="btn" id="focus-node" style="width:100%">◎ Centra nodo</button></aside>
+          </div>
+        </section>
+        <section class="view panel memory-view" id="view-memory"><div class="view-heading"><div><div class="eyebrow">LONG-TERM KNOWLEDGE</div><h1>MEMORY CORE</h1></div><button class="btn" id="memory-refresh">⟳ Aggiorna</button></div><div class="facts-list" id="facts-list"><div class="empty">Caricamento memorie…</div></div></section>
+        <section class="view panel contacts-view" id="view-contacts"><div class="view-heading"><div><div class="eyebrow">PEOPLE / RELATIONSHIPS</div><h1>CONTACTS</h1></div><button class="btn" id="contacts-refresh">⟳ Aggiorna</button></div><div class="contacts-list" id="contacts-list"><div class="empty">Caricamento contatti…</div></div></section>
+        <section class="view panel settings-view" id="view-settings"><div class="view-heading"><div><div class="eyebrow">CONFIGURATION / PERSISTED IN SUPABASE</div><h1>SYSTEM CONFIG</h1></div><button class="btn primary" id="save-settings">Salva configurazione</button></div>
+          <div class="settings-grid">
+            <div class="settings-card"><h3>PERSONALITÀ E CONTESTO</h3><div class="field"><label for="setting-tone">Tono di Peter</label><textarea class="control-textarea" id="setting-tone" rows="3" placeholder="Schietto, empatico…"></textarea></div><div class="field"><label for="setting-timezone">Fuso orario</label><input class="control-input" id="setting-timezone" value="Europe/Rome"></div><div class="field"><label for="setting-calendar-url">Calendario pubblico .ics</label><input class="control-input" id="setting-calendar-url" placeholder="https://…/basic.ics"></div><div class="settings-actions"><button class="btn" id="sync-calendar">Sincronizza calendario</button></div></div>
+            <div class="settings-card"><h3>ASPETTO E ACCESSIBILITÀ</h3><div class="field"><label for="setting-accent">Colore HUD</label><select class="control-select" id="setting-accent"><option value="#54e8ff">Ciano Jarvis</option><option value="#64f2bd">Verde plasma</option><option value="#b59aff">Viola ionico</option><option value="#ffbd68">Ambra</option></select></div><div class="field"><label>Animazioni</label><div class="settings-actions"><button class="btn" id="toggle-motion">Riduci animazioni</button><button class="btn" id="toggle-contrast">Contrasto alto</button></div></div><div class="field"><label>Queste preferenze visive vengono salvate in questo browser.</label></div></div>
+            <div class="settings-card"><h3>IMPORTAZIONE DATI</h3><div class="field"><label for="vcf-file-input">Rubrica vCard (.vcf)</label><input class="control-input" type="file" id="vcf-file-input" accept=".vcf,text/vcard"></div><button class="btn" id="upload-vcard">Importa contatti</button></div>
+            <div class="settings-card"><h3>CONNESSIONE E VOCE</h3><p style="font-size:11px;color:var(--muted);line-height:1.6">Le chiavi API non sono gestite da questa pagina. Configurale nelle Environment Variables di Render; non salvarle nel browser o nel repository.</p><div class="settings-actions"><button class="btn" id="voice-toggle">Avvia sessione vocale</button><span class="status-chip" id="voice-state">VOICE // IDLE</span></div><div class="field"><label>Backend</label><span class="status-chip" id="backend-state">Verifica…</span></div></div>
+            <div class="settings-card"><h3>DATA CONTROL</h3><p style="font-size:11px;color:var(--muted);line-height:1.6">La cancellazione è irreversibile. Seleziona un'area specifica quando possibile.</p><div class="settings-actions"><button class="btn danger" data-wipe="memories">Elimina memorie</button><button class="btn danger" data-wipe="contacts">Elimina contatti</button><button class="btn danger" data-wipe="events">Elimina eventi</button><button class="btn danger" data-wipe="all">Wipe totale</button></div></div>
+          </div>
+        </section>
+      </main>
+      <aside class="panel sidebar right-rail"><div class="section-label">Quick operations</div><div class="nav"><button class="nav-btn" id="quick-search">⌕ Cerca sul web</button><button class="nav-btn" id="quick-youtube">▷ Cerca YouTube</button><button class="nav-btn" id="quick-image">▧ Analizza immagine</button></div><div class="section-label">Latest memories</div><div id="mini-facts" class="facts-list" style="overflow:auto"><div class="empty">In attesa…</div></div><div class="sidebar-spacer"></div><div class="settings-card"><h3>SESSION STATUS</h3><div class="eyebrow" id="service-status">API / CONNECTING</div><p style="font-size:10px;color:var(--muted);line-height:1.5">HTTPS · FastAPI · Supabase<br>HUD SECURE LINK</p></div></aside>
+    </div>
+    <footer class="commandbar"><input type="file" id="file-input" class="attach" accept="image/*"><button class="icon-btn" id="attach-button" title="Allega immagine">＋</button><button class="icon-btn" id="voice-button" title="Sessione vocale">◉</button><input id="cmd-input" placeholder="Comando per Peter… (Invio per inviare)" autocomplete="off"><button class="btn primary" id="send-cmd-btn">INVIA</button></footer>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script>
+  (() => {
+    'use strict';
+    let Graph=null, graphDataCache={nodes:[],links:[]}, selectedNode=null, currentFilter='all', rotate=false, physics=true, attachedFile=null, ws=null, recorder=null, micStream=null, voiceActive=false, graphLoaded=false, requestBusy=false;
+    const $=id=>document.getElementById(id);
+    const safeText=v=>String(v??'');
+    function toast(message){const el=$('toast');el.textContent=message;el.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove('show'),3200)}
+    function setStatus(text,good=true){$('system-status').textContent=text;$('connection-chip').textContent=good?'READY':'DEGRADED';$('connection-chip').style.color=good?'var(--green)':'var(--amber)'}
+    function tick(){ $('clock').textContent=new Intl.DateTimeFormat('it-IT',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(new Date()) }
+    tick();setInterval(tick,1000);
+    function switchView(name){document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id==='view-'+name));document.querySelectorAll('.nav-btn[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===name));if(name==='nexus'&&!graphLoaded){setTimeout(loadGraph,100)}if(name==='memory')loadMemories();if(name==='contacts')loadContacts();if(name==='settings')loadSettings()}
+    document.querySelectorAll('.nav-btn[data-view]').forEach(b=>b.addEventListener('click',()=>switchView(b.dataset.view)));
+    async function fetchJson(url,options={}){const res=await fetch(url,options);let data;try{data=await res.json()}catch(_){data={}}if(!res.ok)throw new Error(data.detail||`HTTP ${res.status}`);return data}
+    function appendMsg(text,kind='peter'){const feed=$('chat-feed'),el=document.createElement('div');el.className=`msg ${kind}`;el.textContent=safeText(text);feed.appendChild(el);while(feed.children.length>120)feed.removeChild(feed.firstChild);feed.scrollTop=feed.scrollHeight}
+    $('clear-chat').addEventListener('click',()=>{$('chat-feed').replaceChildren();appendMsg('Cronologia visibile svuotata. Le memorie salvate non sono state cancellate.','system')});
+    $('attach-button').addEventListener('click',()=>$('file-input').click());$('file-input').addEventListener('change',e=>{attachedFile=e.target.files?.[0]||null;if(attachedFile){$('cmd-input').placeholder=`Immagine: ${attachedFile.name}`;toast('Immagine pronta da inviare')} });
+    $('cmd-input').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage()}});$('send-cmd-btn').addEventListener('click',sendMessage);
+    async function sendMessage(){if(requestBusy)return;const input=$('cmd-input'),text=input.value.trim();if(!text&&!attachedFile)return;requestBusy=true;$('send-cmd-btn').disabled=true;appendMsg(text||'[Immagine allegata]','user');input.value='';setStatus('PROCESSING');$('reasoning-preview').textContent='> Elaborazione richiesta…';const form=new FormData();form.append('message',text);if(attachedFile){form.append('file',attachedFile);attachedFile=null;$('file-input').value='';input.placeholder='Comando per Peter… (Invio per inviare)'}try{const data=await fetchJson('/chat',{method:'POST',body:form});appendMsg(data.reply||'Risposta vuota');if(data.screen)window.updateHudScreen?.(data.screen);if(data.reasoning)$('reasoning-preview').textContent=data.reasoning;setStatus('SYSTEM ONLINE');setTimeout(loadMemories,900);if(data.media?.video_id)toast('Video pronto nel Visual HUD')}catch(e){appendMsg(`Errore: ${e.message}`,'system');setStatus('CONNECTION ERROR',false)}finally{requestBusy=false;$('send-cmd-btn').disabled=false;input.focus()}}
+    window.updateHudScreen=function(screen){if(!screen||screen.type==='NONE')return;const box=$('hud-screen-content'),badge=$('hud-status-badge');badge.textContent=`ACTIVE // ${screen.type}`;if(screen.type==='MEDIA_PLAYER')return;box.replaceChildren();if(screen.type==='IMAGE_PREVIEW'&&screen.image_url){const wrap=document.createElement('div');wrap.style.cssText='display:flex;gap:10px;align-items:center;max-width:100%;height:100%';const img=document.createElement('img');img.src=screen.image_url;img.alt=screen.title||'Immagine';img.style.cssText='max-width:48%;max-height:100%;object-fit:contain;border-radius:8px';const detail=document.createElement('div');detail.style.cssText='font-size:11px;color:var(--muted);overflow:auto;max-height:100%';const title=document.createElement('strong');title.textContent=screen.title||'Ricerca';title.style.color='var(--cyan)';detail.append(title,document.createElement('br'),document.createTextNode(screen.content||''));wrap.append(img,detail);box.append(wrap);return}const card=document.createElement('div');card.className='hud-idle';const strong=document.createElement('strong');strong.textContent=screen.type||'PETER HUD';card.append(strong,document.createTextNode(screen.url||screen.query||screen.title||JSON.stringify(screen)));box.append(card)};
+    async function loadMemories(){try{const data=await fetchJson('/memories');if(!data.connected){$('facts-list').innerHTML='<div class="empty">Supabase non connesso. Verifica le variabili Render.</div>';return}const facts=data.long_term_facts||[];$('memory-count').textContent=facts.length;$('facts-list').replaceChildren();$('mini-facts').replaceChildren();if(!facts.length){$('facts-list').innerHTML='<div class="empty">Nessuna memoria disponibile.</div>';return}facts.forEach((f,i)=>{const row=document.createElement('div');row.className='fact-row';const text=document.createElement('span');text.textContent=f.fact||f.content||'Memoria';row.append(text);if(f.id){const actions=document.createElement('span');actions.style.cssText='display:flex;gap:5px;flex-shrink:0';const edit=document.createElement('button');edit.className='icon-btn';edit.textContent='✎';edit.title='Modifica memoria';edit.onclick=async()=>{const value=prompt('Modifica memoria',f.fact||'');if(value===null)return;try{await fetchJson(`/api/facts/${encodeURIComponent(f.id)}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({fact:value})});toast('Memoria aggiornata');loadMemories()}catch(e){toast(e.message)}};const del=document.createElement('button');del.className='icon-btn';del.textContent='×';del.title='Elimina memoria';del.onclick=async()=>{if(!confirm('Eliminare questa memoria?'))return;try{await fetchJson(`/api/facts/${encodeURIComponent(f.id)}`,{method:'DELETE'});loadMemories()}catch(e){toast(e.message)}};actions.append(edit,del);row.append(actions)}$('facts-list').append(row);if(i<4){const mini=document.createElement('div');mini.className='fact-row';mini.textContent=f.fact||f.content||'Memoria';$('mini-facts').append(mini)}})}catch(e){$('facts-list').innerHTML=`<div class="empty">Errore caricamento: ${e.message}</div>`}}
+    async function loadContacts(){try{const contacts=await fetchJson('/api/contacts');$('contact-count').textContent=contacts.length;$('contacts-list').replaceChildren();if(!contacts.length){$('contacts-list').innerHTML='<div class="empty">Nessun contatto.</div>';return}contacts.forEach(c=>{const row=document.createElement('div');row.className='contact-row';const name=document.createElement('strong');name.textContent=c.name||'Senza nome';row.append(name,document.createTextNode(` · ${c.relation_type||c.category||'contatto'}${c.gender?` · ${c.gender}`:''}${c.birth_year?` · ${c.birth_year}`:''}${c.notes?`\n${c.notes}`:''}`));$('contacts-list').append(row)})}catch(e){$('contacts-list').innerHTML=`<div class="empty">Errore caricamento: ${e.message}</div>`}}
+    async function loadSettings(){try{const s=await fetchJson('/api/personality');$('setting-tone').value=s.tone||'Schietto, empatico, naturale, colto e ironico.';$('setting-timezone').value=s.timezone||'Europe/Rome';$('setting-calendar-url').value=s.public_calendar_url||''}catch(e){toast(`Impostazioni: ${e.message}`)}}
+    $('save-settings').addEventListener('click',async()=>{try{await fetchJson('/api/personality',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tone:$('setting-tone').value.trim(),timezone:$('setting-timezone').value.trim(),public_calendar_url:$('setting-calendar-url').value.trim()})});toast('Configurazione salvata in Supabase')}catch(e){toast(`Salvataggio fallito: ${e.message}`)}});
+    $('sync-calendar').addEventListener('click',async()=>{const url=$('setting-calendar-url').value.trim();if(!url){toast('Inserisci prima l’URL del calendario');return}try{const data=await fetchJson('/api/import/ical',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url})});toast(`Eventi importati: ${data.count||0}`);loadGraph(true)}catch(e){toast(`Import calendario: ${e.message}`)}});
+    $('upload-vcard').addEventListener('click',async()=>{const file=$('vcf-file-input').files?.[0];if(!file){toast('Seleziona un file .vcf');return}const form=new FormData();form.append('file',file);try{const d=await fetchJson('/api/import/vcf',{method:'POST',body:form});toast(`Contatti importati: ${d.count||0}`);loadContacts();loadGraph(true)}catch(e){toast(`Import fallito: ${e.message}`)}});
+    document.querySelectorAll('[data-wipe]').forEach(b=>b.addEventListener('click',async()=>{const kind=b.dataset.wipe;if(!confirm(`Confermi la cancellazione irreversibile: ${kind}?`))return;try{await fetchJson(`/api/wipe/${kind}`,{method:'DELETE'});toast('Operazione completata');loadMemories();loadContacts();loadGraph(true)}catch(e){toast(e.message)}}));
+    async function checkBackend(){try{await fetchJson('/ping');$('backend-state').textContent='ONLINE';$('service-status').textContent='API / ONLINE';setStatus('SYSTEM ONLINE')}catch(e){$('backend-state').textContent='OFFLINE';$('service-status').textContent='API / OFFLINE';setStatus('BACKEND OFFLINE',false)}}
+    $('refresh-all').addEventListener('click',()=>{checkBackend();loadMemories();loadContacts();if(graphLoaded)loadGraph(true);toast('Dati aggiornati')});$('memory-refresh').addEventListener('click',loadMemories);$('contacts-refresh').addEventListener('click',loadContacts);
+    $('quick-search').addEventListener('click',()=>{switchView('dashboard');$('cmd-input').value='Cerca sul web: ';$('cmd-input').focus()});$('quick-youtube').addEventListener('click',()=>{switchView('dashboard');$('cmd-input').value='Cerca e riproduci su YouTube: ';$('cmd-input').focus()});$('quick-image').addEventListener('click',()=>$('file-input').click());
+    const accent=$('setting-accent');accent.value=localStorage.getItem('peter-accent')||'#54e8ff';function applyAccent(){document.documentElement.style.setProperty('--cyan',accent.value);localStorage.setItem('peter-accent',accent.value)}accent.addEventListener('change',applyAccent);applyAccent();$('toggle-motion').onclick=()=>{document.body.classList.toggle('reduce-motion');document.body.style.setProperty('--motion',document.body.classList.contains('reduce-motion')?'0':'1');toast('Preferenza animazioni aggiornata')};$('toggle-contrast').onclick=()=>{document.body.classList.toggle('high-contrast');document.body.style.filter=document.body.classList.contains('high-contrast')?'contrast(1.15)':'';toast('Contrasto aggiornato')};
+    function nodeColor(n){return n.type==='core'?'#32e6ac':n.type==='person'?(n.gender?.toUpperCase()==='F'?'#ff6fbe':n.gender?.toUpperCase()==='M'?'#478cff':'#54e8ff'):n.type==='memory'?'#a687ff':n.type==='event'?'#ff667e':n.type==='interest'?'#ffc66e':'#d7eaff'}
+    function relationColor(l){const r=String(l.relation||'').toLowerCase();return r.includes('amore')?'#ff6fbe':r.includes('famiglia')?'#32e6ac':r.includes('lavoro')?'#ffc66e':r.includes('amiciz')?'#478cff':'#54e8ff'}
+    function showInspector(n){selectedNode=n;$('inspector-type').textContent=`NODE // ${(n.type||'unknown').toUpperCase()}`;$('inspector-title').textContent=n.name||n.id||'Nodo';$('inspector-meta').textContent=[n.category,n.relation_type,n.gender,n.birth_year].filter(Boolean).join(' · ')||'NEXUS ENTITY';$('inspector-desc').textContent=[n.notes,n.details,n.description].filter(Boolean).join('\n\n')||'Nessuna nota aggiuntiva.';$('nexus-inspector').classList.add('open')}
+    function filteredData(){const term=$('graph-search').value.trim().toLowerCase();const nodes=graphDataCache.nodes.filter(n=>(currentFilter==='all'||n.type===currentFilter||n.type==='core')&&(!term||String(n.name||'').toLowerCase().includes(term)||String(n.type||'').toLowerCase().includes(term)));const ids=new Set(nodes.map(n=>String(n.id)));const links=graphDataCache.links.filter(l=>ids.has(String(typeof l.source==='object'?l.source.id:l.source))&&ids.has(String(typeof l.target==='object'?l.target.id:l.target)));return{nodes,links}}
+    function renderGraphData(fit=false){if(!Graph)return;const data=filteredData();Graph.graphData(data);if(fit)setTimeout(()=>Graph?.zoomToFit(500,45,n=>data.nodes.includes(n)),180);$('graph-status').textContent=`${data.nodes.length} NODES · ${data.links.length} LINKS`;}
+    async function loadGraph(force=false){if(!Graph&&typeof ForceGraph3D!=='function'){$('graph-status').textContent='GRAPH LIBRARY UNAVAILABLE';toast('3D graph library non caricata');return}if(!Graph){const el=$('nexus-3d-container');Graph=ForceGraph3D()(el).backgroundColor('#050914').showNavInfo(false).nodeResolution(12).nodeRelSize(5).nodeVal(n=>n.type==='core'?14:n.type==='person'?7:4).nodeColor(nodeColor).nodeLabel(n=>`${n.name||'Nodo'} · ${n.type||'entity'}`).linkColor(relationColor).linkOpacity(.42).linkWidth(1).linkDirectionalParticles(1).linkDirectionalParticleWidth(1.3).linkDirectionalParticleSpeed(.003).d3AlphaDecay(.035).d3VelocityDecay(.25).cooldownTicks(180).warmupTicks(40).onNodeClick(n=>{showInspector(n);const d=100;const ratio=1+d/Math.hypot(n.x||1,n.y||1,n.z||1);Graph.cameraPosition({x:(n.x||0)*ratio,y:(n.y||0)*ratio,z:(n.z||0)*ratio},n,700)}).onNodeHover(n=>{el.style.cursor=n?'pointer':'grab'});Graph.width(el.clientWidth).height(el.clientHeight);graphLoaded=true}
+      try{$('graph-status').textContent='SYNCING…';const data=await fetchJson('/api/nexus');graphDataCache={nodes:(data.nodes||[]).map(n=>({...n,id:String(n.id),val:n.type==='core'?14:n.type==='person'?7:4})),links:(data.edges||[]).map(e=>({source:String(e.source),target:String(e.target),relation:e.relation_type||'neutro'}))};$('node-count').textContent=graphDataCache.nodes.length;$('edge-count').textContent=graphDataCache.links.length;renderGraphData(force);if(!graphDataCache.nodes.length)$('graph-status').textContent='EMPTY GRAPH'}catch(e){$('graph-status').textContent='LOAD ERROR';toast(`Grafo: ${e.message}`)}}
+    $('graph-refresh').addEventListener('click',()=>loadGraph(true));$('graph-fit').addEventListener('click',()=>Graph?.zoomToFit(500,45));$('graph-search').addEventListener('input',()=>renderGraphData(false));document.querySelectorAll('[data-filter]').forEach(b=>b.addEventListener('click',()=>{currentFilter=b.dataset.filter;document.querySelectorAll('[data-filter]').forEach(x=>x.classList.toggle('active',x===b));renderGraphData(true)}));$('inspector-close').onclick=()=>$('nexus-inspector').classList.remove('open');$('focus-node').onclick=()=>{if(!Graph||!selectedNode)return;const n=selectedNode,d=100,r=1+d/Math.hypot(n.x||1,n.y||1,n.z||1);Graph.cameraPosition({x:(n.x||0)*r,y:(n.y||0)*r,z:(n.z||0)*r},n,650)};$('graph-rotate').onclick=()=>{rotate=!rotate;const c=Graph?.controls?.();if(c)c.autoRotate=rotate;$('graph-rotate').textContent=`⟳ Rotazione: ${rotate?'ON':'OFF'}`};$('graph-physics').onclick=()=>{physics=!physics;if(Graph)Graph.cooldownTicks(physics?180:0);$('graph-physics').textContent=`⚡ Fisica: ${physics?'ON':'OFF'}`};$('graph-charge').addEventListener('input',e=>{if(Graph)Graph.d3Force('charge').strength(Number(e.target.value))});$('graph-export').onclick=()=>{const blob=new Blob([JSON.stringify({nodes:graphDataCache.nodes,links:graphDataCache.links.map(l=>({source:typeof l.source==='object'?l.source.id:l.source,target:typeof l.target==='object'?l.target.id:l.target,relation:l.relation}))},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='peter-nexus.json';a.click();URL.revokeObjectURL(a.href)};window.addEventListener('resize',()=>{if(Graph){const e=$('nexus-3d-container');if(e.clientWidth)Graph.width(e.clientWidth).height(e.clientHeight)}});
+    function stopVoice(){if(recorder&&recorder.state!=='inactive')recorder.stop();if(micStream)micStream.getTracks().forEach(t=>t.stop());if(ws&&ws.readyState<2)ws.close();voiceActive=false;$('voice-state').textContent='VOICE // IDLE';$('voice-toggle').textContent='Avvia sessione vocale';$('voice-button').style.color='';$('avatar-status-badge').textContent='CORE // READY'}
+    async function toggleVoice(){if(voiceActive){stopVoice();return}if(!navigator.mediaDevices?.getUserMedia){toast('Microfono non disponibile: usa HTTPS e un browser compatibile');return}try{const protocol=location.protocol==='https:'?'wss:':'ws:';ws=new WebSocket(`${protocol}//${location.host}/ws/voice`);ws.binaryType='arraybuffer';ws.onopen=async()=>{try{micStream=await navigator.mediaDevices.getUserMedia({audio:true});recorder=new MediaRecorder(micStream);recorder.ondataavailable=e=>{if(e.data.size&&ws?.readyState===WebSocket.OPEN)ws.send(e.data)};recorder.start(2500);voiceActive=true;$('voice-state').textContent='VOICE // LISTENING';$('voice-toggle').textContent='Termina sessione vocale';$('voice-button').style.color='var(--green)';$('avatar-status-badge').textContent='CORE // LISTENING';appendMsg('Sessione vocale attiva. Parla pure.','system')}catch(e){toast(`Microfono: ${e.message}`);stopVoice()}};ws.onmessage=async e=>{if(typeof e.data==='string'){try{const d=JSON.parse(e.data);if(d.user_text)appendMsg(d.user_text,'user');if(d.reply_text)appendMsg(d.reply_text,'peter');if(d.screen)window.updateHudScreen(d.screen);if(d.reasoning)$('reasoning-preview').textContent=d.reasoning;$('avatar-status-badge').textContent='CORE // SPEAKING'}catch(_){}}else{const blob=new Blob([e.data],{type:'audio/mp3'}),url=URL.createObjectURL(blob),audio=new Audio(url);audio.onended=()=>{URL.revokeObjectURL(url);if(voiceActive)$('avatar-status-badge').textContent='CORE // LISTENING'};audio.play().catch(()=>{})}};ws.onerror=()=>toast('Errore WebSocket vocale');ws.onclose=()=>{if(voiceActive)stopVoice()}}catch(e){toast(e.message);stopVoice()}}
+    $('voice-toggle').onclick=toggleVoice;$('voice-button').onclick=toggleVoice;
+    checkBackend();loadMemories();loadContacts();loadSettings();
+  })();
+  </script>
+</body>
+</html>'''
