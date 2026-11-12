@@ -2,14 +2,13 @@ import httpx
 from icalendar import Calendar
 
 def parse_vcard(vcf_text: str) -> list:
-    """Analizza un file vCard (.vcf) e restituisce una lista di contatti strutturati."""
+    """Analizza un file vCard (.vcf) e restituisce contatti puliti senza duplicati."""
     contacts = []
     current_contact = {}
-    
     for line in vcf_text.splitlines():
         line = line.strip()
         if line.startswith("BEGIN:VCARD"):
-            current_contact = {"name": "", "category": "contatto", "notes": "", "gender": "sconosciuto", "birth_year": None, "relation_type": "neutrale"}
+            current_contact = {"name": "", "category": "amicizia", "notes": "", "gender": "sconosciuto", "birth_year": None, "relation_type": "neutrale"}
         elif line.startswith("FN:") or line.startswith("N:"):
             name_val = line.split(":", 1)[1].replace(";", " ").strip()
             if name_val and not current_contact.get("name"):
@@ -20,11 +19,10 @@ def parse_vcard(vcf_text: str) -> list:
             if current_contact.get("name"):
                 contacts.append(current_contact)
             current_contact = {}
-            
     return contacts
 
 async def fetch_and_parse_ical(url: str) -> list:
-    """Scarica e analizza un file iCal (.ics) restituendo una lista di eventi."""
+    """Scarica e analizza un calendario pubblico Google tramite URL iCal (.ics)."""
     events = []
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -36,13 +34,7 @@ async def fetch_and_parse_ical(url: str) -> list:
                     desc = str(component.get('description', ''))
                     start = component.get('dtstart')
                     start_str = start.dt.strftime('%Y-%m-%d %H:%M') if start else 'Programmato'
-                    
-                    events.append({
-                        "title": title,
-                        "description": desc,
-                        "start_time": start_str
-                    })
+                    events.append({"title": title, "description": desc, "start_time": start_str})
     except Exception as e:
         print(f"Errore parsing iCal: {e}")
-        
     return events
