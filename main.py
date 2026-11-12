@@ -12,7 +12,7 @@ from database import (
     get_long_term_facts, delete_fact_by_id, update_fact_by_id,
     save_episodic_memory, save_contacts_batch, get_contacts,
     save_calendar_events_batch, get_personality_settings, save_personality_settings,
-    get_nexus_graph_data
+    get_nexus_graph_data, wipe_table_data
 )
 from llm import generate_peter_response, extract_and_save_facts
 from telegram_bot import process_telegram_update
@@ -20,7 +20,7 @@ from ui import get_dashboard_html
 from importer import parse_vcard, fetch_and_parse_ical
 from config import GROQ_API_KEY
 
-app = FastAPI(title="Peter OS Backend v9.0")
+app = FastAPI(title="Peter OS Backend v10 - WebGL Edition")
 
 class TTSRequest(BaseModel):
     text: str
@@ -33,7 +33,6 @@ class ICalRequest(BaseModel):
 
 @app.get("/ping")
 def ping():
-    """Endpoint di Keep-Alive per mantenere attivo il server."""
     return {"status": "alive"}
 
 @app.get("/", response_class=HTMLResponse)
@@ -65,7 +64,6 @@ def api_get_contacts():
 
 @app.post("/api/tts")
 async def api_tts_speech(req: TTSRequest):
-    """Genera lo stream audio MP3 per la voce nativa di Peter nella dashboard."""
     try:
         tts = edge_tts.Communicate(req.text, voice="it-IT-DiegoNeural")
         with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_mp3:
@@ -90,6 +88,14 @@ def api_delete_fact(fact_id: str):
     if not success:
         raise HTTPException(status_code=500, detail="Impossibile eliminare il fatto")
     return {"status": "deleted"}
+
+# -- NUOVO ENDPOINT DANGER ZONE (FASE 4) --
+@app.delete("/api/wipe/{data_type}")
+def api_wipe_data(data_type: str):
+    success = wipe_table_data(data_type)
+    if not success:
+        raise HTTPException(status_code=500, detail="Errore durante il wipe dei dati")
+    return {"status": "success", "wiped": data_type}
 
 @app.post("/api/import/vcf")
 async def import_vcf(file: UploadFile = File(...)):
