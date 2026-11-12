@@ -38,7 +38,20 @@ def get_all_facts():
         return res.data or []
     except Exception:
         return []
+def save_contacts_batch(contacts: list):
+    if not supabase or not contacts: return
+    try:
+        supabase.table("contacts").insert(contacts).execute()
+    except Exception as e:
+        print(f"Errore batch contatti: {e}")
 
+def save_calendar_events_batch(events: list):
+    if not supabase or not events: return
+    try:
+        supabase.table("calendar_events").insert(events).execute()
+    except Exception as e:
+        print(f"Errore batch eventi: {e}")
+        
 def update_fact_by_id(fact_id: str, new_text: str) -> bool:
     if not supabase: return False
     try:
