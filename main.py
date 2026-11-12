@@ -33,6 +33,7 @@ class ICalRequest(BaseModel):
 
 @app.get("/ping")
 def ping():
+    """Endpoint di Keep-Alive per mantenere attivo il server."""
     return {"status": "alive"}
 
 @app.get("/", response_class=HTMLResponse)
@@ -64,6 +65,7 @@ def api_get_contacts():
 
 @app.post("/api/tts")
 async def api_tts_speech(req: TTSRequest):
+    """Genera lo stream audio MP3 per la voce nativa di Peter nella dashboard."""
     try:
         tts = edge_tts.Communicate(req.text, voice="it-IT-DiegoNeural")
         with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_mp3:
@@ -89,6 +91,39 @@ def api_delete_fact(fact_id: str):
         raise HTTPException(status_code=500, detail="Impossibile eliminare il fatto")
     return {"status": "deleted"}
 
+@app.post("/api/import/vcf")
+async def import_vcf(file: UploadFile = File(...)):
+    content = await file.read()
+    text = content.decode("utf-8", errors="ignore")
+    contacts = parse_vcard(text)
+    if contacts:
+        save_contacts_batch(contacts)
+        return {"status": "success", "count": len(contacts)}
+    return {"status": "no_contacts_found"}
+
+@app.post("/api/import/ical")
+async def import_ical(req: ICalRequest):
+    events = await fetch_and_parse_ical(req.url)
+    if events:
+        save_calendar_events_batch(events)
+        return {"status": "success", "count": len(events)}
+    return {"status": "no_events_found"}
+
+@app.get("/api/personality")
+def api_get_personality():
+    return get_personality_settings()
+
+@app.post("/api/personality")
+def api_save_personality(settings: dict):
+    save_personality_settings(settings)
+    return {"status": "updated"}
+
+@app.post("/telegram/webhook")
+async def telegram_webhook(request: Request, background_tasks: BackgroundTasks):
+    update = await request.json()
+    background_tasks.add_task(process_telegram_update, update)
+    return {"status": "ok"}
+
 @app.post("/chat")
 async def chat_endpoint(
     message: str = Form(""),
@@ -113,7 +148,8 @@ async def chat_endpoint(
     reasoning = result.get("reasoning")
 
     save_episodic_memory(message if message else "[Immagine]", reply)
-    background_tasks.add_task(extract_and_save_facts, message, image_data_url)
+    if background_tasks:
+        background_tasks.add_task(extract_and_save_facts, message, image_data_url)
 
     return {"reply": reply, "query_used": query_used, "media": media, "screen": screen, "reasoning": reasoning}
 
@@ -173,5 +209,8 @@ async def websocket_voice_endpoint(websocket: WebSocket):
                 "reasoning": reasoning_data
             })
             await websocket.send_bytes(audio_out)
+
     except WebSocketDisconnect:
         pass
+    except Exception as e:
+        print(f"Errore WebSocket Voice: {e}")
