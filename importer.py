@@ -1,52 +1,48 @@
-def calculate_galaxy_layout(supabase_client) -> dict:
-    nodes = []
-    edges = []
+import httpx
+from icalendar import Calendar
 
-    if not supabase_client:
-        return {
-            "nodes": [{
-                "id": "user_self", 
-                "name": "Marco (Tu)", 
-                "type": "core", 
-                "category": "core", 
-                "notes": "Admin & Core Neural Center",
-                "gender": "M",
-                "birth_year": 2006
-            }],
-            "edges": []
-        }
+def parse_vcard(vcf_text: str) -> list:
+    """Analizza un file vCard (.vcf) e restituisce una lista di contatti strutturati."""
+    contacts = []
+    current_contact = {}
+    
+    for line in vcf_text.splitlines():
+        line = line.strip()
+        if line.startswith("BEGIN:VCARD"):
+            current_contact = {"name": "", "category": "contatto", "notes": "", "gender": "sconosciuto", "birth_year": None, "relation_type": "neutrale"}
+        elif line.startswith("FN:") or line.startswith("N:"):
+            name_val = line.split(":", 1)[1].replace(";", " ").strip()
+            if name_val and not current_contact.get("name"):
+                current_contact["name"] = name_val
+        elif line.startswith("NOTE:"):
+            current_contact["notes"] = line.split(":", 1)[1].strip()
+        elif line.startswith("END:VCARD"):
+            if current_contact.get("name"):
+                contacts.append(current_contact)
+            current_contact = {}
+            
+    return contacts
 
+async def fetch_and_parse_ical(url: str) -> list:
+    """Scarica e analizza un file iCal (.ics) restituendo una lista di eventi."""
+    events = []
     try:
-        res_nodes = supabase_client.table("nodes").select("*").execute()
-        if res_nodes.data:
-            nodes = res_nodes.data
-        else:
-            nodes = [{
-                "id": "user_self", 
-                "name": "Marco (Tu)", 
-                "type": "core", 
-                "category": "core", 
-                "notes": "Admin & Core Neural Center",
-                "gender": "M",
-                "birth_year": 2006
-            }]
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            res = await client.get(url)
+            if res.status_code == 200:
+                cal = Calendar.from_ical(res.content)
+                for component in cal.walk('vevent'):
+                    title = str(component.get('summary', 'Evento'))
+                    desc = str(component.get('description', ''))
+                    start = component.get('dtstart')
+                    start_str = start.dt.strftime('%Y-%m-%d %H:%M') if start else 'Programmato'
+                    
+                    events.append({
+                        "title": title,
+                        "description": desc,
+                        "start_time": start_str
+                    })
     except Exception as e:
-        print(f"Errore lettura nodes: {e}")
-        nodes = [{
-            "id": "user_self", 
-            "name": "Marco (Tu)", 
-            "type": "core", 
-            "category": "core", 
-            "notes": "Admin & Core Neural Center",
-            "gender": "M",
-            "birth_year": 2006
-        }]
-
-    try:
-        res_edges = supabase_client.table("edges").select("*").execute()
-        if res_edges.data:
-            edges = res_edges.data
-    except Exception as e:
-        print(f"Errore lettura edges: {e}")
-
-    return {"nodes": nodes, "edges": edges}
+        print(f"Errore parsing iCal: {e}")
+        
+    return events
