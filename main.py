@@ -1,24 +1,32 @@
-import tempfile
-import os
-import base64
-import httpx
-import edge_tts
-from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form, WebSocket, WebSocketDisconnect, BackgroundTasks
-from fastapi.responses import HTMLResponse, Response
-from pydantic import BaseModel
+import sys
+import traceback
 
-from database import (
-    supabase, supabase_error_log, get_recent_memories, 
-    get_long_term_facts, delete_fact_by_id, update_fact_by_id,
-    save_episodic_memory, save_contacts_batch, get_contacts,
-    save_calendar_events_batch, get_personality_settings, save_personality_settings,
-    get_nexus_graph_data, wipe_table_data
-)
-from llm import generate_peter_response, extract_and_save_facts
-from telegram_bot import process_telegram_update
-from ui import get_dashboard_html
-from importer import parse_vcard, fetch_and_parse_ical
-from config import GROQ_API_KEY
+try:
+    import tempfile
+    import os
+    import base64
+    import httpx
+    import edge_tts
+    from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form, WebSocket, WebSocketDisconnect, BackgroundTasks
+    from fastapi.responses import HTMLResponse, Response
+    from pydantic import BaseModel
+
+    from database import (
+        supabase, supabase_error_log, get_recent_memories, 
+        get_long_term_facts, delete_fact_by_id, update_fact_by_id,
+        save_episodic_memory, save_contacts_batch, get_contacts,
+        save_calendar_events_batch, get_personality_settings, save_personality_settings,
+        get_nexus_graph_data, wipe_table_data
+    )
+    from llm import generate_peter_response, extract_and_save_facts
+    from telegram_bot import process_telegram_update
+    from ui import get_dashboard_html
+    from importer import parse_vcard, fetch_and_parse_ical
+    from config import GROQ_API_KEY
+except Exception as e:
+    print("CRITICAL IMPORT/STARTUP ERROR:", file=sys.stderr)
+    traceback.print_exc(file=sys.stderr)
+    sys.exit(1)
 
 app = FastAPI(title="Peter OS Backend v10 - WebGL Edition")
 
