@@ -11,7 +11,7 @@ if SUPABASE_URL and SUPABASE_KEY:
     except Exception as e:
         supabase_error_log = str(e)
 
-def get_system_settings() -> dict:
+def get_personality_settings() -> dict:
     default = {"timezone": "Europe/Rome", "public_calendar_url": "", "tone": "Schietto, empatico, naturale, colto e ironico."}
     if not supabase: return default
     try:
@@ -21,10 +21,10 @@ def get_system_settings() -> dict:
         pass
     return default
 
-def save_system_settings(settings: dict):
+def save_personality_settings(settings: dict):
     if not supabase: return
     try:
-        current = get_system_settings()
+        current = get_personality_settings()
         updated = {**current, **settings}
         supabase.table("system_settings").upsert({"key": "global_config", "value": updated}).execute()
     except Exception as e:
