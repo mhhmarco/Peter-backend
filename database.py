@@ -38,20 +38,7 @@ def get_all_facts():
         return res.data or []
     except Exception:
         return []
-def save_contacts_batch(contacts: list):
-    if not supabase or not contacts: return
-    try:
-        supabase.table("contacts").insert(contacts).execute()
-    except Exception as e:
-        print(f"Errore batch contatti: {e}")
 
-def save_calendar_events_batch(events: list):
-    if not supabase or not events: return
-    try:
-        supabase.table("calendar_events").insert(events).execute()
-    except Exception as e:
-        print(f"Errore batch eventi: {e}")
-        
 def update_fact_by_id(fact_id: str, new_text: str) -> bool:
     if not supabase: return False
     try:
@@ -112,6 +99,13 @@ def save_contact_entity(name: str, category: str = "amicizia", notes: str = "", 
     except Exception as e:
         print(f"Errore contatto: {e}")
 
+def save_contacts_batch(contacts: list):
+    if not supabase or not contacts: return
+    try:
+        supabase.table("contacts").insert(contacts).execute()
+    except Exception as e:
+        print(f"Errore batch contatti: {e}")
+
 def get_contacts():
     if not supabase: return []
     try:
@@ -125,6 +119,13 @@ def save_event_entity(title: str, description: str = ""):
         supabase.table("calendar_events").insert([{"title": title, "description": description, "start_time": "Programmato"}]).execute()
     except Exception:
         pass
+
+def save_calendar_events_batch(events: list):
+    if not supabase or not events: return
+    try:
+        supabase.table("calendar_events").insert(events).execute()
+    except Exception as e:
+        print(f"Errore batch eventi: {e}")
 
 def save_interest_entity(name: str, description: str = ""):
     if not supabase or not name or name.upper() == "NESSUNO": return
@@ -161,6 +162,22 @@ def save_personality_settings(settings: dict):
         supabase.table("system_settings").upsert({"key": "personality", "value": settings}).execute()
     except Exception:
         pass
+
+def save_telegram_chat_id(chat_id: int):
+    if not supabase: return
+    try:
+        supabase.table("system_settings").upsert({"key": "last_telegram_chat_id", "value": str(chat_id)}).execute()
+    except Exception:
+        pass
+
+def get_telegram_chat_id() -> str:
+    if not supabase: return ""
+    try:
+        res = supabase.table("system_settings").select("value").eq("key", "last_telegram_chat_id").execute()
+        if res.data: return res.data[0]["value"]
+    except Exception:
+        pass
+    return ""
 
 def wipe_table_data(table_type: str) -> bool:
     if not supabase: return False
