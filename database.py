@@ -3,11 +3,13 @@ from config import SUPABASE_URL, SUPABASE_KEY
 from graph import calculate_galaxy_layout
 
 supabase: Client = None
+supabase_error_log = None  <-- AGGIUNGI QUESTA RIGA
+
 if SUPABASE_URL and SUPABASE_KEY:
     try:
         supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
     except Exception as e:
-        print(f"Supabase error: {e}")
+        supabase_error_log = str(e)
 
 def get_system_settings() -> dict:
     default = {"timezone": "Europe/Rome", "public_calendar_url": "", "tone": "Schietto, empatico, naturale, colto e ironico."}
