@@ -9,6 +9,7 @@ try:
     import httpx
     import edge_tts
     from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form, WebSocket, WebSocketDisconnect, BackgroundTasks
+    from fastapi.concurrency import run_in_threadpool
     from fastapi.responses import HTMLResponse, Response
     from pydantic import BaseModel
 
@@ -23,6 +24,7 @@ try:
     from telegram_bot import process_telegram_update
     from ui import get_dashboard_html
     from importer import parse_vcard, fetch_and_parse_ical
+    from tools import search_image_result, search_youtube, youtube_api_status
     from config import GROQ_API_KEY
 except Exception:
     print("CRITICAL IMPORT/STARTUP ERROR:", file=sys.stderr)
@@ -44,18 +46,20 @@ class ICalRequest(BaseModel):
     url: str
 
 
+class ImageSearchRequest(BaseModel):
+    query: str
+
+
 @app.get("/ping")
 def ping():
-    """Keep-alive endpoint."""
     return {"status": "alive"}
 
 
 @app.get("/", response_class=HTMLResponse)
 def root_dashboard():
-    # Load the player enhancement after the dashboard's existing inline script,
-    # so it can replace the old autoplay iframe with the IFrame Player API.
     html = get_dashboard_html().replace(
-        "</body>", '<script src="/player.js"></script></body>'
+        "</body>",
+        '<script src="/player.js"></script><script src="/enhancements.js"></script></body>',
     )
     return HTMLResponse(content=html)
 
@@ -64,13 +68,37 @@ def root_dashboard():
 def youtube_player_script():
     script_path = Path(__file__).with_name("player.js")
     try:
-        return Response(
-            content=script_path.read_text(encoding="utf-8"),
-            media_type="application/javascript",
-            headers={"Cache-Control": "no-cache"},
-        )
-    except OSError as e:
-        raise HTTPException(status_code=500, detail="Player script non disponibile") from e
+        return Response(content=script_path.read_text(encoding="utf-8"), media_type="application/javascript",
+                        headers={"Cache-Control": "no-cache"})
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail="Player script non disponibile") from exc
+
+
+@app.get("/enhancements.js")
+def ui_enhancements_script():
+    script_path = Path(__file__).with_name("enhancements.js")
+    try:
+        return Response(content=script_path.read_text(encoding="utf-8"), media_type="application/javascript",
+                        headers={"Cache-Control": "no-cache"})
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail="UI enhancements non disponibili") from exc
+
+
+@app.get("/api/youtube/status")
+def api_youtube_status():
+    """Check whether a YouTube Data API v3 key is configured (never expose it)."""
+    return youtube_api_status()
+
+
+@app.post("/api/images/search")
+async def api_image_search(req: ImageSearchRequest):
+    query = req.query.strip()
+    if not query:
+        raise HTTPException(status_code=400, detail="Inserisci una ricerca per immagini")
+    result = await run_in_threadpool(search_image_result, query)
+    if not result.get("image_url"):
+        raise HTTPException(status_code=404, detail="Nessuna immagine trovata")
+    return result
 
 
 @app.get("/memories")
@@ -80,13 +108,9 @@ def check_memories():
     try:
         res_mem = supabase.table("memories").select("*").order("created_at", desc=True).limit(10).execute()
         res_facts = supabase.table("user_facts").select("*").order("created_at", desc=True).limit(20).execute()
-        return {
-            "connected": True,
-            "episodic_memories": res_mem.data,
-            "long_term_facts": res_facts.data,
-        }
-    except Exception as e:
-        return {"connected": False, "error": f"Errore lettura: {str(e)}"}
+        return {"connected": True, "episodic_memories": res_mem.data, "long_term_facts": res_facts.data}
+    except Exception as exc:
+        return {"connected": False, "error": f"Errore lettura: {str(exc)}"}
 
 
 @app.get("/api/nexus")
@@ -110,8 +134,8 @@ async def api_tts_speech(req: TTSRequest):
         with open(tmp_path, "rb") as audio_file:
             audio_bytes = audio_file.read()
         return Response(content=audio_bytes, media_type="audio/mp3")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
     finally:
         if tmp_path and os.path.exists(tmp_path):
             os.remove(tmp_path)
@@ -141,8 +165,7 @@ def api_wipe_data(data_type: str):
 @app.post("/api/import/vcf")
 async def import_vcf(file: UploadFile = File(...)):
     content = await file.read()
-    text = content.decode("utf-8", errors="ignore")
-    contacts = parse_vcard(text)
+    contacts = parse_vcard(content.decode("utf-8", errors="ignore"))
     if contacts:
         save_contacts_batch(contacts)
         return {"status": "success", "count": len(contacts)}
@@ -171,43 +194,33 @@ def api_save_personality(settings: dict):
 
 @app.post("/telegram/webhook")
 async def telegram_webhook(request: Request, background_tasks: BackgroundTasks):
-    update = await request.json()
-    background_tasks.add_task(process_telegram_update, update)
+    background_tasks.add_task(process_telegram_update, await request.json())
     return {"status": "ok"}
 
 
 @app.post("/chat")
-async def chat_endpoint(
-    message: str = Form(""),
-    file: UploadFile = File(None),
-    background_tasks: BackgroundTasks = None,
-):
+async def chat_endpoint(message: str = Form(""), file: UploadFile = File(None),
+                        background_tasks: BackgroundTasks = None):
     recent_context = get_recent_memories(limit=8)
     long_term_facts = get_long_term_facts(limit=15)
-
     image_data_url = None
     if file:
         file_bytes = await file.read()
-        encoded = base64.b64encode(file_bytes).decode("utf-8")
+        if len(file_bytes) > 10 * 1024 * 1024:
+            raise HTTPException(status_code=413, detail="Immagine troppo grande (massimo 10 MB)")
         mime = file.content_type or "image/jpeg"
-        image_data_url = f"data:{mime};base64,{encoded}"
+        if not mime.startswith("image/"):
+            raise HTTPException(status_code=415, detail="Il file allegato deve essere un'immagine")
+        image_data_url = f"data:{mime};base64,{base64.b64encode(file_bytes).decode('utf-8')}"
 
-    result = await generate_peter_response(
-        message, recent_context, long_term_facts, image_data_url=image_data_url
-    )
+    result = await generate_peter_response(message, recent_context, long_term_facts,
+                                           image_data_url=image_data_url)
     reply = result["reply"]
     save_episodic_memory(message if message else "[Immagine]", reply)
-
     if background_tasks:
         background_tasks.add_task(extract_and_save_facts, message, image_data_url)
-
-    return {
-        "reply": reply,
-        "query_used": result.get("query_used"),
-        "media": result.get("media"),
-        "screen": result.get("screen"),
-        "reasoning": result.get("reasoning"),
-    }
+    return {"reply": reply, "query_used": result.get("query_used"), "media": result.get("media"),
+            "screen": result.get("screen"), "reasoning": result.get("reasoning")}
 
 
 @app.websocket("/ws/voice")
@@ -218,11 +231,9 @@ async def websocket_voice_endpoint(websocket: WebSocket):
             audio_bytes = await websocket.receive_bytes()
             if not audio_bytes:
                 continue
-
             with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
                 tmp.write(audio_bytes)
                 tmp_path = tmp.name
-
             user_text = ""
             try:
                 async with httpx.AsyncClient(timeout=10.0) as client:
@@ -238,37 +249,27 @@ async def websocket_voice_endpoint(websocket: WebSocket):
             finally:
                 if os.path.exists(tmp_path):
                     os.remove(tmp_path)
-
             if not user_text:
                 continue
-
             recent_context = get_recent_memories(limit=6)
             long_term_facts = get_long_term_facts(limit=10)
             llm_res = await generate_peter_response(user_text, recent_context, long_term_facts)
             reply_text = llm_res["reply"]
             save_episodic_memory(user_text, reply_text)
             await extract_and_save_facts(user_text)
-
             with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_mp3:
                 tmp_mp3_path = tmp_mp3.name
             try:
-                tts = edge_tts.Communicate(reply_text, voice="it-IT-DiegoNeural")
-                await tts.save(tmp_mp3_path)
+                await edge_tts.Communicate(reply_text, voice="it-IT-DiegoNeural").save(tmp_mp3_path)
                 with open(tmp_mp3_path, "rb") as audio_file:
                     audio_out = audio_file.read()
             finally:
                 if os.path.exists(tmp_mp3_path):
                     os.remove(tmp_mp3_path)
-
-            await websocket.send_json({
-                "user_text": user_text,
-                "reply_text": reply_text,
-                "screen": llm_res.get("screen"),
-                "reasoning": llm_res.get("reasoning"),
-            })
+            await websocket.send_json({"user_text": user_text, "reply_text": reply_text,
+                                       "screen": llm_res.get("screen"), "reasoning": llm_res.get("reasoning")})
             await websocket.send_bytes(audio_out)
-
     except WebSocketDisconnect:
         pass
-    except Exception as e:
-        print(f"Errore WebSocket Voice: {e}")
+    except Exception as exc:
+        print(f"Errore WebSocket Voice: {exc}")
