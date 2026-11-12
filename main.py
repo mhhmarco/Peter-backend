@@ -36,10 +36,6 @@ def ping():
     """Endpoint di Keep-Alive per mantenere attivo il server su Render."""
     return {"status": "alive"}
 
-@app.get("/ping")
-def ping():
-    return {"status": "alive"}
-
 @app.get("/", response_class=HTMLResponse)
 def root_dashboard():
     return get_dashboard_html()
@@ -94,7 +90,6 @@ def api_delete_fact(fact_id: str):
         raise HTTPException(status_code=500, detail="Impossibile eliminare il fatto")
     return {"status": "deleted"}
 
-# -- NUOVO ENDPOINT DANGER ZONE (FASE 4) --
 @app.delete("/api/wipe/{data_type}")
 def api_wipe_data(data_type: str):
     success = wipe_table_data(data_type)
