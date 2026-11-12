@@ -5,24 +5,29 @@ def get_dashboard_html() -> str:
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>PETER HUD OS v9.0 - Neural Galaxy</title>
+        <title>PETER HUD OS v10 - True 3D Nexus & Settings</title>
+        
+        <!-- Importiamo la libreria per il VERO GRAFO 3D -->
+        <script src="https://unpkg.com/3d-force-graph"></script>
+
         <style>
             :root { 
-                --bg-main: #03050a; 
-                --panel-bg: rgba(9, 15, 29, 0.88); 
-                --glass-border: rgba(0, 240, 255, 0.2); 
+                --bg-main: #04060d; 
+                --panel-bg: rgba(10, 17, 32, 0.85); 
+                --glass-border: rgba(0, 240, 255, 0.22); 
                 --accent-cyan: #00f0ff; 
                 --accent-purple: #8b5cf6; 
                 --accent-green: #10b981; 
                 --accent-pink: #ec4899;
                 --accent-yellow: #f59e0b;
+                --accent-red: #ef4444;
                 --text-bright: #f8fafc; 
                 --text-dim: #94a3b8; 
             }
             * { box-sizing: border-box; margin: 0; padding: 0; font-family: "Inter", sans-serif; }
-            body { background: radial-gradient(circle at 50% 20%, #0b1329 0%, #03050a 100%); color: var(--text-bright); height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+            body { background: radial-gradient(circle at 50% 20%, #0c162d 0%, #04060d 100%); color: var(--text-bright); height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
             
-            header { height: 56px; border-bottom: 1px solid var(--glass-border); padding: 0 24px; display: flex; align-items: center; justify-content: space-between; background: rgba(3, 5, 10, 0.92); backdrop-filter: blur(20px); z-index: 100; flex-shrink: 0; }
+            header { height: 56px; border-bottom: 1px solid var(--glass-border); padding: 0 24px; display: flex; align-items: center; justify-content: space-between; background: rgba(4, 6, 13, 0.92); backdrop-filter: blur(20px); z-index: 100; flex-shrink: 0; }
             .header-brand { display: flex; align-items: center; gap: 12px; }
             .logo-orb { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple)); display: flex; align-items: center; justify-content: center; box-shadow: 0 0 20px rgba(0, 240, 255, 0.5); font-weight: 900; font-size: 13px; color: #000; }
             .header-title { font-size: 13px; font-weight: 800; letter-spacing: 3px; text-transform: uppercase; background: linear-gradient(90deg, #fff, var(--accent-cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
@@ -32,6 +37,7 @@ def get_dashboard_html() -> str:
 
             .command-grid { flex: 1; display: grid; grid-template-columns: 260px 1fr 340px; gap: 16px; padding: 16px; height: calc(100vh - 120px); overflow: hidden; }
 
+            /* SIDEBAR NAZIGAZIONE */
             .sidebar-panel { background: var(--panel-bg); border: 1px solid var(--glass-border); border-radius: 20px; padding: 18px; display: flex; flex-direction: column; gap: 16px; backdrop-filter: blur(24px); box-shadow: 0 8px 32px rgba(0,0,0,0.4); height: 100%; overflow: hidden; }
             .nav-menu { display: flex; flex-direction: column; gap: 8px; }
             .nav-item { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 12px; font-size: 12px; font-weight: 600; color: var(--text-dim); cursor: pointer; transition: all 0.25s ease; }
@@ -42,9 +48,12 @@ def get_dashboard_html() -> str:
             .avatar-status-tag { font-size: 9px; font-family: monospace; letter-spacing: 1.5px; color: var(--accent-cyan); background: rgba(0,240,255,0.1); padding: 3px 10px; border-radius: 12px; border: 1px solid rgba(0,240,255,0.3); }
 
             .center-workspace { display: flex; flex-direction: column; gap: 16px; height: 100%; overflow: hidden; }
+            
+            /* TABS */
             .view-tab { display: none; flex-direction: column; gap: 16px; height: 100%; width: 100%; overflow: hidden; }
             .view-tab.active { display: flex; }
 
+            /* HUD E CHAT (DASHBOARD) */
             .hud-screen { background: var(--panel-bg); border: 1px solid var(--glass-border); border-radius: 20px; height: 280px; flex-shrink: 0; position: relative; overflow: hidden; display: flex; flex-direction: column; backdrop-filter: blur(20px); }
             .hud-screen-header { padding: 8px 16px; background: rgba(0,0,0,0.3); border-bottom: 1px solid var(--glass-border); font-size: 10px; font-family: monospace; color: var(--accent-cyan); display: flex; justify-content: space-between; flex-shrink: 0; }
             #hud-screen-content { flex: 1; padding: 12px; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative; }
@@ -57,6 +66,7 @@ def get_dashboard_html() -> str:
             .msg.user { align-self: flex-end; background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue)); color: #fff; border-bottom-right-radius: 4px; box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3); }
             .msg.peter { align-self: flex-start; background: rgba(15, 23, 42, 0.85); border: 1px solid var(--glass-border); border-bottom-left-radius: 4px; }
             
+            /* RIGHT SIDEBAR (MEMORIE) */
             .right-sidebar { display: flex; flex-direction: column; gap: 16px; height: 100%; overflow: hidden; }
             .widget-card { background: var(--panel-bg); border: 1px solid var(--glass-border); border-radius: 20px; padding: 16px; backdrop-filter: blur(20px); box-shadow: 0 8px 32px rgba(0,0,0,0.4); display: flex; flex-direction: column; overflow: hidden; }
             .widget-card.flex-grow { flex: 1; min-height: 0; }
@@ -69,7 +79,8 @@ def get_dashboard_html() -> str:
 
             .reasoning-box { background: rgba(0,0,0,0.5); border: 1px solid rgba(0,240,255,0.2); border-radius: 10px; padding: 8px; font-size: 10px; font-family: monospace; color: var(--accent-cyan); flex: 1; overflow-y: auto; }
 
-            .bottom-command-bar { height: 64px; border-top: 1px solid var(--glass-border); padding: 0 24px; display: flex; align-items: center; gap: 12px; background: rgba(3, 5, 10, 0.95); backdrop-filter: blur(20px); flex-shrink: 0; }
+            /* COMMAND BAR INFERIORE */
+            .bottom-command-bar { height: 64px; border-top: 1px solid var(--glass-border); padding: 0 24px; display: flex; align-items: center; gap: 12px; background: rgba(4, 6, 13, 0.95); backdrop-filter: blur(20px); flex-shrink: 0; }
             .cmd-input-container { flex: 1; display: flex; align-items: center; background: rgba(15, 23, 42, 0.7); border: 1px solid var(--glass-border); border-radius: 30px; padding: 4px 8px 4px 16px; transition: border-color 0.3s; gap: 8px; }
             .cmd-input-container:focus-within { border-color: var(--accent-cyan); box-shadow: 0 0 15px rgba(0,240,255,0.2); }
             .cmd-input { flex: 1; background: transparent; border: none; outline: none; color: #fff; font-size: 13px; }
@@ -78,21 +89,23 @@ def get_dashboard_html() -> str:
             .cmd-btn { padding: 10px 20px; background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple)); color: #000; border: none; border-radius: 24px; font-weight: 800; font-size: 12px; cursor: pointer; transition: transform 0.2s; }
             .cmd-btn:hover { transform: scale(1.03); }
 
-            /* NEURAL GALAXY 3D CANVAS & TOOLBAR */
-            #nexus-graph-canvas { width: 100%; height: 100%; display: block; background: #03050a; cursor: grab; }
-            #nexus-graph-canvas:active { cursor: grabbing; }
-            .nexus-toolbar { position: absolute; top: 16px; left: 16px; display: flex; gap: 6px; z-index: 10; background: rgba(9,15,29,0.9); padding: 8px 12px; border-radius: 12px; border: 1px solid var(--glass-border); backdrop-filter: blur(12px); flex-wrap: wrap; }
-            .nexus-filter-btn { background: rgba(0,240,255,0.1); border: 1px solid rgba(0,240,255,0.3); color: var(--text-bright); padding: 5px 10px; border-radius: 8px; font-size: 10px; font-weight: 700; cursor: pointer; transition: all 0.2s; }
+            /* VERO 3D NEXUS GRAPH */
+            #nexus-3d-container { width: 100%; height: 100%; border-radius: 20px; border: 1px solid var(--glass-border); overflow: hidden; position: relative; }
+            .nexus-toolbar { position: absolute; top: 16px; left: 16px; display: flex; gap: 6px; z-index: 10; background: rgba(10,17,32,0.9); padding: 8px 12px; border-radius: 12px; border: 1px solid var(--glass-border); backdrop-filter: blur(12px); flex-wrap: wrap; }
+            .nexus-filter-btn { background: rgba(0,240,255,0.1); border: 1px solid rgba(0,240,255,0.3); color: var(--text-bright); padding: 5px 12px; border-radius: 8px; font-size: 10px; font-weight: 700; cursor: pointer; transition: all 0.2s; }
             .nexus-filter-btn.active, .nexus-filter-btn:hover { background: var(--accent-cyan); color: #000; box-shadow: 0 0 12px rgba(0,240,255,0.5); }
             
-            .nexus-inspector { position: absolute; bottom: 16px; right: 16px; width: 300px; background: rgba(9,15,29,0.96); border: 1px solid var(--accent-cyan); border-radius: 14px; padding: 16px; display: none; z-index: 10; backdrop-filter: blur(18px); box-shadow: 0 10px 30px rgba(0,0,0,0.7); }
+            .nexus-inspector { position: absolute; bottom: 16px; right: 16px; width: 300px; background: rgba(10,17,32,0.96); border: 1px solid var(--accent-cyan); border-radius: 14px; padding: 16px; display: none; z-index: 10; backdrop-filter: blur(18px); box-shadow: 0 10px 30px rgba(0,0,0,0.7); }
 
-            @media (max-width: 900px) {
-                .command-grid { grid-template-columns: 1fr; grid-template-rows: auto 1fr; height: auto; overflow-y: auto; }
-                body { height: auto; overflow: auto; }
-                .right-sidebar { display: none; }
-                .sidebar-panel { height: auto; }
-            }
+            /* SETTINGS TAB */
+            .settings-container { padding: 24px; background: var(--panel-bg); border: 1px solid var(--glass-border); border-radius: 20px; height: 100%; overflow-y: auto; }
+            .settings-group { margin-bottom: 24px; padding-bottom: 24px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+            .settings-group h3 { color: var(--accent-cyan); font-size: 14px; text-transform: uppercase; margin-bottom: 12px; letter-spacing: 1px; }
+            .settings-label { font-size: 12px; color: var(--text-dim); margin-bottom: 4px; display: block; }
+            .settings-input { width: 100%; background: rgba(0,0,0,0.3); border: 1px solid var(--glass-border); color: #fff; padding: 10px; border-radius: 8px; font-size: 13px; margin-bottom: 12px; }
+            .danger-btn { background: rgba(239, 68, 68, 0.1); border: 1px solid var(--accent-red); color: var(--accent-red); padding: 10px 16px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 12px; transition: all 0.2s; margin-right: 8px; }
+            .danger-btn:hover { background: var(--accent-red); color: #000; box-shadow: 0 0 15px rgba(239, 68, 68, 0.4); }
+
         </style>
     </head>
     <body>
@@ -106,7 +119,8 @@ def get_dashboard_html() -> str:
             <aside class="sidebar-panel">
                 <div class="nav-menu">
                     <div class="nav-item active" onclick="switchMainView('hud')">🌐 Dashboard AI</div>
-                    <div class="nav-item" onclick="switchMainView('nexus')">🕸️ Neural Galaxy Graph</div>
+                    <div class="nav-item" onclick="switchMainView('nexus')">🕸️ True 3D Nexus</div>
+                    <div class="nav-item" onclick="switchMainView('settings')">⚙️ Settings & Data</div>
                 </div>
                 <div class="peter-avatar-card">
                     <canvas id="peter-avatar-canvas" title="Clicca per parlare a voce con Peter"></canvas>
@@ -116,6 +130,8 @@ def get_dashboard_html() -> str:
             </aside>
 
             <main class="center-workspace">
+                
+                <!-- TAB 1: DASHBOARD -->
                 <div id="view-hud" class="view-tab active">
                     <div class="hud-screen">
                         <div class="hud-screen-header">
@@ -132,21 +148,24 @@ def get_dashboard_html() -> str:
                     <section class="feed-panel">
                         <div class="panel-header"><span>LIVE DIALOG FEED</span><span style="font-size: 10px; color: var(--accent-green);">● READY</span></div>
                         <div id="chat-feed">
-                            <div class="msg peter">Neural Galaxy v9.0 attiva. Puoi chattare, inviare immagini col tasto 📎 per estrarre entità nel grafo, o esplorare le zone 3D.</div>
+                            <div class="msg peter">Sistema Aggiornato alla v10. Moduli 3D WebGL pronti.</div>
                         </div>
                     </section>
                 </div>
 
-                <!-- VISTA NEURAL GALAXY 3D -->
-                <div id="view-nexus" class="view-tab" style="position: relative; overflow: hidden; border-radius: 20px; border: 1px solid var(--glass-border); height: 100%;">
+                <!-- TAB 2: IL VERO NEXUS 3D -->
+                <div id="view-nexus" class="view-tab" style="position: relative; height: 100%;">
                     <div class="nexus-toolbar">
-                        <button class="nexus-filter-btn active" onclick="filterNexusLayer('all', this)">TUTTO</button>
-                        <button class="nexus-filter-btn" onclick="filterNexusLayer('person', this)">👥 Persone</button>
-                        <button class="nexus-filter-btn" onclick="filterNexusLayer('memory', this)">🧠 Memorie</button>
-                        <button class="nexus-filter-btn" onclick="filterNexusLayer('event', this)">📅 Eventi</button>
-                        <button class="nexus-filter-btn" onclick="filterNexusLayer('interest', this)">⚡ Interessi</button>
+                        <button class="nexus-filter-btn active" onclick="filterNexusLayer3D('all', this)">TUTTO</button>
+                        <button class="nexus-filter-btn" onclick="filterNexusLayer3D('person', this)">👥 Persone</button>
+                        <button class="nexus-filter-btn" onclick="filterNexusLayer3D('memory', this)">🧠 Memorie</button>
+                        <button class="nexus-filter-btn" onclick="filterNexusLayer3D('event', this)">📅 Eventi</button>
+                        <button class="nexus-filter-btn" onclick="filterNexusLayer3D('interest', this)">⚡ Interessi</button>
                     </div>
-                    <canvas id="nexus-graph-canvas"></canvas>
+                    
+                    <!-- Container dove WebGL inietterà il Canvas -->
+                    <div id="nexus-3d-container"></div>
+                    
                     <div id="nexus-inspector" class="nexus-inspector">
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
                             <span id="inspector-type" style="font-size:9px; font-family:monospace; color:var(--accent-cyan); text-transform:uppercase;">NODO</span>
@@ -156,6 +175,28 @@ def get_dashboard_html() -> str:
                         <p id="inspector-desc" style="font-size:11px; color:var(--text-dim); line-height:1.45; word-break:break-word;">Dettagli...</p>
                     </div>
                 </div>
+
+                <!-- TAB 3: SETTINGS & DANGER ZONE -->
+                <div id="view-settings" class="view-tab">
+                    <div class="settings-container">
+                        <div class="settings-group">
+                            <h3>Impostazioni Personalità (WIP)</h3>
+                            <label class="settings-label">Tone of Voice (Come Peter si rivolge a te)</label>
+                            <input type="text" class="settings-input" id="setting-tone" value="Schietto, empatico, naturale, colto e ironico.">
+                            <button class="nexus-filter-btn" onclick="alert('Salvataggio impostazioni in arrivo...')">Salva Personalità</button>
+                        </div>
+                        
+                        <div class="settings-group">
+                            <h3 style="color: var(--accent-red);">Danger Zone (Pulizia Database)</h3>
+                            <p style="font-size:11px; color:var(--text-dim); margin-bottom:12px;">Queste azioni elimineranno permanentemente i dati da Supabase.</p>
+                            <button class="danger-btn" onclick="wipeData('memories')">Svuota Chat</button>
+                            <button class="danger-btn" onclick="wipeData('contacts')">Cancella Persone</button>
+                            <button class="danger-btn" onclick="wipeData('events')">Cancella Eventi</button>
+                            <button class="danger-btn" onclick="wipeData('all')">WIPE TOTALE (Hard Reset)</button>
+                        </div>
+                    </div>
+                </div>
+
             </main>
 
             <aside class="right-sidebar">
@@ -181,9 +222,9 @@ def get_dashboard_html() -> str:
 
         <script>
             let currentAvatarState = 'IDLE';
-            let activeNexusFilter = 'all';
-            let nexusNodesCache = [];
             let attachedFile = null;
+            let Graph = null; // L'oggetto 3D Force Graph
+            let graphDataCache = { nodes: [], links: [] };
 
             document.getElementById('file-input').onchange = (e) => {
                 attachedFile = e.target.files[0];
@@ -201,15 +242,14 @@ def get_dashboard_html() -> str:
                 document.querySelectorAll('.view-tab').forEach(v => v.classList.remove('active'));
                 event.target.classList.add('active');
                 if(view === 'hud') document.getElementById('view-hud').classList.add('active');
-                else if(view === 'nexus') { document.getElementById('view-nexus').classList.add('active'); loadNexus3D(); }
+                else if(view === 'settings') document.getElementById('view-settings').classList.add('active');
+                else if(view === 'nexus') { 
+                    document.getElementById('view-nexus').classList.add('active'); 
+                    initOrRefresh3DGraph(); 
+                }
             }
 
-            function filterNexusLayer(layer, btn) {
-                document.querySelectorAll('.nexus-filter-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                activeNexusFilter = layer;
-            }
-
+            // --- INIZIO LOGICA AVATAR E CHAT ---
             (function initPeterAvatar() {
                 const canvas = document.getElementById('peter-avatar-canvas');
                 const ctx = canvas.getContext('2d');
@@ -238,42 +278,7 @@ def get_dashboard_html() -> str:
                     requestAnimationFrame(renderAvatar);
                 }
                 renderAvatar();
-                canvas.onclick = toggleVoiceSession;
             })();
-
-            function updateHudScreen(screen) {
-                const container = document.getElementById('hud-screen-content');
-                const badge = document.getElementById('hud-status-badge');
-                if(!screen || screen.type === 'NONE') return;
-                badge.innerText = `ACTIVE DISPLAY // ${screen.type}`;
-
-                if(screen.type === 'WEB_BROWSER' && screen.url) {
-                    container.innerHTML = `
-                        <div style="width:100%; max-width:400px; background:rgba(15,23,42,0.95); border:1px solid var(--accent-cyan); border-radius:14px; padding:16px; display:flex; flex-direction:column; gap:10px; text-align:center;">
-                            <div style="font-size:28px;">🌐</div>
-                            <h3 style="color:var(--accent-cyan); font-size:13px; word-break:break-all;">${screen.url}</h3>
-                            <a href="${screen.url}" target="_blank" style="background:linear-gradient(135deg, var(--accent-cyan), var(--accent-purple)); color:#000; text-decoration:none; padding:8px 14px; border-radius:8px; font-weight:800; font-size:11px; display:inline-block;">Apri Pagina Web ↗</a>
-                        </div>
-                    `;
-                } 
-                else if(screen.type === 'MEDIA_PLAYER') {
-                    let embedLink = screen.embed_url;
-                    if(embedLink && embedLink.includes('watch?v=')) {
-                        const vidId = embedLink.split('watch?v=')[1]?.substring(0, 11);
-                        if(vidId) embedLink = `https://www.youtube-nocookie.com/embed/${vidId}?autoplay=1`;
-                    }
-                    container.innerHTML = `
-                        <div style="width:100%; height:100%; display:flex; flex-direction:column; gap:8px; justify-content:center; align-items:center;">
-                            <div style="width:100%; max-width:400px; aspect-ratio:16/9; border-radius:10px; overflow:hidden; border:1px solid var(--accent-cyan); background:#000;">
-                                <iframe src="${embedLink}" style="width:100%; height:100%; border:none;" allow="accelerometer; autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
-                            </div>
-                        </div>
-                    `;
-                } 
-                else if(screen.type === 'PERSON_CARD' && screen.person) {
-                    container.innerHTML = `<div style="background:rgba(15,23,42,0.95); border:1px solid var(--accent-cyan); padding:16px; border-radius:14px; text-align:center; max-width:280px;"><div style="font-size:30px; margin-bottom:2px;">👤</div><h3 style="color:var(--accent-cyan); font-size:16px;">${screen.person.name}</h3><p style="font-size:10px; color:var(--text-dim); margin-bottom:6px;">Livello: ${screen.person.category}</p><p style="font-size:11px; line-height:1.3;">${screen.person.notes || 'In Nexus'}</p></div>`;
-                }
-            }
 
             const input = document.getElementById('cmd-input');
             const btn = document.getElementById('send-cmd-btn');
@@ -301,7 +306,6 @@ def get_dashboard_html() -> str:
                     const data = await res.json();
                     if(data.reply) {
                         appendMsg(data.reply, 'peter');
-                        if(data.screen) updateHudScreen(data.screen);
                         if(data.reasoning) document.getElementById('reasoning-preview').innerText = data.reasoning;
                         currentAvatarState = 'IDLE';
                         loadBrainSummary();
@@ -319,7 +323,7 @@ def get_dashboard_html() -> str:
                 div.className = `msg ${sender}`; div.innerText = text;
                 feed.appendChild(div); feed.scrollTop = feed.scrollHeight;
             }
-
+            
             async function loadBrainSummary() {
                 try {
                     const res = await fetch('/memories');
@@ -328,198 +332,164 @@ def get_dashboard_html() -> str:
                         document.getElementById('facts-preview').innerHTML = data.long_term_facts.map(f => `
                             <div class="fact-item"><span id="fact-text-${f.id}">🧠 ${f.fact}</span>
                             <div style="display:flex; gap:4px;">
-                                <button class="fact-btn" onclick="editFact('${f.id}', '${f.fact.replace(/'/g, "\\'")}')">✏️</button>
                                 <button class="fact-btn" onclick="deleteFact('${f.id}')">🗑️</button>
                             </div></div>`).join('');
                     }
                 } catch(e){}
             }
 
-            async function editFact(id, oldText) {
-                const newText = prompt("Modifica:", oldText);
-                if(newText && newText !== oldText) {
-                    await fetch(`/api/facts/${id}`, { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ fact: newText }) });
-                    loadBrainSummary();
-                }
-            }
-
             async function deleteFact(id) {
-                if(confirm("Eliminare?")) {
+                if(confirm("Eliminare la memoria?")) {
                     await fetch(`/api/facts/${id}`, { method: 'DELETE' });
                     loadBrainSummary();
                 }
             }
+            // --- FINE LOGICA BASE ---
 
-            // NEURAL GALAXY 3D GRAPH ENGINE (OBSIDIAN STYLE - ZOOM, PAN, ZONES & COLOR DOTS)
-            async function loadNexus3D() {
-                const canvas = document.getElementById('nexus-graph-canvas');
-                if(!canvas) return;
-                const ctx = canvas.getContext('2d');
-                canvas.width = canvas.parentElement.clientWidth;
-                canvas.height = canvas.parentElement.clientHeight;
-
+            // --- INIZIO MOTORE 3D WEBGL (FORCE GRAPH) ---
+            async function fetchGraphData() {
                 try {
                     const res = await fetch('/api/nexus');
                     const data = await res.json();
-                    nexusNodesCache = data.nodes || [];
-
-                    let panX = canvas.width / 2;
-                    let panY = canvas.height / 2;
-                    let zoom = 1.0;
-                    let isDragging = false;
-                    let startX, startY;
-                    let projectedNodes = [];
-
-                    canvas.onmousedown = (e) => {
-                        isDragging = true;
-                        startX = e.clientX - panX;
-                        startY = e.clientY - panY;
+                    
+                    // Convertiamo i dati in formato accettato da 3d-force-graph
+                    // Il motore WebGL ricalcola autonomamente x, y, z in base alle forze, ma partiamo dai dati che abbiamo.
+                    graphDataCache = {
+                        nodes: data.nodes.map(n => ({ id: n.id, name: n.name, type: n.type, val: n.type==='core'? 10 : 3, ...n })),
+                        links: data.edges.map(e => ({ source: e.source, target: e.target, relation: e.relation_type || 'neutro' }))
                     };
+                    return graphDataCache;
+                } catch (e) {
+                    console.error("Errore fetch grafo:", e);
+                    return {nodes:[], links:[]};
+                }
+            }
 
-                    window.onmousemove = (e) => {
-                        if(!isDragging) return;
-                        panX = e.clientX - startX;
-                        panY = e.clientY - startY;
-                    };
+            function getNodeColor(node) {
+                if (node.type === 'core') return '#10b981'; // Verde
+                if (node.type === 'person') {
+                    // Colore per sesso
+                    if(node.gender && node.gender.toUpperCase() === 'M') return '#3b82f6'; // Blu uomo
+                    if(node.gender && node.gender.toUpperCase() === 'F') return '#ec4899'; // Rosa donna
+                    return '#00f0ff'; // Ciano default
+                }
+                if (node.type === 'memory') return '#8b5cf6'; // Viola
+                if (node.type === 'event') return '#f43f5e'; // Rosso tenue
+                if (node.type === 'interest') return '#f59e0b'; // Ambra
+                return '#ffffff';
+            }
 
-                    window.onmouseup = () => { isDragging = false; };
+            function getLinkColor(link) {
+                let rel = link.relation || '';
+                rel = rel.toLowerCase();
+                if(rel.includes('amore') || rel.includes('fidanzat')) return 'rgba(236, 72, 153, 0.6)'; // Rosa
+                if(rel.includes('famiglia') || rel.includes('parent')) return 'rgba(16, 185, 129, 0.6)'; // Verde
+                if(rel.includes('lavoro')) return 'rgba(245, 158, 11, 0.6)'; // Ambra
+                return 'rgba(0, 240, 255, 0.2)'; // Standard Cyan
+            }
 
-                    canvas.onwheel = (e) => {
-                        e.preventDefault();
-                        const zoomFactor = 1.12;
-                        if(e.deltaY < 0) zoom *= zoomFactor;
-                        else zoom /= zoomFactor;
-                        zoom = Math.max(0.3, Math.min(4.0, zoom));
-                    };
+            async function initOrRefresh3DGraph() {
+                const container = document.getElementById('nexus-3d-container');
+                if (!container) return;
 
-                    canvas.onclick = (e) => {
-                        const rect = canvas.getBoundingClientRect();
-                        const clickX = e.clientX - rect.left;
-                        const clickY = e.clientY - rect.top;
-                        
-                        for(let pn of projectedNodes) {
-                            const dist = Math.hypot(pn.px - clickX, pn.py - clickY);
-                            if(dist < (pn.node.type === 'core' ? 24 : 16 * zoom)) {
-                                showInspector(pn.node);
-                                break;
-                            }
-                        }
-                    };
+                const data = await fetchGraphData();
 
-                    function drawGraph() {
-                        ctx.clearRect(0, 0, canvas.width, canvas.height);
-                        projectedNodes = [];
-
-                        const filteredNodes = nexusNodesCache.filter(n => activeNexusFilter === 'all' || n.type === activeNexusFilter || n.type === 'core');
-
-                        // Linee di connessione a cascata (Neural Web)
-                        ctx.lineWidth = 1.0;
-                        filteredNodes.forEach((n) => {
-                            if(n.type === 'core') return;
-                            let px = panX + (n.x * zoom);
-                            let py = panY + (n.y * zoom);
-
-                            if(n.type === 'person') ctx.strokeStyle = 'rgba(0, 240, 255, 0.28)';
-                            else if(n.type === 'memory') ctx.strokeStyle = 'rgba(139, 92, 246, 0.28)';
-                            else if(n.type === 'event') ctx.strokeStyle = 'rgba(236, 72, 153, 0.28)';
-                            else ctx.strokeStyle = 'rgba(245, 158, 11, 0.28)';
-
-                            ctx.beginPath();
-                            ctx.moveTo(panX, panY);
-                            ctx.lineTo(px, py);
-                            ctx.stroke();
+                if (!Graph) {
+                    // Inizializza WebGL Graph
+                    Graph = ForceGraph3D()(container)
+                        .backgroundColor('#04060d')
+                        .showNavInfo(false)
+                        .nodeResolution(16)
+                        .nodeRelSize(4)
+                        .nodeColor(getNodeColor)
+                        .linkColor(getLinkColor)
+                        .linkOpacity(0.5)
+                        .linkWidth(1)
+                        .nodeLabel('name') // Tooltip base in hover
+                        .onNodeClick(node => {
+                            // Mostra Inspector
+                            showInspector(node);
+                            // Centra e zooma sulla camera
+                            const distance = 80;
+                            const distRatio = 1 + distance/Math.hypot(node.x, node.y, node.z);
+                            Graph.cameraPosition(
+                                { x: node.x * distRatio, y: node.y * distRatio, z: node.z * distRatio }, 
+                                node, // LookAt
+                                1500  // Transition ms
+                            );
                         });
-
-                        // Pallini colorati luminosi (Senza etichette invasive di default, stile Obsidian)
-                        filteredNodes.forEach((n) => {
-                            let px = panX + (n.x * zoom);
-                            let py = panY + (n.y * zoom);
-
-                            projectedNodes.push({ px, py, node: n });
-
-                            let radius = (n.type === 'core' ? 16 : 6) * zoom;
-
-                            ctx.beginPath();
-                            ctx.arc(px, py, radius * 1.8, 0, Math.PI * 2);
-                            if(n.type === 'core') ctx.fillStyle = 'rgba(16, 185, 129, 0.3)';
-                            else if(n.type === 'person') ctx.fillStyle = 'rgba(0, 240, 255, 0.3)';
-                            else if(n.type === 'memory') ctx.fillStyle = 'rgba(139, 92, 246, 0.3)';
-                            else if(n.type === 'event') ctx.fillStyle = 'rgba(236, 72, 153, 0.3)';
-                            else ctx.fillStyle = 'rgba(245, 158, 11, 0.3)';
-                            ctx.fill();
-
-                            ctx.beginPath();
-                            ctx.arc(px, py, radius, 0, Math.PI * 2);
-                            if(n.type === 'core') ctx.fillStyle = '#10b981'; // Verde Core
-                            else if(n.type === 'person') ctx.fillStyle = '#00f0ff'; // Ciano Persone
-                            else if(n.type === 'memory') ctx.fillStyle = '#8b5cf6'; // Viola Memorie
-                            else if(n.type === 'event') ctx.fillStyle = '#ec4899'; // Rosa Eventi
-                            else ctx.fillStyle = '#f59e0b'; // Ambra Interessi
-                            
-                            ctx.shadowBlur = 12;
-                            ctx.shadowColor = ctx.fillStyle;
-                            ctx.fill();
-                            ctx.shadowBlur = 0;
-
-                            // Mostra il nome solo se il nodo è il core o se si è fatto zoom in avanti
-                            if(n.type === 'core' || zoom > 1.8) {
-                                ctx.fillStyle = '#f8fafc';
-                                ctx.font = `${Math.max(9, 10 * zoom)}px Inter`;
-                                ctx.fillText(n.name, px + radius + 6, py + 4);
-                            }
-                        });
-
-                        requestAnimationFrame(drawGraph);
+                }
+                
+                Graph.graphData(data);
+                
+                // Distribuzione personalizzata lungo l'asse Y per le persone (Età)
+                Graph.d3Force('y', d3.forceY().y(node => {
+                    if(node.type === 'person' && node.birth_year) {
+                        // Più vecchi in alto (es. y negativa), più giovani in basso
+                        const currentYear = 2026;
+                        const age = currentYear - parseInt(node.birth_year);
+                        return (age - 30) * -5; // Spread basato sull'età
                     }
-                    drawGraph();
-                } catch(e) {}
+                    return 0;
+                }).strength(0.1));
+            }
+
+            function filterNexusLayer3D(layer, btn) {
+                document.querySelectorAll('.nexus-filter-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                
+                if (!Graph) return;
+
+                const filteredData = {
+                    nodes: graphDataCache.nodes.filter(n => layer === 'all' || n.type === layer || n.type === 'core'),
+                    links: graphDataCache.links.filter(l => {
+                        const sourceMatch = (layer === 'all' || l.source.type === layer || l.source.type === 'core');
+                        const targetMatch = (layer === 'all' || l.target.type === layer || l.target.type === 'core');
+                        return sourceMatch && targetMatch;
+                    })
+                };
+                
+                Graph.graphData(filteredData);
             }
 
             function showInspector(node) {
                 const inspector = document.getElementById('nexus-inspector');
                 document.getElementById('inspector-type').innerText = `LAYER // ${node.type.toUpperCase()}`;
-                document.getElementById('inspector-title').innerText = node.name;
-                document.getElementById('inspector-desc').innerText = `${node.notes || ''} \n\n${node.details || ''}`;
+                
+                let title = node.name;
+                // Aggiungi indicatori visivi nel titolo dell'inspector
+                if(node.type === 'person') {
+                    if(node.gender === 'M') title += " ♂️";
+                    if(node.gender === 'F') title += " ♀️";
+                    if(node.birth_year) title += ` (Nato: ${node.birth_year})`;
+                }
+                
+                document.getElementById('inspector-title').innerText = title;
+                
+                let desc = `${node.notes || ''} \n\n${node.details || ''}`;
+                if(node.relation_type && node.relation_type !== 'neutrale') {
+                    desc += `\nLegame: ${node.relation_type.toUpperCase()}`;
+                }
+                
+                document.getElementById('inspector-desc').innerText = desc.trim();
                 inspector.style.display = 'block';
             }
+            // --- FINE MOTORE 3D ---
 
-            let ws = null;
-            let mediaRecorder = null;
-            let isRecording = false;
-
-            function toggleVoiceSession() {
-                if(!isRecording) {
-                    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-                    ws = new WebSocket(`${protocol}//${window.location.host}/ws/voice`);
-                    ws.onopen = () => {
-                        navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
-                            mediaRecorder = new MediaRecorder(stream);
-                            mediaRecorder.ondataavailable = e => { if(ws.readyState === WebSocket.OPEN) ws.send(e.data); };
-                            mediaRecorder.start(2000);
-                            isRecording = true;
-                            currentAvatarState = 'LISTENING';
-                        });
-                    };
-                    ws.onmessage = async (event) => {
-                        if(typeof event.data === 'string') {
-                            const data = JSON.parse(event.data);
-                            appendMsg(data.user_text, 'user');
-                            appendMsg(data.reply_text, 'peter');
-                            if(data.screen) updateHudScreen(data.screen);
-                            if(data.reasoning) document.getElementById('reasoning-preview').innerText = data.reasoning;
+            async function wipeData(type) {
+                if(confirm(`Sei SICURO di voler eliminare i dati di tipo: ${type}? L'azione è IRREVERSIBILE.`)) {
+                    try {
+                        const res = await fetch(`/api/wipe/${type}`, { method: 'DELETE' });
+                        if(res.ok) {
+                            alert("Dati eliminati con successo.");
+                            loadBrainSummary();
+                            initOrRefresh3DGraph();
                         } else {
-                            currentAvatarState = 'SPEAKING';
-                            const blob = new Blob([event.data], { type: 'audio/mp3' });
-                            const audio = new Audio(URL.createObjectURL(blob));
-                            audio.onended = () => { currentAvatarState = 'LISTENING'; };
-                            audio.play();
+                            alert("Errore nell'eliminazione.");
                         }
-                    };
-                } else {
-                    if(mediaRecorder) mediaRecorder.stop();
-                    if(ws) ws.close();
-                    isRecording = false;
-                    currentAvatarState = 'IDLE';
+                    } catch(e) {
+                        alert("Errore di rete.");
+                    }
                 }
             }
 
