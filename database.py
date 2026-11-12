@@ -11,6 +11,54 @@ if SUPABASE_URL and SUPABASE_KEY:
     except Exception as e:
         supabase_error_log = str(e)
 
+def get_telegram_chat_id():
+    if not supabase:
+        return None
+
+    try:
+        res = (
+            supabase.table("system_settings")
+            .select("value")
+            .eq("key", "global_config")
+            .execute()
+        )
+
+        if not res.data:
+            return None
+
+        settings = res.data[0].get("value") or {}
+        return settings.get("telegram_chat_id")
+    except Exception as e:
+        print(f"Errore lettura Telegram chat ID: {e}")
+        return None
+
+
+def save_telegram_chat_id(chat_id):
+    if not supabase or chat_id is None:
+        return
+
+    try:
+        res = (
+            supabase.table("system_settings")
+            .select("value")
+            .eq("key", "global_config")
+            .execute()
+        )
+
+        settings = res.data[0].get("value") or {} if res.data else {}
+        settings["telegram_chat_id"] = str(chat_id)
+
+        (
+            supabase.table("system_settings")
+            .upsert({
+                "key": "global_config",
+                "value": settings
+            })
+            .execute()
+        )
+    except Exception as e:
+        print(f"Errore salvataggio Telegram chat ID: {e}")
+
 
 def get_personality_settings() -> dict:
     default = {
