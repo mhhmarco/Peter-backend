@@ -12,9 +12,9 @@ from database import (
 from tools import search_web, search_youtube, search_apple_music, search_image, send_telegram_message, send_telegram_voice_note
 from scraper import fetch_web_page
 
-MODEL_FAST = "llama-3.1-8b-instant"
-MODEL_SMART = "llama-3.3-70b-versatile"
-MODEL_VISION = "meta-llama/llama-3.2-11b-vision-preview"
+MODEL_FAST = "openai/gpt-oss-20b"
+MODEL_SMART = "openai/gpt-oss-120b"
+MODEL_FACT = "qwen/qwen3.8-27b"
 
 async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
     if not GROQ_API_KEY:
@@ -53,7 +53,7 @@ async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
     reasoning_text = "Analisi diretta."
 
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
+        async with httpx.AsyncClient(timeout=6.0) as client:
             res = await client.post(GROQ_URL, json={
                 "model": MODEL_FAST,
                 "messages": messages,
@@ -118,7 +118,6 @@ async def generate_peter_response(user_message: str, recent_context: str, long_t
     tool_exec = await model_1_route_tools(user_message, recent_context)
     now_str = datetime.now().strftime("%A %d %B %Y, %H:%M CET")
     
-    # Carica impostazioni di personalità e interessi in tempo reale
     personality = get_personality_settings()
     current_tone = personality.get("tone", "Schietto, empatico, naturale, colto e ironico.")
     user_interests = get_all_interests()
@@ -131,8 +130,8 @@ async def generate_peter_response(user_message: str, recent_context: str, long_t
         f"DATA E ORA: {now_str}\n\n"
         "=== AUTOCOSCIENZA E STATO DI SISTEMA ===\n"
         f"- La tua personalità attuale impostata nei parametri è: '{current_tone}'\n"
-        "- Architettura: FastAPI + Groq LPU + Supabase PostgreSQL + WebGL 3D Nexus + Sintesi Vocale Neurale.\n"
-        "- Capacità attive: Riproduzione YouTube/Apple Music sull'HUD, ricerca web, invio messaggi/vocali Telegram, analisi immagini Vision, estrazione automatica di persone/eventi/interessi nel Grafo 3D.\n"
+        "- Architettura: FastAPI + Groq LPU (gpt-oss-120b / gpt-oss-20b / qwen3.8-27b) + Supabase PostgreSQL + WebGL 3D Nexus + Sintesi Vocale Neurale.\n"
+        "- Capacità attive: Riproduzione YouTube/Apple Music sull'HUD, ricerca web, invio messaggi/vocali Telegram, estrazione automatica di persone/eventi/interessi nel Grafo 3D.\n"
         "- Se Marco ti chiede come stai, come è impostata la tua personalità o cosa puoi fare, rispondi con piena consapevolezza citando il tuo tono attuale e le tue funzionalità.\n\n"
         "DIRETTIVE DI RISPOSTA:\n"
         "1. Sii naturale, brillante, diretto e conciso (stile chat veloce), senza elenchi puntati lunghi.\n"
@@ -151,11 +150,8 @@ async def generate_peter_response(user_message: str, recent_context: str, long_t
     if long_term_facts:
         system_prompt += f"\n\nMemorie su Marco:\n{long_term_facts}"
 
-    model_to_use = MODEL_SMART
     messages = [{"role": "system", "content": system_prompt}]
-    
     if image_data_url:
-        model_to_use = MODEL_VISION
         messages.append({
             "role": "user",
             "content": [
@@ -169,7 +165,7 @@ async def generate_peter_response(user_message: str, recent_context: str, long_t
     try:
         async with httpx.AsyncClient(timeout=20.0) as client:
             res = await client.post(GROQ_URL, json={
-                "model": model_to_use,
+                "model": MODEL_SMART,
                 "messages": messages,
                 "temperature": 0.65
             }, headers={"Content-Type": "application/json", "Authorization": f"Bearer {GROQ_API_KEY}"})
@@ -177,7 +173,7 @@ async def generate_peter_response(user_message: str, recent_context: str, long_t
             if res.status_code != 200:
                 print(f"Groq Error {res.status_code}: {res.text}")
                 return {
-                    "reply": "Ho avuto un micro-blocco sinaptico con i server Groq, riprova subito!",
+                    "reply": f"Errore dal modello ({res.status_code}), controlla i modelli attivi su Groq.",
                     "query_used": "", "media": None, "screen": None,
                     "reasoning": f"> Errore API {res.status_code}"
                 }
@@ -236,7 +232,7 @@ async def extract_and_save_facts(user_message: str, image_data_url: str = None):
     try:
         async with httpx.AsyncClient(timeout=12.0) as client:
             res = await client.post(GROQ_URL, json={
-                "model": MODEL_VISION if image_data_url else MODEL_SMART,
+                "model": MODEL_FACT,
                 "messages": messages,
                 "temperature": 0.1
             }, headers={"Content-Type": "application/json", "Authorization": f"Bearer {GROQ_API_KEY}"})
@@ -253,7 +249,6 @@ async def extract_and_save_facts(user_message: str, image_data_url: str = None):
                     people_list = parsed.get("people", [])
                     for p in people_list:
                         p_name = p.get("name", "").strip()
-                        # Filtro anti-duplicazione utente
                         if p_name and p_name.lower() not in ["marco", "barbi", "marco barbiero", "marco barbiero torres", "nessuno"]:
                             save_contact_entity(
                                 name=p_name,
