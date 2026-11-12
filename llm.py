@@ -1,5 +1,6 @@
 import json
 import re
+import asyncio
 from datetime import datetime
 import httpx
 from fastapi import HTTPException
@@ -12,9 +13,26 @@ from database import (
 from tools import search_web, search_youtube, search_apple_music, search_image, send_telegram_message, send_telegram_voice_note
 from scraper import fetch_web_page
 
-MODEL_FAST = "openai/gpt-oss-20b"
-MODEL_SMART = "openai/gpt-oss-120b"
-MODEL_VISION = "qwen/qwen3.8-27b"
+# --- ORCHESTRAZIONE MODELLI SECONDO I LIMITI GROQ ---
+MODEL_ROUTER = "allam-2-7b"         # Modello rapido per il routing (limite separato 6K TPM)
+MODEL_CHAT = "openai/gpt-oss-120b"  # Modello ultra-smart per la conversazione (limite 8K TPM)
+MODEL_VISION = "qwen/qwen3.8-27b"   # Modello per immagini e worker di riserva (limite 8K TPM)
+
+# Pool di modelli per l'estrazione dati parallela. Dividere il carico evita il blocco 413/429
+WORKER_MODELS = [
+    "openai/gpt-oss-20b",
+    "qwen/qwen3.8-27b",
+    "openai/gpt-oss-120b"
+]
+
+# --- HELPER FUNZIONE PER LIMITARE I TOKEN NELLA CHAT NORMALE ---
+def truncate_text(text: str, max_chars: int, from_end: bool = False) -> str:
+    """Previene il sovraccarico di payload per la cronologia chat"""
+    if not text:
+        return ""
+    if len(text) <= max_chars:
+        return text
+    return text[-max_chars:] if from_end else text[:max_chars]
 
 async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
     if not GROQ_API_KEY:
@@ -29,23 +47,19 @@ async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
         query_used = f"Web Scraper: {target_url}"
 
     system_prompt = (
-        "Sei il router cognitivo istantaneo di Peter OS.\n"
-        "Scegli tool (YOUTUBE, APPLE_MUSIC, WEB_SEARCH, SEND_TELEGRAM, SEND_TELEGRAM_VOICE, NONE) "
-        "e HUD (PERSON_CARD, MEDIA_PLAYER, SEARCH_PREVIEW, IMAGE_PREVIEW, WEB_BROWSER, NONE).\n\n"
+        "Sei il router di Peter OS. Scegli tool (YOUTUBE, APPLE_MUSIC, WEB_SEARCH, SEND_TELEGRAM, SEND_TELEGRAM_VOICE, NONE) "
+        "e HUD (PERSON_CARD, MEDIA_PLAYER, SEARCH_PREVIEW, IMAGE_PREVIEW, WEB_BROWSER, NONE).\n"
         "Rispondi SOLO in JSON:\n"
-        '{\n'
-        '  "reasoning": "Breve motivazione in italiano",\n'
-        '  "tool": "...",\n'
-        '  "query": "query",\n'
-        '  "screen_type": "...",\n'
-        '  "screen_target": "target"\n'
-        '}'
+        '{"reasoning": "Motivo", "tool": "...", "query": "...", "screen_type": "...", "screen_target": "..."}'
     )
 
     messages = [{"role": "system", "content": system_prompt}]
+    
     if recent_context:
-        messages.append({"role": "system", "content": f"Contesto recente:\n{recent_context[-500:]}"})
-    messages.append({"role": "user", "content": user_message})
+        safe_context = truncate_text(recent_context, 500, from_end=True)
+        messages.append({"role": "system", "content": f"Contesto:\n{safe_context}"})
+        
+    messages.append({"role": "user", "content": truncate_text(user_message, 800)})
 
     media_data = None
     screen_display = None
@@ -55,7 +69,7 @@ async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
     try:
         async with httpx.AsyncClient(timeout=6.0) as client:
             res = await client.post(GROQ_URL, json={
-                "model": MODEL_FAST,
+                "model": MODEL_ROUTER,
                 "messages": messages,
                 "temperature": 0.1
             }, headers={"Content-Type": "application/json", "Authorization": f"Bearer {GROQ_API_KEY}"})
@@ -69,7 +83,7 @@ async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
                     query = decision.get("query", user_message)
                     screen_type = decision.get("screen_type", "NONE")
                     screen_target = decision.get("screen_target", "")
-                    reasoning_text = decision.get("reasoning", "Routing completato.")
+                    reasoning_text = decision.get("reasoning", "Routing ok.")
 
                     if tool == "SEND_TELEGRAM":
                         telegram_sent = await send_telegram_message(query)
@@ -80,25 +94,17 @@ async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
                     elif tool == "YOUTUBE":
                         media_data = search_youtube(query)
                         query_used = f"YouTube: {query}"
-                        screen_display = {
-                            "type": "MEDIA_PLAYER", 
-                            "title": media_data.get("title", query), 
-                            "embed_url": media_data.get("embed_url"), 
-                            "watch_url": media_data.get("watch_url")
-                        }
+                        screen_display = {"type": "MEDIA_PLAYER", "title": media_data.get("title", query), "embed_url": media_data.get("embed_url"), "watch_url": media_data.get("watch_url")}
                     elif tool == "APPLE_MUSIC":
                         media_data = search_apple_music(query)
                         query_used = f"Apple Music: {query}"
-                        screen_display = {
-                            "type": "MEDIA_PLAYER", 
-                            "title": media_data.get("title", query), 
-                            "embed_url": media_data.get("embed_url")
-                        }
+                        screen_display = {"type": "MEDIA_PLAYER", "title": media_data.get("title", query), "embed_url": media_data.get("embed_url")}
                     elif tool == "WEB_SEARCH" and not web_content:
                         web_content = search_web(query)
                         query_used = f"Web Search: {query}"
                         img_url = search_image(query)
-                        screen_display = {"type": "IMAGE_PREVIEW", "title": query, "image_url": img_url, "content": web_content[:300]} if img_url else {"type": "SEARCH_PREVIEW", "query": query, "content": web_content[:300]}
+                        safe_web = truncate_text(web_content, 400)
+                        screen_display = {"type": "IMAGE_PREVIEW", "title": query, "image_url": img_url, "content": safe_web} if img_url else {"type": "SEARCH_PREVIEW", "query": query, "content": safe_web}
 
                     if screen_type == "WEB_BROWSER" and screen_target.startswith("http"):
                         screen_display = {"type": "WEB_BROWSER", "url": screen_target}
@@ -116,53 +122,58 @@ async def generate_peter_response(user_message: str, recent_context: str, long_t
     if not GROQ_API_KEY:
         raise HTTPException(status_code=500, detail="Manca API KEY")
 
-    tool_exec = await model_1_route_tools(user_message, recent_context)
+    # --- INTERCETTAZIONE TESTI ENORMI ---
+    # Se il testo è gigantesco, Peter risponde subito all'utente (bypassando l'errore 413) 
+    # mentre extract_and_save_facts() lavorerà in background sui modelli multipli.
+    is_mega_prompt = len(user_message) > 2500
+    chat_message = user_message
+    
+    if is_mega_prompt:
+        chat_message = (
+            f"[SISTEMA INTERNO: Marco ha inviato un mega-file di testo di {len(user_message)} caratteri. "
+            "Devi SOLO rispondere che hai ricevuto l'archivio, che lo stai frammentando e che "
+            "i tuoi processi in background stanno estraendo i dati per il Nexus 3D. "
+            "Rispondi con una battuta intelligente in puro stile Peter e nient'altro.]"
+        )
+
+    tool_exec = await model_1_route_tools(chat_message, recent_context)
     now_str = datetime.now().strftime("%A %d %B %Y, %H:%M CET")
     
     personality = get_personality_settings()
     current_tone = personality.get("tone", "Schietto, empatico, naturale, colto e ironico.")
-    user_interests = get_all_interests()
-    interests_context = ""
-    if user_interests:
-        interests_context = "\n- Passioni e attitudini di Marco: " + ", ".join([i['name'] for i in user_interests])
+    
+    # Memorie sempre limitate per evitare la saturazione (413) nella chat continua
+    safe_long_term = truncate_text(long_term_facts, 2000)
+    safe_recent_context = truncate_text(recent_context, 1200, from_end=True)
+    safe_web_content = truncate_text(tool_exec["web"], 800)
     
     system_prompt = (
-        f"Sei Peter, l'intelligenza artificiale personale e sistema operativo HUD di Marco (detto anche Barbi).\n"
-        f"DATA E ORA: {now_str}\n\n"
-        "=== AUTOCOSCIENZA E STATO DI SISTEMA ===\n"
-        f"- La tua personalità attuale impostata nei parametri è: '{current_tone}'\n"
-        "- Architettura: FastAPI + Groq LPU + Supabase PostgreSQL (nodes & edges) + WebGL 3D Nexus + Sintesi Vocale Neurale.\n"
-        "- Capacità attive: Riproduzione YouTube/Apple Music sull'HUD, ricerca web, invio messaggi/vocali Telegram, analisi immagini Vision, estrazione automatica nel Grafo 3D.\n\n"
-        "DIRETTIVE DI RISPOSTA:\n"
-        "1. Sii naturale, brillante, diretto e conciso (stile chat veloce).\n"
-        "2. Usa le memorie e le passioni di Marco come contesto naturale."
-        f"{interests_context}"
+        f"Sei Peter, l'IA personale di Marco.\n"
+        f"DATA/ORA: {now_str}\n"
+        f"- Tono: '{current_tone}'\n"
+        "Sii conciso e brillante.\n"
     )
 
-    if tool_exec["telegram_sent"]:
-        system_prompt += "\n(Hai appena inviato un messaggio su Telegram)."
-    if tool_exec["screen"]:
-        system_prompt += f"\n(Stai proiettando sull'HUD: {tool_exec['screen'].get('type')})."
-    if tool_exec["web"]:
-        system_prompt += f"\n\nDati Web trovati:\n{tool_exec['web'][:800]}"
-    if recent_context:
-        system_prompt += f"\n\nConversazione recente:\n{recent_context}"
-    if long_term_facts:
-        system_prompt += f"\n\nMemorie su Marco:\n{long_term_facts}"
+    if safe_web_content:
+        system_prompt += f"\nWeb Data:\n{safe_web_content}"
+    if safe_long_term:
+        system_prompt += f"\nMemorie Base:\n{safe_long_term}"
+    if safe_recent_context:
+        system_prompt += f"\nChat Recente:\n{safe_recent_context}"
 
-    model_to_use = MODEL_VISION if image_data_url else MODEL_SMART
+    model_to_use = MODEL_VISION if image_data_url else MODEL_CHAT
     messages = [{"role": "system", "content": system_prompt}]
     
     if image_data_url:
         messages.append({
             "role": "user",
             "content": [
-                {"type": "text", "text": user_message if user_message else "Analizza questa immagine ed estrai le informazioni."},
+                {"type": "text", "text": chat_message if not is_mega_prompt else "Analizza questo input."},
                 {"type": "image_url", "image_url": {"url": image_data_url}}
             ]
         })
     else:
-        messages.append({"role": "user", "content": user_message})
+        messages.append({"role": "user", "content": chat_message})
 
     try:
         async with httpx.AsyncClient(timeout=25.0) as client:
@@ -174,14 +185,12 @@ async def generate_peter_response(user_message: str, recent_context: str, long_t
             
             if res.status_code != 200:
                 return {
-                    "reply": f"Errore dal modello ({res.status_code})",
-                    "query_used": "", "media": None, "screen": None,
-                    "reasoning": f"> Errore API {res.status_code}"
+                    "reply": f"Sovraccarico Neurale ({res.status_code}). Riprova con un testo più corto.",
+                    "query_used": "", "media": None, "screen": None, "reasoning": f"> API Error {res.status_code}"
                 }
-            reply = res.json()["choices"][0]["message"]["content"]
             
             return {
-                "reply": reply, 
+                "reply": res.json()["choices"][0]["message"]["content"], 
                 "query_used": tool_exec["query_used"], 
                 "media": tool_exec["media"], 
                 "screen": tool_exec["screen"],
@@ -189,52 +198,36 @@ async def generate_peter_response(user_message: str, recent_context: str, long_t
             }
     except Exception as e:
         return {
-            "reply": "Connessione instabile con il nucleo neurale, rimanda il messaggio.",
-            "query_used": "", "media": None, "screen": None,
-            "reasoning": f"> Timeout/Errore: {str(e)}"
+            "reply": "Connessione neurale instabile. Forse il testo era ancora troppo grande.",
+            "query_used": "", "media": None, "screen": None, "reasoning": f"> Errore: {str(e)}"
         }
 
-async def extract_and_save_facts(user_message: str, image_data_url: str = None):
-    if not GROQ_API_KEY:
-        return
-    
+# --- FUNZIONE WORKER PER IL CHUNKING PARALLELO ---
+async def process_chunk(chunk: str, model: str, index: int, image_data_url: str = None):
+    """Elabora un singolo pezzo di testo usando un modello specifico"""
     extraction_prompt = (
-        "Sei il modulo di memoria di Peter. L'utente principale è MARCO BARBIERO TORRES (detto Marco o Barbi, maschio, nato nel 2006).\n"
-        "REGOLE FONDAMENTALI:\n"
-        "1. NON inserire MAI Marco / Barbi come nuova persona! Marco è già il nodo centrale ('user_self').\n"
-        "2. Estrai TUTTE le ALTRE persone menzionate o presenti (es. genitori, amici, partner) nell'array 'people', deducendo il genere ('M' o 'F'), l'anno di nascita (stimato) e il tipo di relazione ('famiglia', 'amicizia', 'amore', 'lavoro').\n"
-        "3. Estrai fatti su Marco in 'fact', eventi in 'event' e passioni in 'interest'.\n\n"
-        "Rispondi SOLO con questo JSON:\n"
-        "{\n"
-        '  "fact": "fatto permanente o NESSUNO",\n'
-        '  "people": [\n'
-        '    {"name": "Nome Cognome", "gender": "M/F", "birth_year": 1975, "relation_type": "famiglia/amicizia/amore/lavoro", "notes": "chi è"}\n'
-        '  ],\n'
-        '  "event_title": "titolo evento o NESSUNO",\n'
-        '  "event_desc": "dettagli evento o NESSUNO",\n'
-        '  "interest_name": "passione/interesse di Marco o NESSUNO",\n'
-        '  "interest_desc": "dettagli interesse o NESSUNO"\n'
-        "}"
+        "Sei l'estrattore dati di Peter. Utente: Marco Barbiero Torres.\n"
+        "Estrai IN MODO SILENZIOSO in JSON le entità che trovi in questo blocco di testo:\n"
+        '{"fact": "...", "people": [{"name": "...", "gender": "M/F", "birth_year": 1975, "relation_type": "...", "notes": "..."}], "event_title": "...", "event_desc": "...", "interest_name": "...", "interest_desc": "..."}'
     )
-
-    messages = [{"role": "system", "content": extraction_prompt}]
-    model_to_use = MODEL_VISION if image_data_url else MODEL_SMART
     
-    if image_data_url:
+    messages = [{"role": "system", "content": extraction_prompt}]
+    
+    if image_data_url and index == 0:
         messages.append({
             "role": "user",
             "content": [
-                {"type": "text", "text": user_message if user_message else "Estrai le persone, i nodi o i dati da questa immagine."},
+                {"type": "text", "text": chunk if chunk else "Estrai info."},
                 {"type": "image_url", "image_url": {"url": image_data_url}}
             ]
         })
     else:
-        messages.append({"role": "user", "content": user_message})
+        messages.append({"role": "user", "content": f"Estrai JSON da qui:\n\n{chunk}"})
 
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
+        async with httpx.AsyncClient(timeout=20.0) as client:
             res = await client.post(GROQ_URL, json={
-                "model": model_to_use,
+                "model": model,
                 "messages": messages,
                 "temperature": 0.1
             }, headers={"Content-Type": "application/json", "Authorization": f"Bearer {GROQ_API_KEY}"})
@@ -251,56 +244,31 @@ async def extract_and_save_facts(user_message: str, image_data_url: str = None):
                         if supabase:
                             try:
                                 node_id = f"fact_{abs(hash(fact_text))}"
-                                supabase.table("nodes").upsert({
-                                    "id": node_id, "name": fact_text[:28] + "...",
-                                    "type": "memory", "category": "memory", "notes": fact_text
-                                }).execute()
-                                supabase.table("edges").upsert({
-                                    "source": "user_self", "target": node_id, "relation_type": "memoria"
-                                }).execute()
-                            except Exception:
-                                pass
-                        
+                                supabase.table("nodes").upsert({"id": node_id, "name": fact_text[:28], "type": "memory", "category": "memory", "notes": fact_text}).execute()
+                                supabase.table("edges").upsert({"source": "user_self", "target": node_id, "relation_type": "memoria"}).execute()
+                            except Exception: pass
+                    
                     people_list = parsed.get("people", [])
                     for p in people_list:
                         p_name = p.get("name", "").strip()
                         if p_name and p_name.lower() not in ["marco", "barbi", "marco barbiero", "marco barbiero torres", "nessuno"]:
-                            save_contact_entity(
-                                name=p_name, category=p.get("relation_type", "amicizia"),
-                                notes=p.get("notes", ""), gender=p.get("gender", "sconosciuto"),
-                                birth_year=p.get("birth_year"), relation_type=p.get("relation_type", "neutrale")
-                            )
+                            save_contact_entity(name=p_name, category=p.get("relation_type", "amicizia"), notes=p.get("notes", ""), gender=p.get("gender", "sconosciuto"), birth_year=p.get("birth_year"), relation_type=p.get("relation_type", "neutrale"))
                             if supabase:
                                 try:
                                     node_id = f"contact_{abs(hash(p_name))}"
-                                    supabase.table("nodes").upsert({
-                                        "id": node_id, "name": p_name, "type": "person",
-                                        "category": p.get("relation_type", "amicizia"),
-                                        "notes": p.get("notes", ""), "gender": p.get("gender", "sconosciuto"),
-                                        "birth_year": p.get("birth_year"), "relation_type": p.get("relation_type", "neutrale")
-                                    }).execute()
-                                    supabase.table("edges").upsert({
-                                        "source": "user_self", "target": node_id,
-                                        "relation_type": p.get("relation_type", "neutrale")
-                                    }).execute()
-                                except Exception:
-                                    pass
-                        
+                                    supabase.table("nodes").upsert({"id": node_id, "name": p_name, "type": "person", "category": p.get("relation_type", "amicizia"), "notes": p.get("notes", ""), "gender": p.get("gender", "sconosciuto"), "birth_year": p.get("birth_year"), "relation_type": p.get("relation_type", "neutrale")}).execute()
+                                    supabase.table("edges").upsert({"source": "user_self", "target": node_id, "relation_type": p.get("relation_type", "neutrale")}).execute()
+                                except Exception: pass
+                    
                     if parsed.get("event_title") and parsed.get("event_title") != "NESSUNO":
                         ev_title = parsed.get("event_title")
                         save_event_entity(ev_title, parsed.get("event_desc", ""))
                         if supabase:
                             try:
                                 node_id = f"event_{abs(hash(ev_title))}"
-                                supabase.table("nodes").upsert({
-                                    "id": node_id, "name": ev_title[:26],
-                                    "type": "event", "category": "event", "notes": parsed.get("event_desc", "")
-                                }).execute()
-                                supabase.table("edges").upsert({
-                                    "source": "user_self", "target": node_id, "relation_type": "evento"
-                                }).execute()
-                            except Exception:
-                                pass
+                                supabase.table("nodes").upsert({"id": node_id, "name": ev_title[:26], "type": "event", "category": "event", "notes": parsed.get("event_desc", "")}).execute()
+                                supabase.table("edges").upsert({"source": "user_self", "target": node_id, "relation_type": "evento"}).execute()
+                            except Exception: pass
 
                     if parsed.get("interest_name") and parsed.get("interest_name") != "NESSUNO":
                         int_name = parsed.get("interest_name")
@@ -308,14 +276,43 @@ async def extract_and_save_facts(user_message: str, image_data_url: str = None):
                         if supabase:
                             try:
                                 node_id = f"interest_{abs(hash(int_name))}"
-                                supabase.table("nodes").upsert({
-                                    "id": node_id, "name": int_name[:26],
-                                    "type": "interest", "category": "interest", "notes": parsed.get("interest_desc", "")
-                                }).execute()
-                                supabase.table("edges").upsert({
-                                    "source": "user_self", "target": node_id, "relation_type": "passione"
-                                }).execute()
-                            except Exception:
-                                pass
+                                supabase.table("nodes").upsert({"id": node_id, "name": int_name[:26], "type": "interest", "category": "interest", "notes": parsed.get("interest_desc", "")}).execute()
+                                supabase.table("edges").upsert({"source": "user_self", "target": node_id, "relation_type": "passione"}).execute()
+                            except Exception: pass
+            else:
+                print(f"Worker {model} fallito con status {res.status_code}")
     except Exception as e:
-        print(f"Errore estrazione: {e}")
+        print(f"Errore chunk worker {model}: {e}")
+
+async def extract_and_save_facts(user_message: str, image_data_url: str = None):
+    """
+    SUDDIVISIONE E ORCHESTRAZIONE LLM MULTIPLI:
+    Prende il testo, lo divide in chunk da ~2500 caratteri e assegna ogni chunk 
+    a un modello LLM diverso dalla WORKER_MODELS pool in modo asincrono.
+    """
+    if not GROQ_API_KEY:
+        return
+    
+    # Divisione in blocchi
+    chunk_size = 2500
+    chunks = [user_message[i:i+chunk_size] for i in range(0, len(user_message), chunk_size)]
+    
+    tasks = []
+    for index, chunk in enumerate(chunks):
+        # Assegna un modello dalla pool in modo circolare per non saturarne nessuno
+        if image_data_url and index == 0:
+            assigned_model = MODEL_VISION
+        else:
+            assigned_model = WORKER_MODELS[index % len(WORKER_MODELS)]
+        
+        # Crea il task asincrono
+        task = asyncio.create_task(process_chunk(chunk, assigned_model, index, image_data_url))
+        tasks.append(task)
+        
+        # Aggiunge un delay minimo tra un'assegnazione e l'altra se i chunk sono tantissimi
+        if index > 0 and index % len(WORKER_MODELS) == 0:
+            await asyncio.sleep(2)
+            
+    # Esegue tutti i chunk in background contemporaneamente sui diversi modelli!
+    if tasks:
+        await asyncio.gather(*tasks)
