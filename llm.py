@@ -7,14 +7,14 @@ from config import GROQ_API_KEY, GROQ_URL
 from database import (
     save_fact, save_contact_entity, save_event_entity, 
     save_interest_entity, get_contacts, get_all_interests,
-    get_personality_settings
+    get_personality_settings, supabase
 )
 from tools import search_web, search_youtube, search_apple_music, search_image, send_telegram_message, send_telegram_voice_note
 from scraper import fetch_web_page
 
 MODEL_FAST = "openai/gpt-oss-20b"
 MODEL_SMART = "openai/gpt-oss-120b"
-MODEL_VISION = "qwen/qwen3.8-27b"  # Modello multimodale ufficiale su Groq per immagini e OCR
+MODEL_VISION = "qwen/qwen3.8-27b"
 
 async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
     if not GROQ_API_KEY:
@@ -130,10 +130,10 @@ async def generate_peter_response(user_message: str, recent_context: str, long_t
         f"DATA E ORA: {now_str}\n\n"
         "=== AUTOCOSCIENZA E STATO DI SISTEMA ===\n"
         f"- La tua personalità attuale impostata nei parametri è: '{current_tone}'\n"
-        "- Architettura: FastAPI + Groq LPU (gpt-oss-120b / qwen3.8-27b) + Supabase PostgreSQL + WebGL 3D Nexus + Sintesi Vocale Neurale.\n"
+        "- Architettura: FastAPI + Groq LPU + Supabase PostgreSQL (nodes & edges) + WebGL 3D Nexus + Sintesi Vocale Neurale.\n"
         "- Capacità attive: Riproduzione YouTube/Apple Music sull'HUD, ricerca web, invio messaggi/vocali Telegram, analisi immagini Vision, estrazione automatica nel Grafo 3D.\n\n"
         "DIRETTIVE DI RISPOSTA:\n"
-        "1. Sii naturale, brillante, diretto e conciso (stile chat veloce), senza elenchi puntati lunghi.\n"
+        "1. Sii naturale, brillante, diretto e conciso (stile chat veloce).\n"
         "2. Usa le memorie e le passioni di Marco come contesto naturale."
         f"{interests_context}"
     )
@@ -149,7 +149,6 @@ async def generate_peter_response(user_message: str, recent_context: str, long_t
     if long_term_facts:
         system_prompt += f"\n\nMemorie su Marco:\n{long_term_facts}"
 
-    # Se c'è un'immagine usiamo il modello vision Qwen, altrimenti il modello smart standard
     model_to_use = MODEL_VISION if image_data_url else MODEL_SMART
     messages = [{"role": "system", "content": system_prompt}]
     
@@ -173,9 +172,8 @@ async def generate_peter_response(user_message: str, recent_context: str, long_t
             }, headers={"Content-Type": "application/json", "Authorization": f"Bearer {GROQ_API_KEY}"})
             
             if res.status_code != 200:
-                print(f"Groq Error {res.status_code}: {res.text}")
                 return {
-                    "reply": f"Errore dal modello ({res.status_code}): {res.text[:100]}",
+                    "reply": f"Errore dal modello ({res.status_code})",
                     "query_used": "", "media": None, "screen": None,
                     "reasoning": f"> Errore API {res.status_code}"
                 }
@@ -189,7 +187,6 @@ async def generate_peter_response(user_message: str, recent_context: str, long_t
                 "reasoning": f"> {tool_exec['reasoning']}"
             }
     except Exception as e:
-        print(f"Eccezione LLM: {e}")
         return {
             "reply": "Connessione instabile con il nucleo neurale, rimanda il messaggio.",
             "query_used": "", "media": None, "screen": None,
@@ -203,9 +200,9 @@ async def extract_and_save_facts(user_message: str, image_data_url: str = None):
     extraction_prompt = (
         "Sei il modulo di memoria di Peter. L'utente principale è MARCO BARBIERO TORRES (detto Marco o Barbi, maschio, nato nel 2006).\n"
         "REGOLE FONDAMENTALI:\n"
-        "1. NON inserire MAI Marco / Barbi nell'array 'people'! Marco è già il nodo centrale.\n"
-        "2. Estrai TUTTE le ALTRE persone menzionate o presenti nell'immagine (es. genitori, amici, partner) nell'array 'people', deducendo il genere ('M' o 'F') dal nome, l'anno di nascita (stimato se non detto) e il tipo di relazione ('famiglia', 'amicizia', 'amore', 'lavoro').\n"
-        "3. Estrai eventuali fatti su Marco in 'fact', eventi in 'event' e passioni in 'interest'.\n\n"
+        "1. NON inserire MAI Marco / Barbi come nuova persona! Marco è già il nodo centrale ('user_self').\n"
+        "2. Estrai TUTTE le ALTRE persone menzionate o presenti (es. genitori, amici, partner) nell'array 'people', deducendo il genere ('M' o 'F'), l'anno di nascita (stimato) e il tipo di relazione ('famiglia', 'amicizia', 'amore', 'lavoro').\n"
+        "3. Estrai fatti su Marco in 'fact', eventi in 'event' e passioni in 'interest'.\n\n"
         "Rispondi SOLO con questo JSON:\n"
         "{\n"
         '  "fact": "fatto permanente o NESSUNO",\n'
@@ -248,25 +245,76 @@ async def extract_and_save_facts(user_message: str, image_data_url: str = None):
                     parsed = json.loads(raw_text)
                     
                     if parsed.get("fact") and parsed.get("fact") != "NESSUNO":
-                        save_fact(parsed.get("fact"))
+                        fact_text = parsed.get("fact")
+                        save_fact(fact_text)
+                        if supabase:
+                            try:
+                                node_id = f"fact_{abs(hash(fact_text))}"
+                                supabase.table("nodes").upsert({
+                                    "id": node_id, "name": fact_text[:28] + "...",
+                                    "type": "memory", "category": "memory", "notes": fact_text
+                                }).execute()
+                                supabase.table("edges").upsert({
+                                    "source": "user_self", "target": node_id, "relation_type": "memoria"
+                                }).execute()
+                            except Exception:
+                                pass
                         
                     people_list = parsed.get("people", [])
                     for p in people_list:
                         p_name = p.get("name", "").strip()
                         if p_name and p_name.lower() not in ["marco", "barbi", "marco barbiero", "marco barbiero torres", "nessuno"]:
                             save_contact_entity(
-                                name=p_name,
-                                category=p.get("relation_type", "amicizia"),
-                                notes=p.get("notes", ""),
-                                gender=p.get("gender", "sconosciuto"),
-                                birth_year=p.get("birth_year"),
-                                relation_type=p.get("relation_type", "neutrale")
+                                name=p_name, category=p.get("relation_type", "amicizia"),
+                                notes=p.get("notes", ""), gender=p.get("gender", "sconosciuto"),
+                                birth_year=p.get("birth_year"), relation_type=p.get("relation_type", "neutrale")
                             )
+                            if supabase:
+                                try:
+                                    node_id = f"contact_{abs(hash(p_name))}"
+                                    supabase.table("nodes").upsert({
+                                        "id": node_id, "name": p_name, "type": "person",
+                                        "category": p.get("relation_type", "amicizia"),
+                                        "notes": p.get("notes", ""), "gender": p.get("gender", "sconosciuto"),
+                                        "birth_year": p.get("birth_year"), "relation_type": p.get("relation_type", "neutrale")
+                                    }).execute()
+                                    supabase.table("edges").upsert({
+                                        "source": "user_self", "target": node_id,
+                                        "relation_type": p.get("relation_type", "neutrale")
+                                    }).execute()
+                                except Exception:
+                                    pass
                         
                     if parsed.get("event_title") and parsed.get("event_title") != "NESSUNO":
-                        save_event_entity(parsed.get("event_title"), parsed.get("event_desc", ""))
+                        ev_title = parsed.get("event_title")
+                        save_event_entity(ev_title, parsed.get("event_desc", ""))
+                        if supabase:
+                            try:
+                                node_id = f"event_{abs(hash(ev_title))}"
+                                supabase.table("nodes").upsert({
+                                    "id": node_id, "name": ev_title[:26],
+                                    "type": "event", "category": "event", "notes": parsed.get("event_desc", "")
+                                }).execute()
+                                supabase.table("edges").upsert({
+                                    "source": "user_self", "target": node_id, "relation_type": "evento"
+                                }).execute()
+                            except Exception:
+                                pass
 
                     if parsed.get("interest_name") and parsed.get("interest_name") != "NESSUNO":
-                        save_interest_entity(parsed.get("interest_name"), parsed.get("interest_desc", ""))
+                        int_name = parsed.get("interest_name")
+                        save_interest_entity(int_name, parsed.get("interest_desc", ""))
+                        if supabase:
+                            try:
+                                node_id = f"interest_{abs(hash(int_name))}"
+                                supabase.table("nodes").upsert({
+                                    "id": node_id, "name": int_name[:26],
+                                    "type": "interest", "category": "interest", "notes": parsed.get("interest_desc", "")
+                                }).execute()
+                                supabase.table("edges").upsert({
+                                    "source": "user_self", "target": node_id, "relation_type": "passione"
+                                }).execute()
+                            except Exception:
+                                pass
     except Exception as e:
         print(f"Errore estrazione: {e}")
