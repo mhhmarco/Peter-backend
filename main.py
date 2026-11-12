@@ -1,14 +1,15 @@
 import tempfile
 import os
+import base64
 import httpx
 import edge_tts
-from fastapi import FastAPI, HTTPException, Request, UploadFile, File, WebSocket, WebSocketDisconnect, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form, WebSocket, WebSocketDisconnect, BackgroundTasks
 from fastapi.responses import HTMLResponse, Response
 from pydantic import BaseModel
 
 from database import (
     supabase, supabase_error_log, get_recent_memories, 
-    get_long_term_facts, get_all_facts, delete_fact_by_id, update_fact_by_id,
+    get_long_term_facts, delete_fact_by_id, update_fact_by_id,
     save_episodic_memory, save_contacts_batch, get_contacts,
     save_calendar_events_batch, get_personality_settings, save_personality_settings,
     get_nexus_graph_data
@@ -19,10 +20,7 @@ from ui import get_dashboard_html
 from importer import parse_vcard, fetch_and_parse_ical
 from config import GROQ_API_KEY
 
-app = FastAPI(title="Peter OS Backend")
-
-class ChatRequest(BaseModel):
-    message: str
+app = FastAPI(title="Peter OS Backend v9.0")
 
 class TTSRequest(BaseModel):
     text: str
@@ -35,7 +33,6 @@ class ICalRequest(BaseModel):
 
 @app.get("/ping")
 def ping():
-    """Endpoint di Keep-Alive per mantenere attivo il server."""
     return {"status": "alive"}
 
 @app.get("/", response_class=HTMLResponse)
@@ -67,7 +64,6 @@ def api_get_contacts():
 
 @app.post("/api/tts")
 async def api_tts_speech(req: TTSRequest):
-    """Genera lo stream audio MP3 per la voce nativa di Peter nella dashboard."""
     try:
         tts = edge_tts.Communicate(req.text, voice="it-IT-DiegoNeural")
         with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_mp3:
@@ -93,53 +89,31 @@ def api_delete_fact(fact_id: str):
         raise HTTPException(status_code=500, detail="Impossibile eliminare il fatto")
     return {"status": "deleted"}
 
-@app.post("/api/import/vcf")
-async def import_vcf(file: UploadFile = File(...)):
-    content = await file.read()
-    text = content.decode("utf-8", errors="ignore")
-    contacts = parse_vcard(text)
-    if contacts:
-        save_contacts_batch(contacts)
-        return {"status": "success", "count": len(contacts)}
-    return {"status": "no_contacts_found"}
-
-@app.post("/api/import/ical")
-async def import_ical(req: ICalRequest):
-    events = await fetch_and_parse_ical(req.url)
-    if events:
-        save_calendar_events_batch(events)
-        return {"status": "success", "count": len(events)}
-    return {"status": "no_events_found"}
-
-@app.get("/api/personality")
-def api_get_personality():
-    return get_personality_settings()
-
-@app.post("/api/personality")
-def api_save_personality(settings: dict):
-    save_personality_settings(settings)
-    return {"status": "updated"}
-
-@app.post("/telegram/webhook")
-async def telegram_webhook(request: Request, background_tasks: BackgroundTasks):
-    update = await request.json()
-    background_tasks.add_task(process_telegram_update, update)
-    return {"status": "ok"}
-
 @app.post("/chat")
-async def chat_endpoint(req: ChatRequest, background_tasks: BackgroundTasks):
+async def chat_endpoint(
+    message: str = Form(""),
+    file: UploadFile = File(None),
+    background_tasks: BackgroundTasks = None
+):
     recent_context = get_recent_memories(limit=8)
     long_term_facts = get_long_term_facts(limit=15)
 
-    result = await generate_peter_response(req.message, recent_context, long_term_facts)
+    image_data_url = None
+    if file:
+        file_bytes = await file.read()
+        encoded = base64.b64encode(file_bytes).decode("utf-8")
+        mime = file.content_type or "image/jpeg"
+        image_data_url = f"data:{mime};base64,{encoded}"
+
+    result = await generate_peter_response(message, recent_context, long_term_facts, image_data_url=image_data_url)
     reply = result["reply"]
     query_used = result.get("query_used")
     media = result.get("media")
     screen = result.get("screen")
     reasoning = result.get("reasoning")
 
-    save_episodic_memory(req.message, reply)
-    background_tasks.add_task(extract_and_save_facts, req.message)
+    save_episodic_memory(message if message else "[Immagine]", reply)
+    background_tasks.add_task(extract_and_save_facts, message, image_data_url)
 
     return {"reply": reply, "query_used": query_used, "media": media, "screen": screen, "reasoning": reasoning}
 
@@ -199,8 +173,5 @@ async def websocket_voice_endpoint(websocket: WebSocket):
                 "reasoning": reasoning_data
             })
             await websocket.send_bytes(audio_out)
-
     except WebSocketDisconnect:
         pass
-    except Exception as e:
-        print(f"Errore WebSocket Voice: {e}")
