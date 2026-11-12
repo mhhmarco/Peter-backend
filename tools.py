@@ -53,12 +53,7 @@ def youtube_api_status() -> dict:
 
 
 def _youtube_data_api_search(query: str) -> dict | None:
-    """Search with YouTube Data API and select the best embeddable result.
-
-    Search.list needs the YouTube Data API v3 enabled and a valid API key. We
-    check video status before selecting, so private/non-embeddable videos are
-    not chosen when the official API provides better candidates.
-    """
+    """Search with YouTube Data API and select the best embeddable result."""
     key = _youtube_api_key()
     if not key:
         return None
@@ -69,9 +64,9 @@ def _youtube_data_api_search(query: str) -> dict | None:
                 params={"part": "snippet", "type": "video", "maxResults": 10,
                        "q": query, "videoEmbeddable": "true", "safeSearch": "moderate", "key": key},
             )
-            if response.status_code == 400 or response.status_code == 403:
-                # Explicit errors are logged to Render; key itself is never logged.
-                print(f“YouTube Data API search error {response.status_code}: {response.text[:400]}")
+            if response.status_code in (400, 403):
+                # Never print the API key. Keep the provider's error body for diagnosis.
+                print(f"YouTube Data API search error {response.status_code}: {response.text[:400]}")
             response.raise_for_status()
             items = response.json().get("items", [])
             candidates = []
@@ -83,9 +78,6 @@ def _youtube_data_api_search(query: str) -> dict | None:
             if not candidates:
                 return None
 
-            # Search.list's videoEmbeddable filter is useful but checking status
-            # avoids relying on search metadata alone. videos.list costs no extra
-            # quota unit beyond the request's minimum and verifies embeddability.
             status_response = client.get(
                 "https://www.googleapis.com/youtube/v3/videos",
                 params={"part": "status", "id": ",".join(v for v, _ in candidates), "key": key},
@@ -96,15 +88,14 @@ def _youtube_data_api_search(query: str) -> dict | None:
                         and entry.get("status", {}).get("privacyStatus") == "public"}
             for video_id, snippet in candidates:
                 if video_id in eligible:
-                    return _youtube_result(
-                        video_id, snippet.get("title", query), query,
-                        channel=snippet.get("channelTitle", ""),
-                        thumbnail=(snippet.get("high") or snippet.get("medium") or snippet.get("default") or {}).get("url", ""),
-                    )
+                    thumbnails = snippet.get("thumbnails") or {}
+                    thumbnail = (thumbnails.get("high") or thumbnails.get("medium") or thumbnails.get("default") or {}).get("url", "")
+                    return _youtube_result(video_id, snippet.get("title", query), query,
+                                           channel=snippet.get("channelTitle", ""), thumbnail=thumbnail)
     except httpx.HTTPStatusError as exc:
-        print(f“YouTube API HTTP {exc.response.status_code}: {exc.response.text[:400]}")
+        print(f"YouTube API HTTP {exc.response.status_code}: {exc.response.text[:400]}")
     except Exception as exc:
-        print(f“YouTube Data API non disponibile, uso ricerca alternativa: {exc}")
+        print(f"YouTube Data API non disponibile, uso ricerca alternativa: {exc}")
     return None
 
 
@@ -116,7 +107,6 @@ def _fallback_youtube_search(query: str) -> dict | None:
             url = video.get("content", "") or video.get("href", "")
             video_id = _extract_youtube_id(url)
             if not video_id:
-                # DDG may return a URL with query params or a shortened URL.
                 match = re.search(r"(?:v=|/embed/|/shorts/|/live/|youtu\.be/)([A-Za-z0-9_-]{11})(?:[?&/]|$)", url, re.I)
                 video_id = match.group(1) if match else None
             if video_id:
@@ -137,13 +127,11 @@ def search_youtube(query: str) -> dict:
     if direct_id:
         return _youtube_result(direct_id, f"Video YouTube ({direct_id})", original_query)
 
-    # Remove common Italian command framing without deleting meaningful search terms.
     search_query = re.sub(
         r"\b(?:cerca(?:mi)?|trova|riproduci|metti|fammi vedere|un video|il video|video|su youtube|youtube)\b",
         " ", original_query, flags=re.IGNORECASE,
     )
     search_query = re.sub(r"\s+", " ", search_query).strip(" :,-") or original_query
-
     result = _youtube_data_api_search(search_query)
     if result:
         return result
@@ -159,10 +147,8 @@ def search_youtube(query: str) -> dict:
 def search_web(query: str, max_results: int = 4) -> str:
     try:
         with DDGS() as ddgs:
-            results = [
-                f"Fonte: {result.get('title', '')}\nSnippet: {result.get('body', '')}\nURL: {result.get('href', '')}"
-                for result in ddgs.text(query, max_results=max_results)
-            ]
+            results = [f"Fonte: {result.get('title', '')}\nSnippet: {result.get('body', '')}\nURL: {result.get('href', '')}"
+                       for result in ddgs.text(query, max_results=max_results)]
         if results:
             return "\n---\n".join(results)
     except Exception as exc:
@@ -223,11 +209,9 @@ async def send_telegram_voice_note(message_text: str) -> bool:
         await tts.save(tmp_path)
         async with httpx.AsyncClient(timeout=15.0) as client:
             with open(tmp_path, "rb") as audio_file:
-                response = await client.post(
-                    f"https://api.telegram.org/bot{token}/sendVoice",
-                    data={"chat_id": chat_id},
-                    files={"voice": ("voice.ogg", audio_file, "audio/ogg")},
-                )
+                response = await client.post(f"https://api.telegram.org/bot{token}/sendVoice",
+                                             data={"chat_id": chat_id},
+                                             files={"voice": ("voice.ogg", audio_file, "audio/ogg")})
         return response.status_code == 200
     except Exception as exc:
         print(f"Errore invio nota vocale Telegram: {exc}")
