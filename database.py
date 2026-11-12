@@ -1,216 +1,152 @@
-import tempfile
-import os
-import base64
-import httpx
-import edge_tts
-from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form, WebSocket, WebSocketDisconnect, BackgroundTasks
-from fastapi.responses import HTMLResponse, Response
-from pydantic import BaseModel
+from supabase import create_client, Client
+from config import SUPABASE_URL, SUPABASE_KEY
+from graph import calculate_galaxy_layout
 
-from database import (
-    supabase, supabase_error_log, get_recent_memories, 
-    get_long_term_facts, delete_fact_by_id, update_fact_by_id,
-    save_episodic_memory, save_contacts_batch, get_contacts,
-    save_calendar_events_batch, get_personality_settings, save_personality_settings,
-    get_nexus_graph_data
-)
-from llm import generate_peter_response, extract_and_save_facts
-from telegram_bot import process_telegram_update
-from ui import get_dashboard_html
-from importer import parse_vcard, fetch_and_parse_ical
-from config import GROQ_API_KEY
+supabase: Client = None
+supabase_error_log = None
 
-app = FastAPI(title="Peter OS Backend v9.0")
-
-class TTSRequest(BaseModel):
-    text: str
-
-class FactUpdateRequest(BaseModel):
-    fact: str
-
-class ICalRequest(BaseModel):
-    url: str
-
-@app.get("/ping")
-def ping():
-    """Endpoint di Keep-Alive per mantenere attivo il server."""
-    return {"status": "alive"}
-
-@app.get("/", response_class=HTMLResponse)
-def root_dashboard():
-    return get_dashboard_html()
-
-@app.get("/memories")
-def check_memories():
-    if not supabase:
-        return {"connected": False, "error": "Supabase non connesso", "dettaglio": supabase_error_log}
+if SUPABASE_URL and SUPABASE_KEY:
     try:
-        res_mem = supabase.table("memories").select("*").order("created_at", desc=True).limit(10).execute()
-        res_facts = supabase.table("user_facts").select("*").order("created_at", desc=True).limit(20).execute()
-        return {
-            "connected": True,
-            "episodic_memories": res_mem.data,
-            "long_term_facts": res_facts.data
-        }
+        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
     except Exception as e:
-        return {"connected": False, "error": f"Errore lettura: {str(e)}"}
+        supabase_error_log = str(e)
 
-@app.get("/api/nexus")
-def api_get_nexus():
-    return get_nexus_graph_data()
-
-@app.get("/api/contacts")
-def api_get_contacts():
-    return get_contacts()
-
-@app.post("/api/tts")
-async def api_tts_speech(req: TTSRequest):
-    """Genera lo stream audio MP3 per la voce nativa di Peter nella dashboard."""
+def get_recent_memories(limit: int = 8) -> str:
+    if not supabase: return ""
     try:
-        tts = edge_tts.Communicate(req.text, voice="it-IT-DiegoNeural")
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_mp3:
-            await tts.save(tmp_mp3.name)
-            with open(tmp_mp3.name, "rb") as f:
-                audio_bytes = f.read()
-            os.remove(tmp_mp3.name)
-        return Response(content=audio_bytes, media_type="audio/mp3")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.put("/api/facts/{fact_id}")
-def api_update_fact(fact_id: str, req: FactUpdateRequest):
-    success = update_fact_by_id(fact_id, req.fact)
-    if not success:
-        raise HTTPException(status_code=500, detail="Impossibile aggiornare il fatto")
-    return {"status": "updated"}
-
-@app.delete("/api/facts/{fact_id}")
-def api_delete_fact(fact_id: str):
-    success = delete_fact_by_id(fact_id)
-    if not success:
-        raise HTTPException(status_code=500, detail="Impossibile eliminare il fatto")
-    return {"status": "deleted"}
-
-@app.post("/api/import/vcf")
-async def import_vcf(file: UploadFile = File(...)):
-    content = await file.read()
-    text = content.decode("utf-8", errors="ignore")
-    contacts = parse_vcard(text)
-    if contacts:
-        save_contacts_batch(contacts)
-        return {"status": "success", "count": len(contacts)}
-    return {"status": "no_contacts_found"}
-
-@app.post("/api/import/ical")
-async def import_ical(req: ICalRequest):
-    events = await fetch_and_parse_ical(req.url)
-    if events:
-        save_calendar_events_batch(events)
-        return {"status": "success", "count": len(events)}
-    return {"status": "no_events_found"}
-
-@app.get("/api/personality")
-def api_get_personality():
-    return get_personality_settings()
-
-@app.post("/api/personality")
-def api_save_personality(settings: dict):
-    save_personality_settings(settings)
-    return {"status": "updated"}
-
-@app.post("/telegram/webhook")
-async def telegram_webhook(request: Request, background_tasks: BackgroundTasks):
-    update = await request.json()
-    background_tasks.add_task(process_telegram_update, update)
-    return {"status": "ok"}
-
-@app.post("/chat")
-async def chat_endpoint(
-    message: str = Form(""),
-    file: UploadFile = File(None),
-    background_tasks: BackgroundTasks = None
-):
-    recent_context = get_recent_memories(limit=8)
-    long_term_facts = get_long_term_facts(limit=15)
-
-    image_data_url = None
-    if file:
-        file_bytes = await file.read()
-        encoded = base64.b64encode(file_bytes).decode("utf-8")
-        mime = file.content_type or "image/jpeg"
-        image_data_url = f"data:{mime};base64,{encoded}"
-
-    result = await generate_peter_response(message, recent_context, long_term_facts, image_data_url=image_data_url)
-    reply = result["reply"]
-    query_used = result.get("query_used")
-    media = result.get("media")
-    screen = result.get("screen")
-    reasoning = result.get("reasoning")
-
-    save_episodic_memory(message if message else "[Immagine]", reply)
-    if background_tasks:
-        background_tasks.add_task(extract_and_save_facts, message, image_data_url)
-
-    return {"reply": reply, "query_used": query_used, "media": media, "screen": screen, "reasoning": reasoning}
-
-@app.websocket("/ws/voice")
-async def websocket_voice_endpoint(websocket: WebSocket):
-    await websocket.accept()
-    try:
-        while True:
-            audio_bytes = await websocket.receive_bytes()
-            if not audio_bytes:
-                continue
-
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
-                tmp.write(audio_bytes)
-                tmp_path = tmp.name
-
-            user_text = ""
-            try:
-                async with httpx.AsyncClient(timeout=10.0) as client:
-                    with open(tmp_path, "rb") as f:
-                        res = await client.post(
-                            "https://api.groq.com/openai/v1/audio/transcriptions",
-                            headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
-                            files={"file": ("audio.wav", f, "audio/wav")},
-                            data={"model": "whisper-large-v3-turbo", "language": "it"}
-                        )
-                        if res.status_code == 200:
-                            user_text = res.json().get("text", "").strip()
-            finally:
-                if os.path.exists(tmp_path):
-                    os.remove(tmp_path)
-
-            if not user_text:
-                continue
-
-            recent_context = get_recent_memories(limit=6)
-            long_term_facts = get_long_term_facts(limit=10)
-            llm_res = await generate_peter_response(user_text, recent_context, long_term_facts)
-            reply_text = llm_res["reply"]
-            screen_data = llm_res.get("screen")
-            reasoning_data = llm_res.get("reasoning")
-
-            save_episodic_memory(user_text, reply_text)
-            await extract_and_save_facts(user_text)
-
-            tts = edge_tts.Communicate(reply_text, voice="it-IT-DiegoNeural")
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_mp3:
-                await tts.save(tmp_mp3.name)
-                with open(tmp_mp3.name, "rb") as f_mp3:
-                    audio_out = f_mp3.read()
-                os.remove(tmp_mp3.name)
-
-            await websocket.send_json({
-                "user_text": user_text,
-                "reply_text": reply_text,
-                "screen": screen_data,
-                "reasoning": reasoning_data
-            })
-            await websocket.send_bytes(audio_out)
-
-    except WebSocketDisconnect:
+        res = supabase.table("memories").select("content").order("created_at", desc=True).limit(limit).execute()
+        if res.data:
+            return "\n".join([item["content"] for item in reversed(res.data)])
+    except Exception:
         pass
+    return ""
+
+def get_long_term_facts(limit: int = 25) -> str:
+    if not supabase: return ""
+    try:
+        res = supabase.table("user_facts").select("fact").order("created_at", desc=True).limit(limit).execute()
+        if res.data:
+            return "\n".join([f"- {item['fact']}" for item in res.data])
+    except Exception:
+        pass
+    return ""
+
+def get_all_facts():
+    if not supabase: return []
+    try:
+        res = supabase.table("user_facts").select("*").order("created_at", desc=True).execute()
+        return res.data or []
+    except Exception:
+        return []
+
+def update_fact_by_id(fact_id: str, new_text: str) -> bool:
+    if not supabase: return False
+    try:
+        supabase.table("user_facts").update({"fact": new_text}).eq("id", fact_id).execute()
+        return True
+    except Exception:
+        return False
+
+def delete_fact_by_id(fact_id: str) -> bool:
+    if not supabase: return False
+    try:
+        supabase.table("user_facts").delete().eq("id", fact_id).execute()
+        return True
+    except Exception:
+        return False
+
+def save_episodic_memory(user_msg: str, peter_reply: str):
+    if not supabase: return
+    try:
+        supabase.table("memories").insert([
+            {"content": f"Marco: {user_msg}"},
+            {"content": f"Peter: {peter_reply}"}
+        ]).execute()
+    except Exception:
+        pass
+
+def save_fact(fact_text: str):
+    if not supabase: return
+    try:
+        supabase.table("user_facts").insert([{"fact": fact_text}]).execute()
+    except Exception:
+        pass
+
+def save_contact_entity(name: str, category: str = "amicizia", notes: str = "", birthday: str = ""):
+    if not supabase or not name or name.upper() == "NESSUNO": return
+    try:
+        res = supabase.table("contacts").select("*").ilike("name", name).execute()
+        if not res.data:
+            supabase.table("contacts").insert([{
+                "name": name,
+                "category": category,
+                "notes": notes,
+                "details": f"Compleanno/Relazione: {birthday}" if birthday else "Profilo Nexus"
+            }]).execute()
+        else:
+            existing = res.data[0]
+            updated_notes = (existing.get("notes", "") + f" | {notes}").strip(" |")
+            supabase.table("contacts").update({"notes": updated_notes}).eq("id", existing["id"]).execute()
     except Exception as e:
-        print(f"Errore WebSocket Voice: {e}")
+        print(f"Errore contatto: {e}")
+
+def save_contacts_batch(contacts: list):
+    if not supabase or not contacts: return
+    try:
+        supabase.table("contacts").insert(contacts).execute()
+    except Exception as e:
+        print(f"Errore batch contatti: {e}")
+
+def save_event_entity(title: str, description: str = ""):
+    if not supabase or not title or title.upper() == "NESSUNO": return
+    try:
+        supabase.table("calendar_events").insert([{
+            "title": title,
+            "description": description,
+            "start_time": "Programmato"
+        }]).execute()
+    except Exception as e:
+        print(f"Errore evento: {e}")
+
+def save_calendar_events_batch(events: list):
+    if not supabase or not events: return
+    try:
+        supabase.table("calendar_events").insert(events).execute()
+    except Exception as e:
+        print(f"Errore batch eventi: {e}")
+
+def save_interest_entity(name: str, description: str = ""):
+    if not supabase or not name or name.upper() == "NESSUNO": return
+    try:
+        res = supabase.table("interests").select("*").ilike("name", name).execute()
+        if not res.data:
+            supabase.table("interests").insert([{"name": name, "description": description}]).execute()
+    except Exception as e:
+        print(f"Errore interesse: {e}")
+
+def get_nexus_graph_data() -> dict:
+    return calculate_galaxy_layout(supabase)
+
+def get_contacts():
+    if not supabase: return []
+    try:
+        return supabase.table("contacts").select("*").limit(50).execute().data or []
+    except Exception:
+        return []
+
+def get_personality_settings() -> dict:
+    default_settings = {"tone": "Schietto, empatico, naturale, colto e ironico.", "initiative_level": "Alto"}
+    if not supabase: return default_settings
+    try:
+        res = supabase.table("system_settings").select("value").eq("key", "personality").execute()
+        if res.data: return res.data[0]["value"]
+    except Exception:
+        pass
+    return default_settings
+
+def save_personality_settings(settings: dict):
+    if not supabase: return
+    try:
+        supabase.table("system_settings").upsert({"key": "personality", "value": settings}).execute()
+    except Exception:
+        pass
