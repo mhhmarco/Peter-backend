@@ -42,13 +42,26 @@ def save_contact_entity(name: str, category: str = "amicizia", notes: str = "", 
             supabase.table("contacts").update({
                 "notes": updated_notes,
                 "gender": gender if gender != "sconosciuto" else existing.get("gender"),
+                "birth_year": birth_year if birth_year else existing.get("birth_year"),
                 "relation_type": relation_type if relation_type != "neutrale" else existing.get("relation_type")
             }).eq("id", existing["id"]).execute()
     except Exception as e:
         print(f"Errore contatto: {e}")
 
+def save_contacts_batch(contacts: list):
+    if not supabase or not contacts: return
+    for c in contacts:
+        save_contact_entity(
+            name=c.get("name"),
+            category=c.get("category", "amicizia"),
+            notes=c.get("notes", ""),
+            gender=c.get("gender", "sconosciuto"),
+            birth_year=c.get("birth_year"),
+            relation_type=c.get("relation_type", "neutrale")
+        )
+
 def merge_contact_aliases(alias_name: str, target_name: str) -> bool:
-    """Fonde due identità nel database e nel grafo (es. Spiderman e Buja) senza duplicati."""
+    """Fonde due identità (es. Spiderman e Buja) senza duplicati."""
     if not supabase: return False
     try:
         alias_res = supabase.table("contacts").select("*").ilike("name", alias_name).execute()
@@ -60,14 +73,10 @@ def merge_contact_aliases(alias_name: str, target_name: str) -> bool:
         alias_c = alias_res.data[0]
         target_c = target_res.data[0]
         
-        # Unisce le note
         merged_notes = f"{target_c.get('notes', '')} | Unificato con alias: {alias_c['name']} ({alias_c.get('notes', '')})".strip(" |")
         supabase.table("contacts").update({"notes": merged_notes}).eq("id", target_c["id"]).execute()
-        
-        # Elimina il record duplicato dell'alias
         supabase.table("contacts").delete().eq("id", alias_c["id"]).execute()
         
-        # Pulisce i nodi nel grafo 3D
         alias_node_id = f"contact_{alias_c['id']}"
         supabase.table("nodes").delete().eq("id", alias_node_id).execute()
         supabase.table("edges").delete().eq("source", alias_node_id).execute()
