@@ -4,7 +4,10 @@ from datetime import datetime
 import httpx
 from fastapi import HTTPException
 from config import GROQ_API_KEY, GROQ_URL
-from database import save_fact, save_contact_entity, save_event_entity, save_interest_entity, get_contacts
+from database import (
+    save_fact, save_contact_entity, save_event_entity, 
+    save_interest_entity, get_contacts, get_all_interests
+)
 from tools import search_web, search_youtube, search_apple_music, search_image, send_telegram_message, send_telegram_voice_note
 from scraper import fetch_web_page
 
@@ -106,13 +109,22 @@ async def generate_peter_response(user_message: str, recent_context: str, long_t
     tool_exec = await model_1_route_tools(user_message, recent_context)
     now_str = datetime.now().strftime("%A %d %B %Y, %H:%M CET")
     
+    # Costruiamo il contesto delle passioni dell'utente per l'LLM
+    user_interests = get_all_interests()
+    interests_context = ""
+    if user_interests:
+        interests_context = "\n- Le tue passioni e attitudini principali:\n" + "\n".join([f"  * {i['name']}: {i['description']}" for i in user_interests])
+    
     system_prompt = (
-        f"Sei Peter, intelligenza artificiale avanzata e migliore amico di Marco.\n"
+        f"Sei Peter, intelligenza artificiale avanzata e sistema HUD di Marco.\n"
         f"DATA ATTUALE: {now_str}\n\n"
         "DIRETTIVE:\n"
-        "1. Sfrutta il contesto per collegare i discorsi precedenti.\n"
+        "1. Usa il contesto recente e le memorie per mantenere coerenza.\n"
         "2. Rispondi in modo brevissimo, diretto e colloquiale (stile iMessage), senza elenchi puntati o markdown pesante.\n"
     )
+
+    if interests_context:
+        system_prompt += f"\n\nCONTESTO IDENTITARIO DELL'UTENTE (Tienine conto nei tuoi ragionamenti):{interests_context}"
 
     if tool_exec["telegram_sent"]:
         system_prompt += "\n\n(Azione Telegram eseguita)."
@@ -125,17 +137,15 @@ async def generate_peter_response(user_message: str, recent_context: str, long_t
     if long_term_facts:
         system_prompt += f"\n\nMemorie permanenti:\n{long_term_facts}"
 
-    # Se l'utente ha allegato un'immagine, usiamo il modello Vision
     model_to_use = MODEL_SMART
-    user_content = user_message
-
     messages = [{"role": "system", "content": system_prompt}]
+    
     if image_data_url:
         model_to_use = MODEL_VISION
         messages.append({
             "role": "user",
             "content": [
-                {"type": "text", "text": user_message if user_message else "Analizza questa immagine e dammi dettagli."},
+                {"type": "text", "text": user_message if user_message else "Analizza questa immagine."},
                 {"type": "image_url", "image_url": {"url": image_data_url}}
             ]
         })
@@ -166,16 +176,17 @@ async def extract_and_save_facts(user_message: str, image_data_url: str = None):
         return
     
     extraction_prompt = (
-        "Analizza il messaggio o l'immagine fornita ed estrai entità strutturate in JSON rigoroso:\n"
+        "Analizza il messaggio o l'immagine ed estrai entità strutturate in JSON rigoroso:\n"
         "{\n"
         '  "fact": "fatto o memoria di chat permanente o NESSUNO",\n'
         '  "person_name": "nome persona o NESSUNO",\n'
-        '  "category": "famiglia / amicizia / amore / lavoro / altro",\n'
-        '  "birthday": "compleanno o data se presente o NESSUNO",\n'
-        '  "notes": "dettagli o legami relazionali o NESSUNO",\n'
+        '  "gender": "M / F / NESSUNO",\n'
+        '  "birth_year": anno_di_nascita_come_intero_o_NULL,\n'
+        '  "relation_type": "famiglia / amicizia / amore / lavoro / neutrale",\n'
+        '  "notes": "dettagli sulla persona o NESSUNO",\n'
         '  "event_title": "evento personale o NESSUNO",\n'
         '  "event_desc": "dettagli evento o NESSUNO",\n'
-        '  "interest_name": "interesse ricorrente o NESSUNO",\n'
+        '  "interest_name": "interesse/passione ricorrente dell\'utente o NESSUNO",\n'
         '  "interest_desc": "descrizione interesse o NESSUNO"\n'
         "}"
     )
@@ -212,9 +223,12 @@ async def extract_and_save_facts(user_message: str, image_data_url: str = None):
                     if parsed.get("person_name") and parsed.get("person_name") != "NESSUNO":
                         save_contact_entity(
                             name=parsed.get("person_name"),
-                            category=parsed.get("category", "amicizia"),
+                            category="contatto",
                             notes=parsed.get("notes", ""),
-                            birthday=parsed.get("birthday", "")
+                            birthday="", 
+                            gender=parsed.get("gender", "sconosciuto"),
+                            birth_year=parsed.get("birth_year"),
+                            relation_type=parsed.get("relation_type", "neutrale")
                         )
                         
                     if parsed.get("event_title") and parsed.get("event_title") != "NESSUNO":
