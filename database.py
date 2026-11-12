@@ -24,7 +24,7 @@ def get_recent_memories(limit: int = 10) -> str:
 def get_long_term_facts(limit: int = 30) -> str:
     if not supabase: return ""
     try:
-        res = supabase.table("user_facts").select("fact").order("created_at", desc=True).limit(limit).execute()
+        res = supabase.table("user_facts").select("*").order("created_at", desc=True).limit(limit).execute()
         if res.data:
             return "\n".join([f"- {item['fact']}" for item in res.data])
     except Exception:
@@ -68,7 +68,6 @@ def save_episodic_memory(user_msg: str, peter_reply: str):
 def save_fact(fact_text: str):
     if not supabase or not fact_text: return
     try:
-        # Evita duplicati identici
         existing = supabase.table("user_facts").select("*").eq("fact", fact_text).execute()
         if not existing.data:
             supabase.table("user_facts").insert([{"fact": fact_text}]).execute()
@@ -76,7 +75,7 @@ def save_fact(fact_text: str):
         pass
 
 def save_contact_entity(name: str, category: str = "amicizia", notes: str = "", gender: str = "sconosciuto", birth_year: int = None, relation_type: str = "neutrale"):
-    if not supabase or not name or name.upper() in ["NESSUNO", "MARCO", "BARBI"]: return
+    if not supabase or not name or name.upper() in ["NESSUNO", "MARCO", "BARBI", "MARCO BARBIERO TORRES"]: return
     try:
         res = supabase.table("contacts").select("*").ilike("name", name).execute()
         if not res.data:
@@ -94,6 +93,7 @@ def save_contact_entity(name: str, category: str = "amicizia", notes: str = "", 
             supabase.table("contacts").update({
                 "notes": updated_notes,
                 "gender": gender if gender != "sconosciuto" else existing.get("gender"),
+                "birth_year": birth_year if birth_year else existing.get("birth_year"),
                 "relation_type": relation_type if relation_type != "neutrale" else existing.get("relation_type")
             }).eq("id", existing["id"]).execute()
     except Exception as e:
@@ -156,16 +156,21 @@ def wipe_table_data(table_type: str) -> bool:
         if table_type == "memories":
             supabase.table("memories").delete().neq("id", dummy_uuid).execute()
             supabase.table("user_facts").delete().neq("id", dummy_uuid).execute()
+            supabase.table("nodes").delete().eq("type", "memory").execute()
         elif table_type == "contacts":
             supabase.table("contacts").delete().neq("id", dummy_uuid).execute()
+            supabase.table("nodes").delete().eq("type", "person").execute()
         elif table_type == "events":
             supabase.table("calendar_events").delete().neq("id", dummy_uuid).execute()
+            supabase.table("nodes").delete().eq("type", "event").execute()
         elif table_type == "all":
             supabase.table("memories").delete().neq("id", dummy_uuid).execute()
             supabase.table("user_facts").delete().neq("id", dummy_uuid).execute()
             supabase.table("contacts").delete().neq("id", dummy_uuid).execute()
             supabase.table("calendar_events").delete().neq("id", dummy_uuid).execute()
             supabase.table("interests").delete().neq("id", dummy_uuid).execute()
+            supabase.table("nodes").delete().neq("id", "user_self").execute()
+            supabase.table("edges").delete().neq("id", dummy_uuid).execute()
         return True
     except Exception as e:
         print(f"Wipe error: {e}")
