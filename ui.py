@@ -5,23 +5,24 @@ def get_dashboard_html() -> str:
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>PETER HUD OS v8.4 - Neural Galaxy</title>
+        <title>PETER HUD OS v9.0 - Neural Galaxy</title>
         <style>
             :root { 
-                --bg-main: #04060d; 
-                --panel-bg: rgba(10, 17, 32, 0.85); 
-                --glass-border: rgba(0, 240, 255, 0.22); 
+                --bg-main: #03050a; 
+                --panel-bg: rgba(9, 15, 29, 0.88); 
+                --glass-border: rgba(0, 240, 255, 0.2); 
                 --accent-cyan: #00f0ff; 
                 --accent-purple: #8b5cf6; 
                 --accent-green: #10b981; 
                 --accent-pink: #ec4899;
+                --accent-yellow: #f59e0b;
                 --text-bright: #f8fafc; 
                 --text-dim: #94a3b8; 
             }
             * { box-sizing: border-box; margin: 0; padding: 0; font-family: "Inter", sans-serif; }
-            body { background: radial-gradient(circle at 50% 20%, #0c162d 0%, #04060d 100%); color: var(--text-bright); height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+            body { background: radial-gradient(circle at 50% 20%, #0b1329 0%, #03050a 100%); color: var(--text-bright); height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
             
-            header { height: 56px; border-bottom: 1px solid var(--glass-border); padding: 0 24px; display: flex; align-items: center; justify-content: space-between; background: rgba(4, 6, 13, 0.92); backdrop-filter: blur(20px); z-index: 100; flex-shrink: 0; }
+            header { height: 56px; border-bottom: 1px solid var(--glass-border); padding: 0 24px; display: flex; align-items: center; justify-content: space-between; background: rgba(3, 5, 10, 0.92); backdrop-filter: blur(20px); z-index: 100; flex-shrink: 0; }
             .header-brand { display: flex; align-items: center; gap: 12px; }
             .logo-orb { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple)); display: flex; align-items: center; justify-content: center; box-shadow: 0 0 20px rgba(0, 240, 255, 0.5); font-weight: 900; font-size: 13px; color: #000; }
             .header-title { font-size: 13px; font-weight: 800; letter-spacing: 3px; text-transform: uppercase; background: linear-gradient(90deg, #fff, var(--accent-cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
@@ -68,21 +69,23 @@ def get_dashboard_html() -> str:
 
             .reasoning-box { background: rgba(0,0,0,0.5); border: 1px solid rgba(0,240,255,0.2); border-radius: 10px; padding: 8px; font-size: 10px; font-family: monospace; color: var(--accent-cyan); flex: 1; overflow-y: auto; }
 
-            .bottom-command-bar { height: 64px; border-top: 1px solid var(--glass-border); padding: 0 24px; display: flex; align-items: center; gap: 16px; background: rgba(4, 6, 13, 0.95); backdrop-filter: blur(20px); flex-shrink: 0; }
-            .cmd-input-container { flex: 1; display: flex; align-items: center; background: rgba(15, 23, 42, 0.7); border: 1px solid var(--glass-border); border-radius: 30px; padding: 6px 8px 6px 20px; transition: border-color 0.3s; }
+            .bottom-command-bar { height: 64px; border-top: 1px solid var(--glass-border); padding: 0 24px; display: flex; align-items: center; gap: 12px; background: rgba(3, 5, 10, 0.95); backdrop-filter: blur(20px); flex-shrink: 0; }
+            .cmd-input-container { flex: 1; display: flex; align-items: center; background: rgba(15, 23, 42, 0.7); border: 1px solid var(--glass-border); border-radius: 30px; padding: 4px 8px 4px 16px; transition: border-color 0.3s; gap: 8px; }
             .cmd-input-container:focus-within { border-color: var(--accent-cyan); box-shadow: 0 0 15px rgba(0,240,255,0.2); }
             .cmd-input { flex: 1; background: transparent; border: none; outline: none; color: #fff; font-size: 13px; }
-            .cmd-btn { padding: 10px 24px; background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue)); color: #000; border: none; border-radius: 24px; font-weight: 800; font-size: 12px; cursor: pointer; transition: transform 0.2s; }
+            .file-upload-btn { background: transparent; border: none; color: var(--text-dim); cursor: pointer; font-size: 16px; transition: color 0.2s; }
+            .file-upload-btn:hover { color: var(--accent-cyan); }
+            .cmd-btn { padding: 10px 20px; background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple)); color: #000; border: none; border-radius: 24px; font-weight: 800; font-size: 12px; cursor: pointer; transition: transform 0.2s; }
             .cmd-btn:hover { transform: scale(1.03); }
 
-            /* NEURAL GALAXY 3D (OBSIDIAN STYLE) */
-            #nexus-graph-canvas { width: 100%; height: 100%; display: block; background: #04060d; cursor: grab; }
+            /* NEURAL GALAXY 3D CANVAS & TOOLBAR */
+            #nexus-graph-canvas { width: 100%; height: 100%; display: block; background: #03050a; cursor: grab; }
             #nexus-graph-canvas:active { cursor: grabbing; }
-            .nexus-toolbar { position: absolute; top: 16px; left: 16px; display: flex; gap: 6px; z-index: 10; background: rgba(10,17,32,0.9); padding: 8px 12px; border-radius: 12px; border: 1px solid var(--glass-border); backdrop-filter: blur(12px); flex-wrap: wrap; }
-            .nexus-filter-btn { background: rgba(0,240,255,0.1); border: 1px solid rgba(0,240,255,0.3); color: var(--text-bright); padding: 5px 12px; border-radius: 8px; font-size: 10px; font-weight: 700; cursor: pointer; transition: all 0.2s; }
+            .nexus-toolbar { position: absolute; top: 16px; left: 16px; display: flex; gap: 6px; z-index: 10; background: rgba(9,15,29,0.9); padding: 8px 12px; border-radius: 12px; border: 1px solid var(--glass-border); backdrop-filter: blur(12px); flex-wrap: wrap; }
+            .nexus-filter-btn { background: rgba(0,240,255,0.1); border: 1px solid rgba(0,240,255,0.3); color: var(--text-bright); padding: 5px 10px; border-radius: 8px; font-size: 10px; font-weight: 700; cursor: pointer; transition: all 0.2s; }
             .nexus-filter-btn.active, .nexus-filter-btn:hover { background: var(--accent-cyan); color: #000; box-shadow: 0 0 12px rgba(0,240,255,0.5); }
             
-            .nexus-inspector { position: absolute; bottom: 16px; right: 16px; width: 300px; background: rgba(10,17,32,0.96); border: 1px solid var(--accent-cyan); border-radius: 14px; padding: 16px; display: none; z-index: 10; backdrop-filter: blur(18px); box-shadow: 0 10px 30px rgba(0,0,0,0.7); }
+            .nexus-inspector { position: absolute; bottom: 16px; right: 16px; width: 300px; background: rgba(9,15,29,0.96); border: 1px solid var(--accent-cyan); border-radius: 14px; padding: 16px; display: none; z-index: 10; backdrop-filter: blur(18px); box-shadow: 0 10px 30px rgba(0,0,0,0.7); }
 
             @media (max-width: 900px) {
                 .command-grid { grid-template-columns: 1fr; grid-template-rows: auto 1fr; height: auto; overflow-y: auto; }
@@ -103,7 +106,7 @@ def get_dashboard_html() -> str:
             <aside class="sidebar-panel">
                 <div class="nav-menu">
                     <div class="nav-item active" onclick="switchMainView('hud')">🌐 Dashboard AI</div>
-                    <div class="nav-item" onclick="switchMainView('nexus')">🕸️ Second Brain 3D</div>
+                    <div class="nav-item" onclick="switchMainView('nexus')">🕸️ Neural Galaxy Graph</div>
                 </div>
                 <div class="peter-avatar-card">
                     <canvas id="peter-avatar-canvas" title="Clicca per parlare a voce con Peter"></canvas>
@@ -129,18 +132,19 @@ def get_dashboard_html() -> str:
                     <section class="feed-panel">
                         <div class="panel-header"><span>LIVE DIALOG FEED</span><span style="font-size: 10px; color: var(--accent-green);">● READY</span></div>
                         <div id="chat-feed">
-                            <div class="msg peter">Second Brain 3D rigenerato con grafica galattica e layer separati per persone, memorie ed eventi. Esplora liberamente!</div>
+                            <div class="msg peter">Neural Galaxy v9.0 attiva. Puoi chattare, inviare immagini col tasto 📎 per estrarre entità nel grafo, o esplorare le zone 3D.</div>
                         </div>
                     </section>
                 </div>
 
-                <!-- VISTA SECOND BRAIN 3D -->
+                <!-- VISTA NEURAL GALAXY 3D -->
                 <div id="view-nexus" class="view-tab" style="position: relative; overflow: hidden; border-radius: 20px; border: 1px solid var(--glass-border); height: 100%;">
                     <div class="nexus-toolbar">
                         <button class="nexus-filter-btn active" onclick="filterNexusLayer('all', this)">TUTTO</button>
                         <button class="nexus-filter-btn" onclick="filterNexusLayer('person', this)">👥 Persone</button>
                         <button class="nexus-filter-btn" onclick="filterNexusLayer('memory', this)">🧠 Memorie</button>
                         <button class="nexus-filter-btn" onclick="filterNexusLayer('event', this)">📅 Eventi</button>
+                        <button class="nexus-filter-btn" onclick="filterNexusLayer('interest', this)">⚡ Interessi</button>
                     </div>
                     <canvas id="nexus-graph-canvas"></canvas>
                     <div id="nexus-inspector" class="nexus-inspector">
@@ -168,7 +172,9 @@ def get_dashboard_html() -> str:
 
         <footer class="bottom-command-bar">
             <div class="cmd-input-container">
-                <input type="text" id="cmd-input" class="cmd-input" placeholder="Parla con Peter..." autocomplete="off" />
+                <input type="file" id="file-input" style="display:none" accept="image/*" />
+                <button type="button" class="file-upload-btn" onclick="document.getElementById('file-input').click()" title="Allega immagine">📎</button>
+                <input type="text" id="cmd-input" class="cmd-input" placeholder="Parla con Peter o carica un'immagine..." autocomplete="off" />
                 <button type="button" id="send-cmd-btn" class="cmd-btn">INVIA</button>
             </div>
         </footer>
@@ -177,6 +183,14 @@ def get_dashboard_html() -> str:
             let currentAvatarState = 'IDLE';
             let activeNexusFilter = 'all';
             let nexusNodesCache = [];
+            let attachedFile = null;
+
+            document.getElementById('file-input').onchange = (e) => {
+                attachedFile = e.target.files[0];
+                if(attachedFile) {
+                    document.getElementById('cmd-input').placeholder = `Immagine allegata: ${attachedFile.name}`;
+                }
+            };
 
             setInterval(() => {
                 document.getElementById('live-clock').innerText = new Date().toTimeString().split(' ')[0];
@@ -267,14 +281,22 @@ def get_dashboard_html() -> str:
 
             async function sendMessage() {
                 const text = input.value.trim();
-                if(!text) return;
-                appendMsg(text, 'user');
+                if(!text && !attachedFile) return;
+                appendMsg(text || '[Immagine allegata]', 'user');
                 input.value = '';
                 currentAvatarState = 'THINKING';
 
+                const formData = new FormData();
+                formData.append('message', text);
+                if(attachedFile) {
+                    formData.append('file', attachedFile);
+                    attachedFile = null;
+                    document.getElementById('cmd-input').placeholder = "Parla con Peter o carica un'immagine...";
+                }
+
                 try {
                     const res = await fetch('/chat', {
-                        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: text })
+                        method: 'POST', body: formData
                     });
                     const data = await res.json();
                     if(data.reply) {
@@ -328,7 +350,7 @@ def get_dashboard_html() -> str:
                 }
             }
 
-            // MOTORE GRAFICO SECOND BRAIN 3D // ALTA QUALITÀ VISIVA (OBSIDIAN STYLE)
+            // NEURAL GALAXY 3D GRAPH ENGINE (OBSIDIAN STYLE - ZOOM, PAN, ZONES & COLOR DOTS)
             async function loadNexus3D() {
                 const canvas = document.getElementById('nexus-graph-canvas');
                 if(!canvas) return;
@@ -390,16 +412,17 @@ def get_dashboard_html() -> str:
 
                         const filteredNodes = nexusNodesCache.filter(n => activeNexusFilter === 'all' || n.type === activeNexusFilter || n.type === 'core');
 
-                        // Linee di connessione laser
-                        ctx.lineWidth = 1.2;
+                        // Linee di connessione a cascata (Neural Web)
+                        ctx.lineWidth = 1.0;
                         filteredNodes.forEach((n) => {
                             if(n.type === 'core') return;
                             let px = panX + (n.x * zoom);
                             let py = panY + (n.y * zoom);
 
-                            if(n.type === 'person') ctx.strokeStyle = 'rgba(0, 240, 255, 0.35)';
-                            else if(n.type === 'memory') ctx.strokeStyle = 'rgba(139, 92, 246, 0.35)';
-                            else ctx.strokeStyle = 'rgba(236, 72, 153, 0.35)';
+                            if(n.type === 'person') ctx.strokeStyle = 'rgba(0, 240, 255, 0.28)';
+                            else if(n.type === 'memory') ctx.strokeStyle = 'rgba(139, 92, 246, 0.28)';
+                            else if(n.type === 'event') ctx.strokeStyle = 'rgba(236, 72, 153, 0.28)';
+                            else ctx.strokeStyle = 'rgba(245, 158, 11, 0.28)';
 
                             ctx.beginPath();
                             ctx.moveTo(panX, panY);
@@ -407,41 +430,43 @@ def get_dashboard_html() -> str:
                             ctx.stroke();
                         });
 
-                        // Nodi sferici tridimensionali con bagliore
+                        // Pallini colorati luminosi (Senza etichette invasive di default, stile Obsidian)
                         filteredNodes.forEach((n) => {
                             let px = panX + (n.x * zoom);
                             let py = panY + (n.y * zoom);
 
                             projectedNodes.push({ px, py, node: n });
 
-                            let radius = (n.type === 'core' ? 16 : 8) * zoom;
+                            let radius = (n.type === 'core' ? 16 : 6) * zoom;
 
-                            // Bagliore esterno
                             ctx.beginPath();
-                            ctx.arc(px, py, radius * 1.6, 0, Math.PI * 2);
-                            if(n.type === 'core') ctx.fillStyle = 'rgba(16, 185, 129, 0.25)';
-                            else if(n.type === 'person') ctx.fillStyle = 'rgba(0, 240, 255, 0.25)';
-                            else if(n.type === 'memory') ctx.fillStyle = 'rgba(139, 92, 246, 0.25)';
-                            else ctx.fillStyle = 'rgba(236, 72, 153, 0.25)';
+                            ctx.arc(px, py, radius * 1.8, 0, Math.PI * 2);
+                            if(n.type === 'core') ctx.fillStyle = 'rgba(16, 185, 129, 0.3)';
+                            else if(n.type === 'person') ctx.fillStyle = 'rgba(0, 240, 255, 0.3)';
+                            else if(n.type === 'memory') ctx.fillStyle = 'rgba(139, 92, 246, 0.3)';
+                            else if(n.type === 'event') ctx.fillStyle = 'rgba(236, 72, 153, 0.3)';
+                            else ctx.fillStyle = 'rgba(245, 158, 11, 0.3)';
                             ctx.fill();
 
-                            // Sfera principale
                             ctx.beginPath();
                             ctx.arc(px, py, radius, 0, Math.PI * 2);
                             if(n.type === 'core') ctx.fillStyle = '#10b981'; // Verde Core
                             else if(n.type === 'person') ctx.fillStyle = '#00f0ff'; // Ciano Persone
                             else if(n.type === 'memory') ctx.fillStyle = '#8b5cf6'; // Viola Memorie
                             else if(n.type === 'event') ctx.fillStyle = '#ec4899'; // Rosa Eventi
+                            else ctx.fillStyle = '#f59e0b'; // Ambra Interessi
                             
-                            ctx.shadowBlur = 14;
+                            ctx.shadowBlur = 12;
                             ctx.shadowColor = ctx.fillStyle;
                             ctx.fill();
                             ctx.shadowBlur = 0;
 
-                            // Etichetta testuale leggibile
-                            ctx.fillStyle = '#f8fafc';
-                            ctx.font = `bold ${Math.max(10, 11 * zoom)}px Inter`;
-                            ctx.fillText(n.name, px + radius + 6, py + 4);
+                            // Mostra il nome solo se il nodo è il core o se si è fatto zoom in avanti
+                            if(n.type === 'core' || zoom > 1.8) {
+                                ctx.fillStyle = '#f8fafc';
+                                ctx.font = `${Math.max(9, 10 * zoom)}px Inter`;
+                                ctx.fillText(n.name, px + radius + 6, py + 4);
+                            }
                         });
 
                         requestAnimationFrame(drawGraph);
