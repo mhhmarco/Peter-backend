@@ -5,6 +5,7 @@ try:
     import tempfile
     import os
     import base64
+    from pathlib import Path
     import httpx
     import edge_tts
     from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form, WebSocket, WebSocketDisconnect, BackgroundTasks
@@ -12,7 +13,7 @@ try:
     from pydantic import BaseModel
 
     from database import (
-        supabase, supabase_error_log, get_recent_memories, 
+        supabase, supabase_error_log, get_recent_memories,
         get_long_term_facts, delete_fact_by_id, update_fact_by_id,
         save_episodic_memory, save_contacts_batch, get_contacts,
         save_calendar_events_batch, get_personality_settings, save_personality_settings,
@@ -23,30 +24,54 @@ try:
     from ui import get_dashboard_html
     from importer import parse_vcard, fetch_and_parse_ical
     from config import GROQ_API_KEY
-except Exception as e:
+except Exception:
     print("CRITICAL IMPORT/STARTUP ERROR:", file=sys.stderr)
     traceback.print_exc(file=sys.stderr)
     sys.exit(1)
 
 app = FastAPI(title="Peter OS Backend v10 - WebGL Edition")
 
+
 class TTSRequest(BaseModel):
     text: str
+
 
 class FactUpdateRequest(BaseModel):
     fact: str
 
+
 class ICalRequest(BaseModel):
     url: str
 
+
 @app.get("/ping")
 def ping():
-    """Endpoint di Keep-Alive per mantenere attivo il server su Render."""
+    """Keep-alive endpoint."""
     return {"status": "alive"}
+
 
 @app.get("/", response_class=HTMLResponse)
 def root_dashboard():
-    return get_dashboard_html()
+    # Load the player enhancement after the dashboard's existing inline script,
+    # so it can replace the old autoplay iframe with the IFrame Player API.
+    html = get_dashboard_html().replace(
+        "</body>", '<script src="/player.js"></script></body>'
+    )
+    return HTMLResponse(content=html)
+
+
+@app.get("/player.js")
+def youtube_player_script():
+    script_path = Path(__file__).with_name("player.js")
+    try:
+        return Response(
+            content=script_path.read_text(encoding="utf-8"),
+            media_type="application/javascript",
+            headers={"Cache-Control": "no-cache"},
+        )
+    except OSError as e:
+        raise HTTPException(status_code=500, detail="Player script non disponibile") from e
+
 
 @app.get("/memories")
 def check_memories():
@@ -58,52 +83,60 @@ def check_memories():
         return {
             "connected": True,
             "episodic_memories": res_mem.data,
-            "long_term_facts": res_facts.data
+            "long_term_facts": res_facts.data,
         }
     except Exception as e:
         return {"connected": False, "error": f"Errore lettura: {str(e)}"}
+
 
 @app.get("/api/nexus")
 def api_get_nexus():
     return get_nexus_graph_data()
 
+
 @app.get("/api/contacts")
 def api_get_contacts():
     return get_contacts()
 
+
 @app.post("/api/tts")
 async def api_tts_speech(req: TTSRequest):
+    tmp_path = None
     try:
         tts = edge_tts.Communicate(req.text, voice="it-IT-DiegoNeural")
         with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_mp3:
-            await tts.save(tmp_mp3.name)
-            with open(tmp_mp3.name, "rb") as f:
-                audio_bytes = f.read()
-            os.remove(tmp_mp3.name)
+            tmp_path = tmp_mp3.name
+        await tts.save(tmp_path)
+        with open(tmp_path, "rb") as audio_file:
+            audio_bytes = audio_file.read()
         return Response(content=audio_bytes, media_type="audio/mp3")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            os.remove(tmp_path)
+
 
 @app.put("/api/facts/{fact_id}")
 def api_update_fact(fact_id: str, req: FactUpdateRequest):
-    success = update_fact_by_id(fact_id, req.fact)
-    if not success:
+    if not update_fact_by_id(fact_id, req.fact):
         raise HTTPException(status_code=500, detail="Impossibile aggiornare il fatto")
     return {"status": "updated"}
 
+
 @app.delete("/api/facts/{fact_id}")
 def api_delete_fact(fact_id: str):
-    success = delete_fact_by_id(fact_id)
-    if not success:
+    if not delete_fact_by_id(fact_id):
         raise HTTPException(status_code=500, detail="Impossibile eliminare il fatto")
     return {"status": "deleted"}
 
+
 @app.delete("/api/wipe/{data_type}")
 def api_wipe_data(data_type: str):
-    success = wipe_table_data(data_type)
-    if not success:
+    if not wipe_table_data(data_type):
         raise HTTPException(status_code=500, detail="Errore durante il wipe dei dati")
     return {"status": "success", "wiped": data_type}
+
 
 @app.post("/api/import/vcf")
 async def import_vcf(file: UploadFile = File(...)):
@@ -115,6 +148,7 @@ async def import_vcf(file: UploadFile = File(...)):
         return {"status": "success", "count": len(contacts)}
     return {"status": "no_contacts_found"}
 
+
 @app.post("/api/import/ical")
 async def import_ical(req: ICalRequest):
     events = await fetch_and_parse_ical(req.url)
@@ -123,14 +157,17 @@ async def import_ical(req: ICalRequest):
         return {"status": "success", "count": len(events)}
     return {"status": "no_events_found"}
 
+
 @app.get("/api/personality")
 def api_get_personality():
     return get_personality_settings()
+
 
 @app.post("/api/personality")
 def api_save_personality(settings: dict):
     save_personality_settings(settings)
     return {"status": "updated"}
+
 
 @app.post("/telegram/webhook")
 async def telegram_webhook(request: Request, background_tasks: BackgroundTasks):
@@ -138,11 +175,12 @@ async def telegram_webhook(request: Request, background_tasks: BackgroundTasks):
     background_tasks.add_task(process_telegram_update, update)
     return {"status": "ok"}
 
+
 @app.post("/chat")
 async def chat_endpoint(
     message: str = Form(""),
     file: UploadFile = File(None),
-    background_tasks: BackgroundTasks = None
+    background_tasks: BackgroundTasks = None,
 ):
     recent_context = get_recent_memories(limit=8)
     long_term_facts = get_long_term_facts(limit=15)
@@ -154,18 +192,23 @@ async def chat_endpoint(
         mime = file.content_type or "image/jpeg"
         image_data_url = f"data:{mime};base64,{encoded}"
 
-    result = await generate_peter_response(message, recent_context, long_term_facts, image_data_url=image_data_url)
+    result = await generate_peter_response(
+        message, recent_context, long_term_facts, image_data_url=image_data_url
+    )
     reply = result["reply"]
-    query_used = result.get("query_used")
-    media = result.get("media")
-    screen = result.get("screen")
-    reasoning = result.get("reasoning")
-
     save_episodic_memory(message if message else "[Immagine]", reply)
+
     if background_tasks:
         background_tasks.add_task(extract_and_save_facts, message, image_data_url)
 
-    return {"reply": reply, "query_used": query_used, "media": media, "screen": screen, "reasoning": reasoning}
+    return {
+        "reply": reply,
+        "query_used": result.get("query_used"),
+        "media": result.get("media"),
+        "screen": result.get("screen"),
+        "reasoning": result.get("reasoning"),
+    }
+
 
 @app.websocket("/ws/voice")
 async def websocket_voice_endpoint(websocket: WebSocket):
@@ -183,12 +226,12 @@ async def websocket_voice_endpoint(websocket: WebSocket):
             user_text = ""
             try:
                 async with httpx.AsyncClient(timeout=10.0) as client:
-                    with open(tmp_path, "rb") as f:
+                    with open(tmp_path, "rb") as audio_file:
                         res = await client.post(
                             "https://api.groq.com/openai/v1/audio/transcriptions",
                             headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
-                            files={"file": ("audio.wav", f, "audio/wav")},
-                            data={"model": "whisper-large-v3-turbo", "language": "it"}
+                            files={"file": ("audio.wav", audio_file, "audio/wav")},
+                            data={"model": "whisper-large-v3-turbo", "language": "it"},
                         )
                         if res.status_code == 200:
                             user_text = res.json().get("text", "").strip()
@@ -203,24 +246,25 @@ async def websocket_voice_endpoint(websocket: WebSocket):
             long_term_facts = get_long_term_facts(limit=10)
             llm_res = await generate_peter_response(user_text, recent_context, long_term_facts)
             reply_text = llm_res["reply"]
-            screen_data = llm_res.get("screen")
-            reasoning_data = llm_res.get("reasoning")
-
             save_episodic_memory(user_text, reply_text)
             await extract_and_save_facts(user_text)
 
-            tts = edge_tts.Communicate(reply_text, voice="it-IT-DiegoNeural")
             with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_mp3:
-                await tts.save(tmp_mp3.name)
-                with open(tmp_mp3.name, "rb") as f_mp3:
-                    audio_out = f_mp3.read()
-                os.remove(tmp_mp3.name)
+                tmp_mp3_path = tmp_mp3.name
+            try:
+                tts = edge_tts.Communicate(reply_text, voice="it-IT-DiegoNeural")
+                await tts.save(tmp_mp3_path)
+                with open(tmp_mp3_path, "rb") as audio_file:
+                    audio_out = audio_file.read()
+            finally:
+                if os.path.exists(tmp_mp3_path):
+                    os.remove(tmp_mp3_path)
 
             await websocket.send_json({
                 "user_text": user_text,
                 "reply_text": reply_text,
-                "screen": screen_data,
-                "reasoning": reasoning_data
+                "screen": llm_res.get("screen"),
+                "reasoning": llm_res.get("reasoning"),
             })
             await websocket.send_bytes(audio_out)
 
