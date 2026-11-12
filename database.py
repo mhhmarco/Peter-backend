@@ -85,6 +85,23 @@ def save_calendar_events_batch(events: list):
     except Exception as e:
         print(f"Errore salvataggio eventi batch: {e}")
 
+def save_interest_entity(name: str, category: str = "generale", notes: str = ""):
+    if not supabase or not name: return
+    try:
+        res = supabase.table("interests").select("*").ilike("name", name).execute()
+        if not res.data:
+            supabase.table("interests").insert([{
+                "name": name, "category": category, "notes": notes
+            }]).execute()
+        else:
+            existing = res.data[0]
+            updated_notes = (existing.get("notes", "") + f" | {notes}").strip(" |")
+            supabase.table("interests").update({
+                "notes": updated_notes
+            }).eq("id", existing["id"]).execute()
+    except Exception as e:
+        print(f"Errore salvataggio interesse: {e}")
+
 def merge_contact_aliases(alias_name: str, target_name: str) -> bool:
     if not supabase: return False
     try:
