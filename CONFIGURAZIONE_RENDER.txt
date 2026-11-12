@@ -1,0 +1,88 @@
+GUIDA CONFIGURAZIONE PETER BACKEND SU RENDER
+============================================
+
+Questa guida descrive le variabili d'ambiente usate dal backend. Le chiavi sono
+segreti: inseriscile nella dashboard Render, non nel codice e non in GitHub.
+
+1. COLLEGARE IL REPOSITORY A RENDER
+-----------------------------------
+- In Render crea/apri un servizio Web Service collegato a mhhmarco/Peter-backend.
+- Branch: main (o il branch effettivamente collegato al servizio).
+- Root Directory: lascia vuoto se i file Python sono nella root del repository.
+- Build Command: pip install -r requirements.txt
+- Start Command: uvicorn main:app --host 0.0.0.0 --port $PORT
+- Dopo ogni push, controlla il deploy e i log. Il build deve terminare con
+  “Build successful”; poi Uvicorn deve avviarsi senza traceback.
+
+2. DOVE INSERIRE LE VARIABILI SU RENDER
+---------------------------------------
+Render Dashboard -> servizio Peter -> Environment -> Environment Variables.
+Aggiungi ogni coppia Name / Value e salva. Render riavvia o richiede un nuovo
+Deploy per applicare le variabili. Non mettere virgolette attorno ai valori.
+
+Variabili richieste / opzionali:
+
+SUPABASE_URL
+  URL del progetto Supabase. Supabase Dashboard -> Project Settings -> API
+  (o Data API, a seconda della versione della dashboard) -> Project URL.
+
+SUPABASE_KEY
+  Chiave API del progetto Supabase, dalla stessa pagina delle API. Il backend
+  usa questa chiave solo lato server. Non inserirla mai nel JavaScript pubblico.
+  Configura le policy RLS appropriate alle tabelle e all'uso del servizio.
+
+FREELLM_API_KEY
+  Chiave API Groq, richiesta per le risposte AI. Si crea/gestisce nella console
+  Groq: https://console.groq.com/keys . Nel codice la variabile si chiama
+  FREELLM_API_KEY anche se il valore è una chiave Groq.
+
+YOUTUBE_API_KEY  (opzionale, consigliata per risultati più affidabili)
+  Crea una chiave Google Cloud e abilita “YouTube Data API v3” sul progetto:
+  https://console.cloud.google.com/apis/library/youtube.googleapis.com
+  Poi crea la API key in Google Cloud -> APIs & Services -> Credentials.
+  In Render imposta YOUTUBE_API_KEY con quella chiave. Limita la chiave a
+  YouTube Data API v3 e, se possibile, alle API consentite. La chiave resta sul
+  backend; non inserirla nella pagina HTML o in player.js. Senza questa chiave
+  Peter usa la ricerca alternativa già prevista, che può restituire video non
+  incorporabili.
+
+TELEGRAM_BOT_TOKEN  (opzionale, solo se usi Telegram)
+  Crea/recupera il token tramite @BotFather su Telegram. Se il token è stato
+  esposto, revocalo e creane uno nuovo. Il bot memorizza il chat ID quando riceve
+  un messaggio e Supabase è configurato.
+
+3. PLAYER YOUTUBE: COSA ASPETTARSI
+----------------------------------
+Il player HUD usa la YouTube IFrame Player API ufficiale e mostra play/pausa,
+stop, seek, volume/mute e un collegamento diretto a YouTube. Per rispettare le
+regole del browser la riproduzione parte dopo un click, non con autoplay
+forzato. Alcuni proprietari disabilitano l'embed: gli errori 101/150 non possono
+essere aggirati dal codice; usa “Apri su YouTube” o “Cerca un altro video”.
+L'errore 153 può dipendere dal referrer/browser o da un URL non pubblico: prova
+il dominio HTTPS pubblico del servizio Render, non un'anteprima locale/incognita.
+La chiave YouTube migliora la selezione verificando se il risultato è
+incorporabile, ma non garantisce che ogni video sia disponibile in ogni paese,
+account o dispositivo.
+
+4. CONTROLLI DOPO IL DEPLOY
+---------------------------
+- Apri https://TUO-SERVIZIO.onrender.com/ping: deve rispondere {"status":"alive"}.
+- Apri la dashboard dallo stesso dominio HTTPS.
+- Invia un comando esplicito, ad esempio “cerca su YouTube e riproduci
+  [titolo/artista]”.
+- Se il player mostra un errore, apri la console del browser (F12 -> Console) e
+  annota il codice YouTube; gli errori 101/150 indicano restrizioni del video,
+  non un guasto di Render.
+- Se Render non parte, consulta Events e Logs e usa il primo traceback completo.
+
+5. SICUREZZA
+------------
+- Non committare file .env con chiavi reali.
+- Non incollare token o chiavi in issue, screenshot pubblici o chat.
+- Se una chiave è stata pubblicata, revocala e creane una nuova.
+- Conserva chiavi e credenziali esclusivamente nelle Environment Variables di
+  Render o in un secret manager.
+
+Nota: le etichette delle pagine Supabase/Google Cloud possono cambiare nel
+ tempo; cerca “Project URL/API keys” in Supabase e “YouTube Data API v3” in
+ Google Cloud Console se il menu è diverso.
