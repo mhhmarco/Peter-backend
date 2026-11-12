@@ -103,6 +103,13 @@ def get_long_term_facts(limit: int = 30) -> str:
     except Exception: pass
     return ""
 
+def save_episodic_memory(content: str):
+    if not supabase or not content: return
+    try:
+        supabase.table("memories").insert({"content": content}).execute()
+    except Exception as e:
+        print(f"Errore salvataggio memoria episodica: {e}")
+
 def delete_fact_by_id(fact_id: str) -> bool:
     if not supabase: return False
     try:
