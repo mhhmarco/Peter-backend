@@ -180,3 +180,28 @@ def get_telegram_chat_id() -> str:
     except Exception:
         pass
     return ""
+
+# -- NUOVA FUNZIONE WIPE DATA (FASE 4) --
+def wipe_table_data(table_type: str) -> bool:
+    """Svuota in blocco tabelle specifiche in base al tipo."""
+    if not supabase: return False
+    try:
+        # Usiamo neq("id", "0000...") come hack sicuro per fare una delete bulk su Supabase (elimina tutte le righe dove ID non è UUID nullo)
+        dummy_uuid = "00000000-0000-0000-0000-000000000000"
+        if table_type == "memories":
+            supabase.table("memories").delete().neq("id", dummy_uuid).execute()
+            supabase.table("user_facts").delete().neq("id", dummy_uuid).execute()
+        elif table_type == "contacts":
+            supabase.table("contacts").delete().neq("id", dummy_uuid).execute()
+        elif table_type == "events":
+            supabase.table("calendar_events").delete().neq("id", dummy_uuid).execute()
+        elif table_type == "all":
+            supabase.table("memories").delete().neq("id", dummy_uuid).execute()
+            supabase.table("user_facts").delete().neq("id", dummy_uuid).execute()
+            supabase.table("contacts").delete().neq("id", dummy_uuid).execute()
+            supabase.table("calendar_events").delete().neq("id", dummy_uuid).execute()
+            supabase.table("interests").delete().neq("id", dummy_uuid).execute()
+        return True
+    except Exception as e:
+        print(f"Errore WIPING dati {table_type}: {e}")
+        return False
