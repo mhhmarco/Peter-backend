@@ -1,10 +1,13 @@
 import sys
 import traceback
+import asyncio
+from contextlib import asynccontextmanager
 
 try:
     import tempfile
     import os
     import base64
+    from datetime import datetime
     from pathlib import Path
     import httpx
     import edge_tts
@@ -15,7 +18,7 @@ try:
 
     from database import (
         supabase, supabase_error_log, get_recent_memories,
-        get_long_term_facts, delete_fact_by_id, update_fact_by_id,
+        get_long_term_facts, get_structured_memory_overview, delete_fact_by_id, update_fact_by_id,
         save_episodic_memory, save_contacts_batch, get_contacts,
         save_calendar_events_batch, get_personality_settings, save_personality_settings,
         get_nexus_graph_data, wipe_table_data
@@ -25,7 +28,7 @@ try:
     from ui import get_dashboard_html
     from importer import parse_vcard, fetch_and_parse_ical
     from tools import search_image_result, search_youtube, youtube_api_status
-    from config import GROQ_API_KEY
+    from config import GROQ_API_KEY, RENDER_EXTERNAL_URL
     from nexus_views import router as nexus_views_router
     from relationship_extractor import extract_and_save_relationships
 except Exception:
@@ -33,7 +36,28 @@ except Exception:
     traceback.print_exc(file=sys.stderr)
     sys.exit(1)
 
-app = FastAPI(title="Peter OS Backend v10 - WebGL Edition")
+
+async def render_keep_alive_loop():
+    """Esegue un auto-ping periodico ogni 10 minuti per mantenere attiva l'istanza su Render."""
+    target = f"{RENDER_EXTERNAL_URL.rstrip('/')}/ping" if RENDER_EXTERNAL_URL else "http://127.0.0.1:10000/ping"
+    await asyncio.sleep(60)
+    while True:
+        try:
+            async with httpx.AsyncClient(timeout=8.0) as client:
+                await client.get(target)
+        except Exception as e:
+            print(f"Keep-alive ping info: {e}")
+        await asyncio.sleep(600)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    task = asyncio.create_task(render_keep_alive_loop())
+    yield
+    task.cancel()
+
+
+app = FastAPI(title="Peter OS Backend v11 - iOS 27 Liquid Glass Edition", lifespan=lifespan)
 app.include_router(nexus_views_router)
 
 
@@ -55,7 +79,7 @@ class ImageSearchRequest(BaseModel):
 
 @app.get("/ping")
 def ping():
-    return {"status": "alive"}
+    return {"status": "alive", "version": "v11", "timestamp": datetime.utcnow().isoformat()}
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -89,7 +113,6 @@ def ui_enhancements_script():
 
 @app.get("/api/youtube/status")
 def api_youtube_status():
-    """Check whether a YouTube Data API v3 key is configured (never expose it)."""
     return youtube_api_status()
 
 
@@ -114,6 +137,11 @@ def check_memories():
         return {"connected": True, "episodic_memories": res_mem.data, "long_term_facts": res_facts.data}
     except Exception as exc:
         return {"connected": False, "error": f"Errore lettura: {str(exc)}"}
+
+
+@app.get("/api/memories/structured")
+def api_structured_memories():
+    return get_structured_memory_overview()
 
 
 @app.get("/api/nexus")
@@ -222,7 +250,6 @@ async def chat_endpoint(message: str = Form(""), file: UploadFile = File(None),
     save_episodic_memory(message if message else "[Immagine]", reply)
     if background_tasks:
         background_tasks.add_task(extract_and_save_facts, message, image_data_url)
-        # This second pass writes only explicitly stated person-to-person / parent links.
         background_tasks.add_task(extract_and_save_relationships, message)
     return {"reply": reply, "query_used": result.get("query_used"), "media": result.get("media"),
             "screen": result.get("screen"), "reasoning": result.get("reasoning")}
