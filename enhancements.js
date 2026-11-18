@@ -10,100 +10,184 @@
     .topbar{border-radius:16px!important}.panel,.settings-card{border-radius:var(--radius)!important}.sidebar{background:rgba(10,15,24,.76)!important}
     .brandmark{box-shadow:0 0 24px rgba(131,232,244,.28)}.nav-btn,.btn,.filter-btn,.icon-btn,.commandbar button{border-radius:12px!important;transition:background .18s ease,transform .18s ease,border-color .18s ease!important}
     .nav-btn:hover,.btn:hover,.filter-btn:hover,.icon-btn:hover{transform:translateY(-1px);background:rgba(255,255,255,.09)!important}.nav-btn.active,.filter-btn.active{background:rgba(131,232,244,.13)!important;border-color:rgba(131,232,244,.35)!important}
-    .dashboard-grid{grid-template-columns:minmax(0,1fr) minmax(340px,.96fr)!important;gap:14px!important}.side-stack{min-width:0;grid-template-rows:minmax(340px,1fr) auto auto!important}.hud-card{min-height:400px!important}
-    .peter-player{width:100%!important;max-width:none!important;min-height:100%!important;gap:10px!important}.peter-player-frame{min-height:240px!important;aspect-ratio:16/9;flex:1 1 auto!important}
+    .dashboard-grid{grid-template-columns:minmax(0,1.08fr) minmax(320px,.92fr)!important;gap:14px!important}.side-stack{min-width:0;display:flex!important;flex-direction:column!important;gap:14px!important}.hud-card{min-height:360px!important;display:flex!important;flex-direction:column!important}.hud-content{flex:1 1 auto!important;min-height:280px!important;display:flex!important;flex-direction:column!important;overflow:hidden!important}
+    .peter-player{width:100%!important;max-width:none!important;min-height:100%!important;gap:10px!important}.peter-player-frame{min-height:220px!important;aspect-ratio:16/9;flex:1 1 auto!important}
     .brain-status{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 10px}.brain-chip{border:1px solid rgba(255,255,255,.13);border-radius:999px;padding:6px 10px;color:#d8eaff;background:rgba(255,255,255,.04);font:11px ui-monospace,monospace}
     #view-nexus{position:relative}.nexus-overview{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:-2px 0 10px}.nexus-overview .brain-chip{background:rgba(12,21,34,.78)}
     #nexus-3d-container{background:radial-gradient(ellipse at center,rgba(115,151,194,.17),transparent 68%)!important}.graph-view{position:relative;border:1px solid var(--line)!important;box-shadow:0 18px 55px rgba(0,0,0,.25)!important}
     .graph-view:after{content:"PETER MEMORY FIELD · LIVE";position:absolute;top:14px;left:16px;z-index:1;pointer-events:none;color:rgba(203,223,246,.48);font:9px ui-monospace,monospace;letter-spacing:.16em}
     .graph-toolbar,.graph-bottom,.graph-legend{backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}.graph-toolbar{background:rgba(8,13,22,.58)!important;border:1px solid rgba(255,255,255,.08)!important}
-    .reasoning{line-height:1.6!important;color:#b9c9dc!important}.msg{line-height:1.55}.commandbar{border-radius:18px!important}.commandbar input{min-width:0}.btn.primary{box-shadow:0 5px 22px rgba(83,211,255,.18)}
-    .peter-image-view{width:100%;height:100%;min-height:280px;display:grid;grid-template-rows:auto minmax(0,1fr);gap:10px;color:#f7f8fc}.peter-image-view h3{margin:0;color:#e4f2ff;font-size:14px}.peter-image-body{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(120px,.7fr);gap:12px;min-height:0}.peter-image-body img{width:100%;height:100%;min-height:220px;object-fit:contain;background:rgba(0,0,0,.22);border-radius:12px}.peter-image-info{overflow:auto;color:#b9c9dc;font-size:12px;line-height:1.6}.peter-image-info a{color:var(--cyan)}
+    .reasoning{line-height:1.6!important;color:#b9c9dc!important}.msg{line-height:1.55;white-space:pre-wrap;word-break:break-word}.commandbar{border-radius:18px!important}.commandbar input{min-width:0}.btn.primary{box-shadow:0 5px 22px rgba(83,211,255,.18)}
+
+    /* RESPONSIVE VISUAL HUD IMAGE & SEARCH CARDS */
+    .peter-image-view{width:100%;height:100%;display:flex;flex-direction:column;gap:10px;color:#f7f8fc;min-height:0}
+    .peter-image-header{display:flex;align-items:center;justify-content:space-between;gap:8px}
+    .peter-image-header h3{margin:0;color:#e4f2ff;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .peter-image-header a{color:var(--cyan);font:11px ui-monospace,monospace;text-decoration:none;white-space:nowrap}
+    .peter-image-stage{position:relative;flex:1 1 auto;min-height:190px;max-height:300px;display:flex;align-items:center;justify-content:center;background:rgba(3,7,14,.55);border:1px solid rgba(131,232,244,.16);border-radius:12px;overflow:hidden;padding:6px}
+    .peter-image-stage img{max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;border-radius:8px;transition:opacity .2s ease}
+    .peter-image-thumbs{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px;flex-shrink:0}
+    .peter-image-thumb{width:58px;height:44px;object-fit:cover;border-radius:8px;border:1px solid rgba(255,255,255,.14);cursor:pointer;opacity:.72;transition:all .15s ease;flex-shrink:0;background:#0a111d}
+    .peter-image-thumb:hover,.peter-image-thumb.active{opacity:1;border-color:var(--cyan);transform:translateY(-1px)}
+    .peter-image-caption{font-size:11.5px;color:#a8bbd2;line-height:1.45;max-height:64px;overflow-y:auto;padding-right:4px}
+    .peter-search-card{width:100%;height:100%;display:flex;flex-direction:column;gap:10px;overflow-y:auto;padding:4px}
+    .peter-search-card h3{margin:0;font-size:13px;color:var(--cyan);font-family:ui-monospace,monospace}
+    .peter-search-body{font-size:12.5px;line-height:1.55;color:#cfe0f5;white-space:pre-wrap}
+
     .route-pending{opacity:.72}.route-pending:before{content:"";display:inline-block;width:7px;height:7px;margin-right:8px;border-radius:50%;background:var(--cyan);box-shadow:0 0 12px var(--cyan);animation:peterPulse 1s infinite alternate}@keyframes peterPulse{to{opacity:.25}}
     .nexus-multi-graphs{margin:10px 0 14px}.nexus-graph-tabs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}.nexus-graph-tab{border:1px solid var(--line);border-radius:12px;background:rgba(14,24,38,.85);color:#d8eaff;padding:10px 14px;font:600 11px ui-monospace,monospace;letter-spacing:.05em;cursor:pointer}.nexus-graph-tab.active{background:rgba(83,211,255,.15);border-color:rgba(83,211,255,.5);color:#a8f4ff}.nexus-graph-caption{color:#aabbd0;font-size:12px;margin:0 0 9px}.nexus-graph-count{float:right;color:#9eb4cb;font:10px ui-monospace,monospace}.nexus-graph-canvas{height:min(68vh,720px);min-height:390px;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(ellipse at center,rgba(54,91,130,.18),rgba(4,8,15,.96) 70%)}.nexus-graph-error{padding:24px;color:#e6b5b5;font-size:13px}.graph-view.peter-legacy-hidden{display:none!important}
-    @media(max-width:1100px){.dashboard-grid{grid-template-columns:1fr!important}.side-stack{grid-template-rows:minmax(340px,1fr) auto auto!important}.hud-card{min-height:400px!important}}
-    @media(max-width:760px){.dashboard-grid{grid-template-columns:1fr!important}.side-stack{display:grid;grid-template-columns:1fr!important}.hud-card{min-height:360px!important}.hud-content{min-height:280px!important}.peter-image-body{grid-template-columns:1fr;grid-template-rows:minmax(180px,1fr) auto}.nexus-graph-canvas{height:65vh;min-height:360px}.nexus-graph-tab{flex:1 1 calc(50% - 8px)}}
+
+    @media(max-width:1100px){
+      .dashboard-grid{grid-template-columns:1fr!important}
+      .hud-card{min-height:340px!important}
+    }
+    @media(max-width:760px){
+      .dashboard-grid{grid-template-columns:1fr!important}
+      .hud-card{min-height:310px!important}
+      .hud-content{min-height:240px!important}
+      .peter-image-stage{min-height:160px;max-height:230px}
+      .nexus-graph-canvas{height:65vh;min-height:360px}
+      .nexus-graph-tab{flex:1 1 calc(50% - 8px)}
+    }
     @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition:none!important;scroll-behavior:auto!important}}
   `;
   document.head.appendChild(style);
 
-  // Warm the same-origin connection before the first command; this does not add
-  // a model call and keeps the existing routing/reasoning pipeline untouched.
   const warmConnection = () => fetch('/ping', { method: 'GET', cache: 'no-store' }).catch(() => {});
   if ('requestIdleCallback' in window) requestIdleCallback(warmConnection, { timeout: 1200 });
   else setTimeout(warmConnection, 300);
 
   const box = () => document.getElementById('hud-screen-content');
+
   function showImage(screen) {
     const container = box();
     if (!container || !screen?.image_url) return;
-    const root = document.createElement('div'); root.className = 'peter-image-view';
-    const title = document.createElement('h3'); title.textContent = screen.title || 'Immagine';
-    const body = document.createElement('div'); body.className = 'peter-image-body';
-    const img = document.createElement('img'); img.src = screen.image_url; img.alt = screen.title || 'Immagine trovata';
-    const info = document.createElement('div'); info.className = 'peter-image-info'; info.textContent = screen.content || 'Immagine trovata sul web.';
-    if (screen.source_url) {
-      const link = document.createElement('a'); link.href = screen.source_url; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = 'Apri fonte ↗';
-      info.append(document.createElement('br'), link);
-    }
-    img.addEventListener('error', () => { info.textContent = 'Immagine non accessibile direttamente; prova un’altra ricerca.'; }, { once: true });
-    body.append(img, info); root.append(title, body); container.replaceChildren(root);
-    const badge = document.getElementById('hud-status-badge'); if (badge) badge.textContent = 'ACTIVE // IMAGE';
-  }
-  const originalUpdateHud = window.updateHudScreen;
-  if (typeof originalUpdateHud === 'function') window.updateHudScreen = screen => {
-    if (screen?.type === 'IMAGE_PREVIEW' && screen.image_url) { showImage(screen); return; }
-    return originalUpdateHud(screen);
-  };
 
-  // Keep the normal /chat request as the sole reasoning pipeline. Render its
-  // reply immediately, then let image lookup enhance the HUD when it completes.
-  const input = document.getElementById('cmd-input');
-  const send = document.getElementById('send-cmd-btn');
-  let busy = false;
-  const imageIntent = text => /\b(immagin(?:e|i)|foto|fotografie)\b/i.test(text) && /\b(mostra(?:mi)?|cerca|trova|fammi vedere|voglio)\b/i.test(text);
-  async function sendImageRequest(event) {
-    if (!input || !imageIntent(input.value.trim()) || busy) return;
-    event.preventDefault(); event.stopImmediatePropagation(); busy = true;
-    if (send) send.disabled = true;
-    const message = input.value.trim(); input.value = '';
-    const feed = document.getElementById('chat-feed');
-    const append = (text, kind = 'peter') => {
-      if (!feed) return;
-      const el = document.createElement('div'); el.className = `msg ${kind}`; el.textContent = String(text);
-      if (kind === 'user') el.classList.add('route-pending');
-      feed.append(el); feed.scrollTop = feed.scrollHeight;
-      return el;
-    };
-    append(message, 'user');
-    const form = new FormData(); form.append('message', message);
-    const imagePromise = fetch('/api/images/search', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: message })
-    }).then(async response => ({ ok: response.ok, data: await response.json() })).catch(() => ({ ok: false, data: {} }));
-    try {
-      const chatResponse = await fetch('/chat', { method: 'POST', body: form });
-      const chat = await chatResponse.json();
-      if (!chatResponse.ok) throw new Error(chat.detail || 'Richiesta non riuscita');
-      append(chat.reply || 'Risposta vuota');
-      if (chat.reasoning) {
-        const reasoning = document.getElementById('reasoning-preview');
-        if (reasoning) reasoning.textContent = chat.reasoning;
+    const gallery = Array.isArray(screen.images) && screen.images.length
+      ? screen.images
+      : [{ title: screen.title, image_url: screen.image_url, thumbnail_url: screen.thumbnail_url || screen.image_url, source_url: screen.source_url || '' }];
+
+    let currentIndex = 0;
+
+    const root = document.createElement('div');
+    root.className = 'peter-image-view';
+
+    const header = document.createElement('div');
+    header.className = 'peter-image-header';
+    const title = document.createElement('h3');
+    title.textContent = screen.title || 'Visual Feed';
+    const sourceLink = document.createElement('a');
+    sourceLink.target = '_blank';
+    sourceLink.rel = 'noopener noreferrer';
+    sourceLink.textContent = 'Fonte ↗';
+    header.append(title, sourceLink);
+
+    const stage = document.createElement('div');
+    stage.className = 'peter-image-stage';
+    const mainImg = document.createElement('img');
+    mainImg.alt = screen.title || 'Immagine';
+    stage.append(mainImg);
+
+    const thumbsBar = document.createElement('div');
+    thumbsBar.className = 'peter-image-thumbs';
+
+    const caption = document.createElement('div');
+    caption.className = 'peter-image-caption';
+    caption.textContent = screen.content || '';
+
+    function selectImage(idx) {
+      const item = gallery[idx];
+      if (!item) return;
+      currentIndex = idx;
+      title.textContent = item.title || screen.title || 'Visual Feed';
+      if (item.source_url) {
+        sourceLink.href = item.source_url;
+        sourceLink.style.display = 'inline';
+      } else {
+        sourceLink.style.display = 'none';
       }
-      if (chat.screen && typeof window.updateHudScreen === 'function') window.updateHudScreen(chat.screen);
-      // Do not block chat/reasoning on a slower image provider.
-      imagePromise.then(result => { if (result.ok && result.data?.image_url) showImage({ type: 'IMAGE_PREVIEW', ...result.data }); });
-    } catch (error) {
-      append(`Errore: ${error.message}`, 'system');
-    } finally {
-      busy = false; if (send) send.disabled = false; input.focus();
-    }
-  }
-  if (send) send.addEventListener('click', sendImageRequest, true);
-  if (input) input.addEventListener('keydown', event => {
-    if (event.key === 'Enter' && !event.shiftKey && imageIntent(input.value.trim())) sendImageRequest(event);
-  }, true);
 
-  // Keep the existing Nexus graph, and offer focused 3D views backed by full-table data.
+      let triedThumb = false;
+      mainImg.onerror = () => {
+        if (!triedThumb && item.thumbnail_url && mainImg.src !== item.thumbnail_url) {
+          triedThumb = true;
+          mainImg.src = item.thumbnail_url;
+        } else if (currentIndex + 1 < gallery.length) {
+          selectImage(currentIndex + 1);
+        } else {
+          caption.textContent = 'Anteprima bloccata dal sito sorgente. Prova a chiedere un modello specifico.';
+        }
+      };
+      mainImg.src = item.image_url;
+
+      thumbsBar.querySelectorAll('.peter-image-thumb').forEach((el, i) => {
+        el.classList.toggle('active', i === idx);
+      });
+    }
+
+    if (gallery.length > 1) {
+      gallery.forEach((item, idx) => {
+        const t = document.createElement('img');
+        t.className = 'peter-image-thumb' + (idx === 0 ? ' active' : '');
+        t.src = item.thumbnail_url || item.image_url;
+        t.alt = item.title || `Anteprima ${idx + 1}`;
+        t.onerror = () => { t.style.display = 'none'; };
+        t.onclick = () => selectImage(idx);
+        thumbsBar.append(t);
+      });
+    }
+
+    root.append(header, stage);
+    if (gallery.length > 1) root.append(thumbsBar);
+    if (screen.content) root.append(caption);
+
+    container.replaceChildren(root);
+    selectImage(0);
+
+    const badge = document.getElementById('hud-status-badge');
+    if (badge) badge.textContent = 'ACTIVE // IMAGE_PREVIEW';
+  }
+
+  function showSearchPreview(screen) {
+    const container = box();
+    if (!container) return;
+    const card = document.createElement('div');
+    card.className = 'peter-search-card';
+    const h = document.createElement('h3');
+    h.textContent = `WEB INTEL // ${(screen.query || 'RICERCA').toUpperCase()}`;
+    const body = document.createElement('div');
+    body.className = 'peter-search-body';
+    body.textContent = screen.content || 'Nessun dettaglio testuale disponibile.';
+    card.append(h, body);
+    container.replaceChildren(card);
+    const badge = document.getElementById('hud-status-badge');
+    if (badge) badge.textContent = 'ACTIVE // WEB_INTEL';
+  }
+
+  function installHudHook() {
+    const originalUpdateHud = window.updateHudScreen;
+    if (typeof originalUpdateHud !== 'function') {
+      setTimeout(installHudHook, 30);
+      return;
+    }
+    if (originalUpdateHud.__peterEnhancedHook) return;
+    const wrapped = screen => {
+      if (screen?.type === 'IMAGE_PREVIEW' && screen.image_url) {
+        showImage(screen);
+        return;
+      }
+      if (screen?.type === 'SEARCH_PREVIEW') {
+        showSearchPreview(screen);
+        return;
+      }
+      return originalUpdateHud(screen);
+    };
+    wrapped.__peterEnhancedHook = true;
+    window.updateHudScreen = wrapped;
+  }
+  installHudHook();
+
+  // Mantiene intatti tutti i grafi 3D di Neural Nexus
   const graphView = document.getElementById('view-nexus');
   if (graphView) {
     const heading = graphView.querySelector('.view-heading');
