@@ -8,7 +8,7 @@ from config import GROQ_API_KEY, GROQ_URL
 from database import (
     save_fact, save_contact_entity, save_event_entity, 
     save_interest_entity, get_contacts, get_all_interests,
-    get_personality_settings, supabase
+    get_personality_settings, make_stable_id, supabase
 )
 from tools import (
     search_web, search_youtube, search_apple_music,
@@ -16,10 +16,9 @@ from tools import (
 )
 from scraper import fetch_web_page
 
-# --- ORCHESTRAZIONE MODELLI SECONDO I LIMITI GROQ ---
-MODEL_ROUTER = "llama-3.1-8b-instant" # Modello rapido e affidabile per JSON routing
-MODEL_CHAT = "openai/gpt-oss-120b"    # Modello ultra-smart per la conversazione
-MODEL_VISION = "qwen/qwen3.8-27b"     # Modello per immagini e worker di riserva
+MODEL_ROUTER = "llama-3.1-8b-instant"
+MODEL_CHAT = "openai/gpt-oss-120b"
+MODEL_VISION = "qwen/qwen3.8-27b"
 
 WORKER_MODELS = [
     "openai/gpt-oss-20b",
@@ -37,7 +36,7 @@ def truncate_text(text: str, max_chars: int, from_end: bool = False) -> str:
 
 
 def clean_reply_text(text: str) -> str:
-    """Rimuove simboli Markdown sporchi (**, ###, tabelle |, link [a](b)) mantenendo il testo naturale."""
+    """Rimuove simboli Markdown sporchi (**, ###, tabelle |, link [a](b))."""
     if not text:
         return ""
     text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
@@ -64,6 +63,38 @@ def clean_reply_text(text: str) -> str:
     return re.sub(r'\n{3,}', '\n\n', "\n".join(cleaned_lines)).strip()
 
 
+def _detect_intent_by_rules(user_message: str) -> tuple[str, str, str] | None:
+    """
+    Classificatore deterministico ad alta priorità:
+    1. YouTube / Video / Canzoni (prima di 'mostrami'!)
+    2. Apple Music
+    3. Domande informative / biografiche / prezzi ('chi è', 'cos'è', 'quanto costa')
+    4. Richieste visive pure ('mostrami', 'foto di', 'immagine di')
+    """
+    msg = user_message.strip()
+    low = msg.lower()
+
+    # 1. Media / Video / YouTube / Canzoni
+    if any(k in low for k in ["youtube", "canzone", "brano", "video", "trailer", "videoclip", "ascolta", "riproduci", "metti musica"]):
+        clean_q = re.sub(r'^(mostrami|fammi vedere|cerca|riproduci|metti|ascolta)\s+(una|un|il|la|lo)?\s*(canzone|brano|video|videoclip)?\s*(di|su)?\s*', '', low).strip()
+        clean_q = re.sub(r'\s+(da youtube|su youtube)$', '', clean_q).strip() or msg
+        if "apple music" in low:
+            return ("APPLE_MUSIC", "MEDIA_PLAYER", clean_q)
+        return ("YOUTUBE", "MEDIA_PLAYER", clean_q)
+
+    # 2. Domande biografiche, fattuali, prezzi, notizie
+    if any(k in low for k in ["chi è", "chi era", "chi sono", "cos'è", "cosa è", "cosa sono", "parlami di", "quanto costa", "prezzo di", "notizie su", "dove si trova"]):
+        clean_q = re.sub(r'^(chi è|chi era|chi sono|cos\'è|cosa è|cosa sono|parlami di|quanto costa|prezzo di|notizie su|dove si trova)\s+(un|una|uno|il|lo|la|i|gli|le|l\')?\s*', '', low).rstrip("?.!").strip() or msg
+        return ("WEB_SEARCH", "IMAGE_PREVIEW", clean_q)
+
+    # 3. Richieste visive pure
+    if any(k in low for k in ["mostrami", "fammi vedere", "foto di", "immagine di", "immagini di", "com'è fatto", "com'è fatta"]):
+        clean_q = re.sub(r'^(mostrami|fammi vedere|cerca foto di|cerca immagini di|foto di|immagine di)\s+(un|una|uno|il|lo|la|i|gli|le|l\')?\s*', '', low).rstrip("?.!").strip() or msg
+        return ("IMAGE_SEARCH", "IMAGE_PREVIEW", clean_q)
+
+    return None
+
+
 async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
     if not GROQ_API_KEY:
         return {"web": "", "media": None, "screen": None, "query_used": "", "telegram_sent": False, "reasoning": ""}
@@ -76,78 +107,77 @@ async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
         web_content = await fetch_web_page(target_url)
         query_used = f"Web Scraper: {target_url}"
 
-    system_prompt = (
-        "Sei il router intelligente di Peter OS. Analizza il comando dell'utente e scegli tool e schermata Visual HUD.\n"
-        "Tool disponibili: IMAGE_SEARCH, WEB_SEARCH, YOUTUBE, APPLE_MUSIC, SEND_TELEGRAM, SEND_TELEGRAM_VOICE, NONE.\n"
-        "HUD disponibili: IMAGE_PREVIEW, SEARCH_PREVIEW, MEDIA_PLAYER, PERSON_CARD, WEB_BROWSER, NONE.\n\n"
-        "REGOLE RIGIDE:\n"
-        "- Se l'utente chiede di VEDERE qualcosa ('mostrami', 'fammi vedere', 'foto di', 'immagine di', 'com'è fatto') -> tool='IMAGE_SEARCH', screen_type='IMAGE_PREVIEW', query='nome oggetto corretto ortograficamente senza articoli'.\n"
-        "- Se l'utente chiede PREZZI, NOTIZIE, SPECIFICHE o INFO REALI -> tool='WEB_SEARCH', screen_type='IMAGE_PREVIEW', query='query di ricerca pulita'.\n"
-        "- Se l'utente chiede VIDEO, CANZONI, TRAILER o YOUTUBE -> tool='YOUTUBE', screen_type='MEDIA_PLAYER', query='titolo video/canzone'.\n"
-        "- Se l'utente chiede MUSICA su Apple Music -> tool='APPLE_MUSIC', screen_type='MEDIA_PLAYER', query='brano/artista'.\n"
-        "- Se l'utente chiede info su una PERSONA/CONTATTO -> tool='NONE', screen_type='PERSON_CARD', screen_target='Nome Persona'.\n"
-        "- Se è semplice conversazione -> tool='NONE', screen_type='NONE'.\n\n"
-        "Rispondi SOLO con JSON valido:\n"
-        '{"reasoning": "Breve motivo", "tool": "...", "query": "...", "screen_type": "...", "screen_target": "..."}'
-    )
-
-    messages = [{"role": "system", "content": system_prompt}]
-    if recent_context:
-        messages.append({"role": "system", "content": f"Contesto recente:\n{truncate_text(recent_context, 450, from_end=True)}"})
-    messages.append({"role": "user", "content": truncate_text(user_message, 800)})
-
-    media_data = None
-    screen_display = None
-    telegram_sent = False
-    reasoning_text = "Analisi diretta."
     tool = "NONE"
     query = user_message
     screen_type = "NONE"
     screen_target = ""
+    reasoning_text = "Analisi contestuale."
 
-    try:
-        async with httpx.AsyncClient(timeout=6.0) as client:
-            res = await client.post(GROQ_URL, json={
-                "model": MODEL_ROUTER,
-                "messages": messages,
-                "temperature": 0.0
-            }, headers={"Content-Type": "application/json", "Authorization": f"Bearer {GROQ_API_KEY}"})
+    # Step A: Controlla prima le regole deterministiche ad alta precisione
+    rule_match = _detect_intent_by_rules(user_message)
+    if rule_match:
+        tool, screen_type, query = rule_match
+        reasoning_text = f"Intent rilevato ({tool}): {query}"
+    else:
+        # Step B: Chiedi al router LLM per comandi complessi (Telegram, Contatti, Browser, ecc.)
+        system_prompt = (
+            "Sei il router di Peter OS. Scegli tool e schermata Visual HUD.\n"
+            "Tool: YOUTUBE, APPLE_MUSIC, WEB_SEARCH, IMAGE_SEARCH, SEND_TELEGRAM, SEND_TELEGRAM_VOICE, NONE.\n"
+            "HUD: MEDIA_PLAYER, IMAGE_PREVIEW, SEARCH_PREVIEW, PERSON_CARD, WEB_BROWSER, SYSTEM_BRIEF.\n"
+            "Rispondi SOLO con JSON:\n"
+            '{"reasoning": "Motivo", "tool": "...", "query": "...", "screen_type": "...", "screen_target": "..."}'
+        )
+        messages = [{"role": "system", "content": system_prompt}]
+        if recent_context:
+            messages.append({"role": "system", "content": f"Contesto:\n{truncate_text(recent_context, 350, from_end=True)}"})
+        messages.append({"role": "user", "content": truncate_text(user_message, 600)})
 
-            if res.status_code == 200:
-                raw_text = res.json()["choices"][0]["message"]["content"].strip()
-                if "{" in raw_text and "}" in raw_text:
-                    raw_text = raw_text[raw_text.find("{"):raw_text.rfind("}")+1]
-                    decision = json.loads(raw_text)
-                    tool = decision.get("tool", "NONE").upper()
-                    query = decision.get("query") or user_message
-                    screen_type = decision.get("screen_type", "NONE").upper()
-                    screen_target = decision.get("screen_target", "")
-                    reasoning_text = decision.get("reasoning", "Routing ok.")
-    except Exception as e:
-        print(f"Errore Router LLM: {e}")
+        try:
+            async with httpx.AsyncClient(timeout=6.0) as client:
+                res = await client.post(GROQ_URL, json={
+                    "model": MODEL_ROUTER,
+                    "messages": messages,
+                    "temperature": 0.0
+                }, headers={"Content-Type": "application/json", "Authorization": f"Bearer {GROQ_API_KEY}"})
 
-    # Fallback deterministico se il router lascia NONE su richieste visive o video
-    msg_lower = user_message.lower().strip()
-    if tool == "NONE" and screen_type == "NONE":
-        if any(k in msg_lower for k in ["mostrami", "fammi vedere", "foto di", "immagine di", "immagini di", "com'è fatto", "com'è fatta", "cerca foto"]):
-            tool = "IMAGE_SEARCH"
-            screen_type = "IMAGE_PREVIEW"
-            query = re.sub(r'^(mostrami|fammi vedere|cerca foto di|cerca immagini di|foto di|immagine di)\s+(un|una|uno|il|lo|la|i|gli|le)?\s*', '', msg_lower).strip() or user_message
-            reasoning_text = f"Ricerca visiva per: {query}"
-        elif any(k in msg_lower for k in ["video di", "su youtube", "metti la canzone", "riproduci", "trailer di"]):
-            tool = "YOUTUBE"
-            screen_type = "MEDIA_PLAYER"
-            reasoning_text = f"Ricerca media per: {query}"
+                if res.status_code == 200:
+                    raw_text = res.json()["choices"][0]["message"]["content"].strip()
+                    if "{" in raw_text and "}" in raw_text:
+                        raw_text = raw_text[raw_text.find("{"):raw_text.rfind("}")+1]
+                        decision = json.loads(raw_text)
+                        tool = decision.get("tool", "NONE").upper()
+                        query = decision.get("query") or user_message
+                        screen_type = decision.get("screen_type", "SYSTEM_BRIEF").upper()
+                        screen_target = decision.get("screen_target", "")
+                        reasoning_text = decision.get("reasoning", "Routing completato.")
+        except Exception as e:
+            print(f"Errore Router LLM: {e}")
 
-    # Esecuzione tool e composizione payload HUD
+    media_data = None
+    screen_display = None
+    telegram_sent = False
+
+    # Step C: Esecuzione Tool e generazione payload HUD (l'HUD mostra SEMPRE qualcosa)
     try:
         if tool == "SEND_TELEGRAM":
             telegram_sent = await send_telegram_message(query)
             query_used = f"Telegram Text: '{query}'"
+            screen_display = {
+                "type": "SYSTEM_BRIEF",
+                "title": "TELEGRAM DISPATCH",
+                "subtitle": "Messaggio inviato" if telegram_sent else "Invio non riuscito (verifica chat_id)",
+                "highlights": [query]
+            }
 
         elif tool == "SEND_TELEGRAM_VOICE":
             telegram_sent = await send_telegram_voice_note(query)
             query_used = f"Telegram Voice: '{query}'"
+            screen_display = {
+                "type": "SYSTEM_BRIEF",
+                "title": "TELEGRAM VOICE NOTE",
+                "subtitle": "Nota vocale generata e inviata" if telegram_sent else "Errore invio vocale",
+                "highlights": [query]
+            }
 
         elif tool == "YOUTUBE" or screen_type == "MEDIA_PLAYER":
             if tool == "APPLE_MUSIC":
@@ -169,16 +199,24 @@ async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
                         "source": "youtube",
                         "video_id": media_data.get("video_id"),
                         "title": media_data.get("title", query),
+                        "author": media_data.get("author", ""),
                         "embed_url": media_data.get("embed_url"),
                         "watch_url": media_data.get("watch_url")
                     }
+                else:
+                    screen_display = {
+                        "type": "SEARCH_PREVIEW",
+                        "query": f"YouTube: {query}",
+                        "content": f"Nessun video incorporabile trovato per '{query}'. Prova a specificare titolo e artista."
+                    }
 
-        elif tool == "IMAGE_SEARCH" or screen_type == "IMAGE_PREVIEW":
-            img_res = search_image_result(query, max_results=5)
-            query_used = f"Image Search: {query}"
+        elif tool in ("IMAGE_SEARCH", "WEB_SEARCH") or screen_type == "IMAGE_PREVIEW":
             if not web_content:
-                web_content = search_web(query, max_results=3)
-            safe_web = truncate_text(web_content, 450)
+                web_content = search_web(query, max_results=4)
+            img_res = search_image_result(query, max_results=5)
+            query_used = f"{tool}: {query}"
+            safe_web = truncate_text(web_content, 550)
+
             if img_res.get("image_url"):
                 screen_display = {
                     "type": "IMAGE_PREVIEW",
@@ -193,40 +231,34 @@ async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
                 screen_display = {
                     "type": "SEARCH_PREVIEW",
                     "query": query,
-                    "content": safe_web or f"Nessuna anteprima diretta trovata per {query}."
+                    "content": safe_web or f"Nessun dato esterno trovato per '{query}'."
                 }
 
-        elif tool == "WEB_SEARCH" and not web_content:
-            web_content = search_web(query, max_results=4)
-            query_used = f"Web Search: {query}"
-            img_res = search_image_result(query, max_results=3)
-            safe_web = truncate_text(web_content, 450)
-            if img_res.get("image_url"):
-                screen_display = {
-                    "type": "IMAGE_PREVIEW",
-                    "title": query,
-                    "image_url": img_res.get("image_url"),
-                    "thumbnail_url": img_res.get("thumbnail_url"),
-                    "source_url": img_res.get("source_url"),
-                    "images": img_res.get("images", []),
-                    "content": safe_web
-                }
-            else:
-                screen_display = {
-                    "type": "SEARCH_PREVIEW",
-                    "query": query,
-                    "content": safe_web
-                }
-
-        if screen_type == "WEB_BROWSER" and screen_target.startswith("http"):
+        elif screen_type == "WEB_BROWSER" and screen_target.startswith("http"):
             screen_display = {"type": "WEB_BROWSER", "url": screen_target}
+
         elif screen_type == "PERSON_CARD" and screen_target:
             all_contacts = get_contacts()
             matched = next((c for c in all_contacts if screen_target.lower() in c['name'].lower()), None)
             screen_display = {
                 "type": "PERSON_CARD",
-                "person": matched or {"name": screen_target, "relation_type": "contatto", "notes": ""}
+                "person": matched or {"name": screen_target, "relation_type": "contatto", "notes": "Nessuna nota salvata"}
             }
+
+        # Fallback intelligente: l'HUD non resta mai vuoto
+        if not screen_display:
+            now_label = datetime.now().strftime("%H:%M · %d/%m/%Y")
+            screen_display = {
+                "type": "SYSTEM_BRIEF",
+                "title": "NEURAL CONTEXT HUD",
+                "subtitle": f"ACTIVE SESSION · {now_label}",
+                "highlights": [
+                    f"Comando analizzato: {truncate_text(user_message, 90)}",
+                    f"Routing: {reasoning_text}",
+                    "Suggerimento: chiedi 'mostrami [oggetto]', 'chi è [persona]' o 'metti [brano] su YouTube'"
+                ]
+            }
+
     except Exception as e:
         print(f"Errore esecuzione Tool/HUD: {e}")
 
@@ -249,10 +281,8 @@ async def generate_peter_response(user_message: str, recent_context: str, long_t
 
     if is_mega_prompt:
         chat_message = (
-            f"[SISTEMA INTERNO: Marco ha inviato un mega-file di testo di {len(user_message)} caratteri. "
-            "Devi SOLO rispondere che hai ricevuto l'archivio, che lo stai frammentando e che "
-            "i tuoi processi in background stanno estraendo i dati per il Nexus 3D. "
-            "Rispondi con una battuta intelligente in puro stile Peter e nient'altro.]"
+            f"[SISTEMA INTERNO: Marco ha inviato un archivio testuale di {len(user_message)} caratteri. "
+            "Rispondi brevemente confermando la ricezione e la suddivisione parallela nei 4 domini di memoria.]"
         )
 
     tool_exec = await model_1_route_tools(chat_message, recent_context)
@@ -263,30 +293,36 @@ async def generate_peter_response(user_message: str, recent_context: str, long_t
 
     safe_long_term = truncate_text(long_term_facts, 2000)
     safe_recent_context = truncate_text(recent_context, 1200, from_end=True)
-    safe_web_content = truncate_text(tool_exec["web"], 800)
+    safe_web_content = truncate_text(tool_exec["web"], 1400)
 
     hud_status_note = ""
     if tool_exec["screen"]:
         s_type = tool_exec["screen"].get("type", "")
         if s_type == "IMAGE_PREVIEW":
-            hud_status_note = "\n[SISTEMA HUD: Hai appena proiettato l'immagine reale nel Visual HUD a destra. Descrivila in 2-3 frasi senza inserire link in chat.]"
+            hud_status_note = (
+                "\n[SISTEMA HUD: Hai proiettato l'immagine nel Visual HUD a destra. "
+                "NON descrivere mai dettagli visivi dell'immagine perché non la vedi; limita la risposta ai fatti verificati.]"
+            )
         elif s_type == "MEDIA_PLAYER":
-            hud_status_note = "\n[SISTEMA HUD: Hai appena caricato il player video/audio nel Visual HUD a destra.]"
+            vid_title = tool_exec["screen"].get("title", "")
+            hud_status_note = (
+                f"\n[SISTEMA HUD: Hai caricato nel player YouTube a destra il video '{vid_title}'. "
+                "Conferma brevemente la riproduzione senza inventare date di uscita o dettagli non presenti nei dati.]"
+            )
 
     system_prompt = (
         f"Sei Peter, l'IA personale di Marco.\n"
         f"DATA/ORA: {now_str}\n"
         f"- Tono: '{current_tone}'\n"
-        "REGOLE OBBLIGATORIE:\n"
-        "1. Sii breve, concreto e brillante (massimo 3-4 frasi per domande normali, niente chiusure inutili).\n"
-        "2. NON usare MAI tabelle Markdown (niente | o ---), asterischi (**), cancelletti (#) o link [testo](url). Scrivi in testo pulito.\n"
-        "3. Se elenchi opzioni, usa al massimo 3 punti brevi con un semplice trattino (-).\n"
-        "4. NON inventare MAI URL o link.\n"
+        "REGOLE ANTI-ALLUCINAZIONE E STILE:\n"
+        "1. Rispondi in modo conciso, chiaro e naturale (massimo 3-4 frasi).\n"
+        "2. Usa ESCLUSIVAMENTE i Web Data reali forniti qui sotto per date, biografie, prezzi o fatti recenti. Se un dato non è presente nei Web Data e non ne sei certo al 100%, dichiaralo senza indovinare.\n"
+        "3. NON usare MAI tabelle Markdown (|), asterischi (**), cancelletti (#) o link [testo](url). Scrivi in testo pulito.\n"
         f"{hud_status_note}"
     )
 
     if safe_web_content:
-        system_prompt += f"\nWeb Data reali:\n{safe_web_content}"
+        system_prompt += f"\nWeb Data reali (FONTE VERIFICATA):\n{safe_web_content}"
     if safe_long_term:
         system_prompt += f"\nMemorie Base:\n{safe_long_term}"
     if safe_recent_context:
@@ -311,13 +347,13 @@ async def generate_peter_response(user_message: str, recent_context: str, long_t
             res = await client.post(GROQ_URL, json={
                 "model": model_to_use,
                 "messages": messages,
-                "temperature": 0.4
+                "temperature": 0.15
             }, headers={"Content-Type": "application/json", "Authorization": f"Bearer {GROQ_API_KEY}"})
 
             if res.status_code != 200:
                 return {
-                    "reply": f"Sovraccarico Neurale ({res.status_code}). Riprova con un testo più corto.",
-                    "query_used": "", "media": None, "screen": None, "reasoning": f"> API Error {res.status_code}"
+                    "reply": f"Sovraccarico Neurale ({res.status_code}). Riprova tra un istante.",
+                    "query_used": "", "media": None, "screen": tool_exec["screen"], "reasoning": f"> API Error {res.status_code}"
                 }
 
             raw_reply = res.json()["choices"][0]["message"]["content"]
@@ -331,13 +367,12 @@ async def generate_peter_response(user_message: str, recent_context: str, long_t
     except Exception as e:
         return {
             "reply": "Connessione neurale instabile. Riprova tra un istante.",
-            "query_used": "", "media": None, "screen": None, "reasoning": f"> Errore: {str(e)}"
+            "query_used": "", "media": None, "screen": tool_exec["screen"], "reasoning": f"> Errore: {str(e)}"
         }
 
 
-# --- FUNZIONE WORKER PER IL CHUNKING PARALLELO ---
+# --- FUNZIONE WORKER PER IL CHUNKING PARALLELO CON ID DETERMINISTICI ---
 async def process_chunk(chunk: str, model: str, index: int, image_data_url: str = None):
-    """Elabora un singolo pezzo di testo usando un modello specifico"""
     extraction_prompt = (
         "Sei l'estrattore dati di Peter. Utente: Marco Barbiero Torres.\n"
         "Estrai IN MODO SILENZIOSO in JSON le entità che trovi in questo blocco di testo:\n"
@@ -376,7 +411,7 @@ async def process_chunk(chunk: str, model: str, index: int, image_data_url: str 
                         save_fact(fact_text)
                         if supabase:
                             try:
-                                node_id = f"fact_{abs(hash(fact_text))}"
+                                node_id = make_stable_id("fact", fact_text)
                                 supabase.table("nodes").upsert({"id": node_id, "name": fact_text[:28], "type": "memory", "category": "memory", "notes": fact_text}).execute()
                                 supabase.table("edges").upsert({"source": "user_self", "target": node_id, "relation_type": "memoria"}).execute()
                             except Exception:
@@ -396,7 +431,7 @@ async def process_chunk(chunk: str, model: str, index: int, image_data_url: str 
                             )
                             if supabase:
                                 try:
-                                    node_id = f"contact_{abs(hash(p_name))}"
+                                    node_id = make_stable_id("contact", p_name)
                                     supabase.table("nodes").upsert({
                                         "id": node_id, "name": p_name, "type": "person",
                                         "category": p.get("relation_type", "amicizia"),
@@ -412,7 +447,7 @@ async def process_chunk(chunk: str, model: str, index: int, image_data_url: str 
                         save_event_entity(ev_title, parsed.get("event_desc", ""))
                         if supabase:
                             try:
-                                node_id = f"event_{abs(hash(ev_title))}"
+                                node_id = make_stable_id("event", ev_title)
                                 supabase.table("nodes").upsert({"id": node_id, "name": ev_title[:26], "type": "event", "category": "event", "notes": parsed.get("event_desc", "")}).execute()
                                 supabase.table("edges").upsert({"source": "user_self", "target": node_id, "relation_type": "evento"}).execute()
                             except Exception:
@@ -423,7 +458,7 @@ async def process_chunk(chunk: str, model: str, index: int, image_data_url: str 
                         save_interest_entity(int_name, parsed.get("interest_desc", ""))
                         if supabase:
                             try:
-                                node_id = f"interest_{abs(hash(int_name))}"
+                                node_id = make_stable_id("interest", int_name)
                                 supabase.table("nodes").upsert({"id": node_id, "name": int_name[:26], "type": "interest", "category": "interest", "notes": parsed.get("interest_desc", "")}).execute()
                                 supabase.table("edges").upsert({"source": "user_self", "target": node_id, "relation_type": "passione"}).execute()
                             except Exception:
@@ -435,11 +470,6 @@ async def process_chunk(chunk: str, model: str, index: int, image_data_url: str 
 
 
 async def extract_and_save_facts(user_message: str, image_data_url: str = None):
-    """
-    SUDDIVISIONE E ORCHESTRAZIONE LLM MULTIPLI:
-    Prende il testo, lo divide in chunk da ~2500 caratteri e assegna ogni chunk 
-    a un modello LLM diverso dalla WORKER_MODELS pool in modo asincrono.
-    """
     if not GROQ_API_KEY:
         return
 
