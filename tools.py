@@ -1,221 +1,228 @@
-import os
 import re
-import urllib.parse
-from urllib.parse import urlparse, parse_qs
 import httpx
-import tempfile
-import edge_tts
 from duckduckgo_search import DDGS
-from config import TELEGRAM_BOT_TOKEN
+from config import TELEGRAM_BOT_TOKEN, YOUTUBE_API_KEY
 from database import get_telegram_chat_id
-
-# Read at call time so environment configuration and tests can replace the key
-# without re-importing this module. The key must be a YouTube Data API v3 key.
-def _youtube_api_key() -> str:
-    from config import YOUTUBE_API_KEY
-    return (os.getenv("YOUTUBE_API_KEY") or YOUTUBE_API_KEY or "").strip().strip('"\' ')
-
-
-def _youtube_result(video_id: str, title: str, query: str, *, channel: str = "", thumbnail: str = "") -> dict:
-    return {
-        "title": title or query,
-        "video_id": video_id,
-        "embed_url": f"https://www.youtube-nocookie.com/embed/{video_id}?enablejsapi=1&playsinline=1&rel=0&autoplay=1",
-        "watch_url": f"https://www.youtube.com/watch?v={video_id}",
-        "source": "youtube",
-        "channel": channel,
-        "thumbnail": thumbnail,
-    }
-
-
-def _extract_youtube_id(value: str) -> str | None:
-    """Extract a valid video ID from supported YouTube URL forms."""
-    try:
-        parsed = urlparse(value.strip())
-        host = (parsed.hostname or "").lower().removeprefix("www.")
-        video_id = None
-        if host == "youtu.be":
-            video_id = parsed.path.strip("/").split("/")[0]
-        elif host in {"youtube.com", "m.youtube.com", "music.youtube.com", "youtube-nocookie.com"}:
-            video_id = parse_qs(parsed.query).get("v", [None])[0]
-            if not video_id:
-                match = re.match(r"/(?:embed|shorts|live|v)/([^/?]+)", parsed.path)
-                video_id = match.group(1) if match else None
-        return video_id if video_id and re.fullmatch(r"[A-Za-z0-9_-]{11}", video_id) else None
-    except (ValueError, AttributeError):
-        return None
 
 
 def youtube_api_status() -> dict:
-    """Return safe, non-secret diagnostics for the API-key configuration."""
-    key = _youtube_api_key()
-    return {"configured": bool(key), "key_type": "YouTube Data API v3" if key else None}
-
-
-def _youtube_data_api_search(query: str) -> dict | None:
-    """Search with YouTube Data API and select the best embeddable result."""
-    key = _youtube_api_key()
-    if not key:
-        return None
-    try:
-        with httpx.Client(timeout=httpx.Timeout(6.0, connect=3.0)) as client:
-            response = client.get(
-                "https://www.googleapis.com/youtube/v3/search",
-                params={"part": "snippet", "type": "video", "maxResults": 10,
-                       "q": query, "videoEmbeddable": "true", "safeSearch": "moderate", "key": key},
-            )
-            if response.status_code in (400, 403):
-                # Never print the API key. Keep the provider's error body for diagnosis.
-                print(f"YouTube Data API search error {response.status_code}: {response.text[:400]}")
-            response.raise_for_status()
-            items = response.json().get("items", [])
-            candidates = []
-            for item in items:
-                video_id = (item.get("id") or {}).get("videoId")
-                snippet = item.get("snippet") or {}
-                if video_id:
-                    candidates.append((video_id, snippet))
-            if not candidates:
-                return None
-
-            status_response = client.get(
-                "https://www.googleapis.com/youtube/v3/videos",
-                params={"part": "status", "id": ",".join(v for v, _ in candidates), "key": key},
-            )
-            status_response.raise_for_status()
-            eligible = {entry.get("id") for entry in status_response.json().get("items", [])
-                        if entry.get("status", {}).get("embeddable") is True
-                        and entry.get("status", {}).get("privacyStatus") == "public"}
-            for video_id, snippet in candidates:
-                if video_id in eligible:
-                    thumbnails = snippet.get("thumbnails") or {}
-                    thumbnail = (thumbnails.get("high") or thumbnails.get("medium") or thumbnails.get("default") or {}).get("url", "")
-                    return _youtube_result(video_id, snippet.get("title", query), query,
-                                           channel=snippet.get("channelTitle", ""), thumbnail=thumbnail)
-    except httpx.HTTPStatusError as exc:
-        print(f"YouTube API HTTP {exc.response.status_code}: {exc.response.text[:400]}")
-    except Exception as exc:
-        print(f"YouTube Data API non disponibile, uso ricerca alternativa: {exc}")
-    return None
-
-
-def _fallback_youtube_search(query: str) -> dict | None:
-    try:
-        with DDGS() as ddgs:
-            results = list(ddgs.videos(query, max_results=8))
-        for video in results:
-            url = video.get("content", "") or video.get("href", "")
-            video_id = _extract_youtube_id(url)
-            if not video_id:
-                match = re.search(r"(?:v=|/embed/|/shorts/|/live/|youtu\.be/)([A-Za-z0-9_-]{11})(?:[?&/]|$)", url, re.I)
-                video_id = match.group(1) if match else None
-            if video_id:
-                return _youtube_result(video_id, video.get("title", query), query)
-    except Exception as exc:
-        print(f"Errore ricerca YouTube alternativa: {exc}")
-    return None
-
-
-def search_youtube(query: str) -> dict:
-    """Find a playable YouTube result; use official API first, DDG as fallback."""
-    original_query = (query or "").strip()
-    if not original_query:
-        return {"title": "Ricerca YouTube", "video_id": None, "embed_url": "",
-                "watch_url": "https://www.youtube.com/", "source": "youtube"}
-
-    direct_id = _extract_youtube_id(original_query)
-    if direct_id:
-        return _youtube_result(direct_id, f"Video YouTube ({direct_id})", original_query)
-
-    search_query = re.sub(
-        r"\b(?:cerca(?:mi)?|trova|riproduci|metti|fammi vedere|un video|il video|video|su youtube|youtube)\b",
-        " ", original_query, flags=re.IGNORECASE,
-    )
-    search_query = re.sub(r"\s+", " ", search_query).strip(" :,-") or original_query
-    result = _youtube_data_api_search(search_query)
-    if result:
-        return result
-    result = _fallback_youtube_search(search_query)
-    if result:
-        return result
-    encoded = urllib.parse.quote(search_query)
-    return {"title": f"Risultati YouTube: {search_query}", "video_id": None,
-            "embed_url": "", "watch_url": f"https://www.youtube.com/results?search_query={encoded}",
-            "source": "youtube"}
+    return {
+        "configured": bool(YOUTUBE_API_KEY),
+        "mode": "youtube_data_api_v3" if YOUTUBE_API_KEY else "html_fallback"
+    }
 
 
 def search_web(query: str, max_results: int = 4) -> str:
+    """Ricerca web sintetica e pulita per fornire dati reali agli LLM e all'HUD."""
+    if not query:
+        return ""
     try:
         with DDGS() as ddgs:
-            results = [f"Fonte: {result.get('title', '')}\nSnippet: {result.get('body', '')}\nURL: {result.get('href', '')}"
-                       for result in ddgs.text(query, max_results=max_results)]
-        if results:
-            return "\n---\n".join(results)
-    except Exception as exc:
-        print(f"Errore ricerca web: {exc}")
-    return "Nessun risultato rilevante trovato."
+            results = list(ddgs.text(query, region="it-it", safesearch="moderate", max_results=max_results))
+            if not results:
+                return ""
+            lines = []
+            for r in results:
+                title = r.get("title", "").strip()
+                body = r.get("body", "").strip()
+                href = r.get("href", "").strip()
+                lines.append(f"- {title}: {body} ({href})")
+            return "\n".join(lines)
+    except Exception as e:
+        print(f"Errore search_web: {e}")
+        return ""
 
 
-def search_image_result(query: str) -> dict:
-    """Return image URL and attribution when the image search provider supplies it."""
+def search_image_result(query: str, max_results: int = 5) -> dict:
+    """Restituisce immagine principale, thumbnail di riserva, fonte e galleria per il Visual HUD."""
+    clean_q = re.sub(r'^(mostrami|fammi vedere|cerca|trova|foto di|immagine di|immagini di)\s+', '', query.strip(), flags=re.IGNORECASE).strip()
+    if not clean_q:
+        clean_q = query.strip()
+
+    items = []
+    # 1. Ricerca primaria DuckDuckGo Images
     try:
         with DDGS() as ddgs:
-            results = list(ddgs.images(query, max_results=1))
-        if results:
-            item = results[0]
-            return {"image_url": item.get("image", ""), "source_url": item.get("url", "") or item.get("source", ""),
-                    "title": item.get("title", query), "content": item.get("title", "")}
-    except Exception as exc:
-        print(f"Errore ricerca immagine: {exc}")
-    return {"image_url": "", "source_url": "", "title": query, "content": ""}
+            raw_images = list(ddgs.images(clean_q, region="it-it", safesearch="moderate", max_results=max_results))
+            for r in raw_images:
+                img_url = r.get("image") or ""
+                thumb_url = r.get("thumbnail") or img_url
+                if img_url.startswith("http"):
+                    items.append({
+                        "title": r.get("title") or clean_q,
+                        "image_url": img_url,
+                        "thumbnail_url": thumb_url,
+                        "source_url": r.get("url") or ""
+                    })
+    except Exception as e:
+        print(f"Errore DDGS images: {e}")
+
+    # 2. Fallback automatico su Wikimedia Commons API se DuckDuckGo viene limitato su Render
+    if not items:
+        try:
+            with httpx.Client(timeout=6.0, headers={"User-Agent": "PeterOS/1.0"}) as client:
+                resp = client.get(
+                    "https://commons.wikimedia.org/w/api.php",
+                    params={
+                        "action": "query",
+                        "generator": "search",
+                        "gsrsearch": f"filetype:bitmap {clean_q}",
+                        "gsrnamespace": 6,
+                        "gsrlimit": max_results,
+                        "prop": "imageinfo",
+                        "iiprop": "url|extmetadata",
+                        "iiurlwidth": 800,
+                        "format": "json"
+                    }
+                )
+                if resp.status_code == 200:
+                    pages = resp.json().get("query", {}).get("pages", {})
+                    for page in pages.values():
+                        info = (page.get("imageinfo") or [{}])[0]
+                        thumb = info.get("thumburl") or info.get("url")
+                        full = info.get("url") or thumb
+                        if full:
+                            items.append({
+                                "title": page.get("title", "").replace("File:", ""),
+                                "image_url": thumb or full,
+                                "thumbnail_url": thumb or full,
+                                "source_url": info.get("descriptionurl") or ""
+                            })
+        except Exception as e:
+            print(f"Errore Wikimedia fallback: {e}")
+
+    if not items:
+        return {"title": clean_q, "image_url": None, "thumbnail_url": None, "source_url": "", "images": []}
+
+    first = items[0]
+    return {
+        "title": first["title"],
+        "image_url": first["image_url"],
+        "thumbnail_url": first["thumbnail_url"],
+        "source_url": first["source_url"],
+        "images": items
+    }
 
 
-def search_image(query: str) -> str:
-    return search_image_result(query).get("image_url", "")
+def search_image(query: str) -> str | None:
+    """Compatibilità retroattiva: restituisce l'URL principale dell'immagine."""
+    res = search_image_result(query, max_results=3)
+    return res.get("image_url")
 
 
-def search_apple_music(query: str) -> dict:
-    q_enc = urllib.parse.quote(query)
-    return {"title": f"Apple Music: {query}",
-            "embed_url": f"https://embed.music.apple.com/it/search?term={q_enc}", "source": "applemusic"}
+def search_youtube(query: str) -> dict | None:
+    """Cerca un video YouTube incorporabile (via API v3 se presente, altrimenti fallback diretto)."""
+    clean_q = re.sub(r'^(cerca su youtube|riproduci|metti|video di|su youtube)\s+', '', query.strip(), flags=re.IGNORECASE).strip() or query.strip()
+
+    if YOUTUBE_API_KEY:
+        try:
+            with httpx.Client(timeout=8.0) as client:
+                res = client.get(
+                    "https://www.googleapis.com/youtube/v3/search",
+                    params={
+                        "part": "snippet",
+                        "q": clean_q,
+                        "type": "video",
+                        "videoEmbeddable": "true",
+                        "maxResults": 1,
+                        "key": YOUTUBE_API_KEY
+                    }
+                )
+                if res.status_code == 200:
+                    items = res.json().get("items", [])
+                    if items:
+                        vid = items[0]["id"]["videoId"]
+                        title = items[0]["snippet"]["title"]
+                        return {
+                            "source": "youtube",
+                            "video_id": vid,
+                            "title": title,
+                            "embed_url": f"https://www.youtube-nocookie.com/embed/{vid}",
+                            "watch_url": f"https://www.youtube.com/watch?v={vid}"
+                        }
+        except Exception as e:
+            print(f"Errore YouTube API: {e}")
+
+    # Fallback senza API key: cerca su YouTube HTML e prende il primo videoId valido
+    try:
+        with httpx.Client(timeout=8.0, headers={"User-Agent": "Mozilla/5.0"}) as client:
+            res = client.get("https://www.youtube.com/results", params={"search_query": clean_q})
+            if res.status_code == 200:
+                match = re.search(r'"videoId":"([A-Za-z0-9_-]{11})"', res.text)
+                if match:
+                    vid = match.group(1)
+                    return {
+                        "source": "youtube",
+                        "video_id": vid,
+                        "title": clean_q,
+                        "embed_url": f"https://www.youtube-nocookie.com/embed/{vid}",
+                        "watch_url": f"https://www.youtube.com/watch?v={vid}"
+                    }
+    except Exception as e:
+        print(f"Errore YouTube fallback: {e}")
+
+    return None
 
 
-async def send_telegram_message(message_text: str) -> bool:
-    token = TELEGRAM_BOT_TOKEN.strip()
+def search_apple_music(query: str) -> dict | None:
+    """Cerca un brano su iTunes / Apple Music e restituisce il player embed."""
+    try:
+        with httpx.Client(timeout=6.0) as client:
+            res = client.get("https://itunes.apple.com/search", params={"term": query, "media": "music", "limit": 1, "country": "IT"})
+            if res.status_code == 200:
+                results = res.json().get("results", [])
+                if results:
+                    track = results[0]
+                    track_view = track.get("trackViewUrl", "")
+                    embed_url = track_view.replace("https://music.apple.com", "https://embed.music.apple.com") if track_view else ""
+                    return {
+                        "source": "apple_music",
+                        "title": f"{track.get('trackName', query)} - {track.get('artistName', '')}",
+                        "embed_url": embed_url,
+                        "preview_url": track.get("previewUrl", "")
+                    }
+    except Exception as e:
+        print(f"Errore Apple Music: {e}")
+    return None
+
+
+async def send_telegram_message(text: str) -> bool:
     chat_id = get_telegram_chat_id()
-    if not token or not chat_id:
+    if not TELEGRAM_BOT_TOKEN or not chat_id:
         return False
     try:
         async with httpx.AsyncClient(timeout=8.0) as client:
-            response = await client.post(f"https://api.telegram.org/bot{token}/sendMessage",
-                                         json={"chat_id": chat_id, "text": message_text})
-            return response.status_code == 200
-    except Exception as exc:
-        print(f"Errore invio Telegram: {exc}")
+            res = await client.post(
+                f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
+                json={"chat_id": chat_id, "text": text}
+            )
+            return res.status_code == 200
+    except Exception as e:
+        print(f"Errore Telegram send: {e}")
         return False
 
 
-async def send_telegram_voice_note(message_text: str) -> bool:
-    """Generate and send a Telegram voice note."""
-    token = TELEGRAM_BOT_TOKEN.strip()
+async def send_telegram_voice_note(text: str) -> bool:
     chat_id = get_telegram_chat_id()
-    if not token or not chat_id:
+    if not TELEGRAM_BOT_TOKEN or not chat_id:
         return False
-    tmp_path = None
     try:
-        tts = edge_tts.Communicate(message_text, voice="it-IT-DiegoNeural")
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".ogg") as tmp:
+        import edge_tts
+        import tempfile
+        import os
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp:
             tmp_path = tmp.name
-        await tts.save(tmp_path)
+        await edge_tts.Communicate(text, voice="it-IT-DiegoNeural").save(tmp_path)
         async with httpx.AsyncClient(timeout=15.0) as client:
-            with open(tmp_path, "rb") as audio_file:
-                response = await client.post(f"https://api.telegram.org/bot{token}/sendVoice",
-                                             data={"chat_id": chat_id},
-                                             files={"voice": ("voice.ogg", audio_file, "audio/ogg")})
-        return response.status_code == 200
-    except Exception as exc:
-        print(f"Errore invio nota vocale Telegram: {exc}")
-        return False
-    finally:
-        if tmp_path and os.path.exists(tmp_path):
+            with open(tmp_path, "rb") as f:
+                res = await client.post(
+                    f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendVoice",
+                    data={"chat_id": chat_id},
+                    files={"voice": ("peter_voice.mp3", f, "audio/mpeg")}
+                )
+        if os.path.exists(tmp_path):
             os.remove(tmp_path)
+        return res.status_code == 200
+    except Exception as e:
+        print(f"Errore Telegram voice: {e}")
+        return False
