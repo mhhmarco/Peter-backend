@@ -14,9 +14,9 @@ from tools import search_web, search_youtube, search_apple_music, search_image, 
 from scraper import fetch_web_page
 
 # --- ORCHESTRAZIONE MODELLI SECONDO I LIMITI GROQ ---
-MODEL_ROUTER = "allam-2-7b"         # Modello rapido per il routing (limite separato 6K TPM)
-MODEL_CHAT = "openai/gpt-oss-120b"  # Modello ultra-smart per la conversazione (limite 8K TPM)
-MODEL_VISION = "qwen/qwen3.8-27b"   # Modello per immagini e worker di riserva (limite 8K TPM)
+MODEL_ROUTER = "llama-3.1-8b-instant" # Modello rapido e preciso per JSON routing (limite separato)
+MODEL_CHAT = "openai/gpt-oss-120b"    # Modello ultra-smart per la conversazione (limite 8K TPM)
+MODEL_VISION = "qwen/qwen3.8-27b"     # Modello per immagini e worker di riserva (limite 8K TPM)
 
 # Pool di modelli per l'estrazione dati parallela. Dividere il carico evita il blocco 413/429
 WORKER_MODELS = [
@@ -34,6 +34,38 @@ def truncate_text(text: str, max_chars: int, from_end: bool = False) -> str:
         return text
     return text[-max_chars:] if from_end else text[:max_chars]
 
+def clean_reply_text(text: str) -> str:
+    """Pulisce la risposta da simboli Markdown grezzi (**, ###, tabelle |, link [a](b))"""
+    if not text:
+        return ""
+    # Rimuove grassetti e corsivi Markdown
+    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
+    text = re.sub(r'__(.*?)__', r'\1', text)
+    text = re.sub(r'(?<!\w)\*(?!\s)(.*?)(?<!\s)\*(?!\w)', r'\1', text)
+    # Rimuove intestazioni Markdown (#, ##, ###)
+    text = re.sub(r'^\s*#{1,6}\s*', '', text, flags=re.MULTILINE)
+    # Converte link Markdown [Testo](url) in solo Testo
+    text = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', text)
+    # Rimuove backtick di codice inline
+    text = re.sub(r'`{1,3}', '', text)
+    # Pulisce righe di tabelle Markdown (| col1 | col2 | e |---|---|)
+    cleaned_lines = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            cleaned_lines.append("")
+            continue
+        if set(stripped).issubset({'|', '-', ':', ' '}):
+            continue
+        if stripped.startswith('|') and stripped.endswith('|'):
+            cells = [c.strip() for c in stripped.strip('|').split('|') if c.strip()]
+            cleaned_lines.append(" - ".join(cells))
+        else:
+            cleaned_lines.append(line)
+    # Riduce eventuali righe vuote multiple
+    result = re.sub(r'\n{3,}', '\n\n', "\n".join(cleaned_lines))
+    return result.strip()
+
 async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
     if not GROQ_API_KEY:
         return {"web": "", "media": None, "screen": None, "query_used": "", "telegram_sent": False, "reasoning": ""}
@@ -47,17 +79,25 @@ async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
         query_used = f"Web Scraper: {target_url}"
 
     system_prompt = (
-        "Sei il router di Peter OS. Scegli tool (YOUTUBE, APPLE_MUSIC, WEB_SEARCH, SEND_TELEGRAM, SEND_TELEGRAM_VOICE, NONE) "
-        "e HUD (PERSON_CARD, MEDIA_PLAYER, SEARCH_PREVIEW, IMAGE_PREVIEW, WEB_BROWSER, NONE).\n"
-        "Rispondi SOLO in JSON:\n"
-        '{"reasoning": "Motivo", "tool": "...", "query": "...", "screen_type": "...", "screen_target": "..."}'
+        "Sei il router intelligente di Peter OS. Analizza il comando dell'utente e scegli il tool e la schermata Visual HUD.\n"
+        "Tool disponibili: IMAGE_SEARCH, WEB_SEARCH, YOUTUBE, APPLE_MUSIC, SEND_TELEGRAM, SEND_TELEGRAM_VOICE, NONE.\n"
+        "HUD disponibili: IMAGE_PREVIEW, SEARCH_PREVIEW, MEDIA_PLAYER, PERSON_CARD, WEB_BROWSER, NONE.\n\n"
+        "REGOLE RIGIDE:\n"
+        "- Se l'utente chiede di VEDERE qualcosa ('mostrami', 'fammi vedere', 'foto di', 'immagine di', 'com'è fatto') -> tool='IMAGE_SEARCH', screen_type='IMAGE_PREVIEW', query='oggetto pulito da cercare'.\n"
+        "- Se l'utente chiede PREZZI, NOTIZIE, SPECIFICHE o INFO REALI -> tool='WEB_SEARCH', screen_type='IMAGE_PREVIEW', query='query di ricerca'.\n"
+        "- Se l'utente chiede VIDEO, CANZONI, TRAILER o YOUTUBE -> tool='YOUTUBE', screen_type='MEDIA_PLAYER', query='titolo video/canzone'.\n"
+        "- Se l'utente chiede MUSICA su Apple Music -> tool='APPLE_MUSIC', screen_type='MEDIA_PLAYER', query='brano/artista'.\n"
+        "- Se l'utente chiede info su una PERSONA/CONTATTO -> tool='NONE', screen_type='PERSON_CARD', screen_target='Nome Persona'.\n"
+        "- Se è semplice conversazione -> tool='NONE', screen_type='NONE'.\n\n"
+        "Rispondi SOLO con questo JSON valido:\n"
+        '{"reasoning": "Breve motivo", "tool": "...", "query": "...", "screen_type": "...", "screen_target": "..."}'
     )
 
     messages = [{"role": "system", "content": system_prompt}]
     
     if recent_context:
         safe_context = truncate_text(recent_context, 500, from_end=True)
-        messages.append({"role": "system", "content": f"Contesto:\n{safe_context}"})
+        messages.append({"role": "system", "content": f"Contesto recente:\n{safe_context}"})
         
     messages.append({"role": "user", "content": truncate_text(user_message, 800)})
 
@@ -65,13 +105,17 @@ async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
     screen_display = None
     telegram_sent = False
     reasoning_text = "Analisi diretta."
+    tool = "NONE"
+    query = user_message
+    screen_type = "NONE"
+    screen_target = ""
 
     try:
         async with httpx.AsyncClient(timeout=6.0) as client:
             res = await client.post(GROQ_URL, json={
                 "model": MODEL_ROUTER,
                 "messages": messages,
-                "temperature": 0.1
+                "temperature": 0.0
             }, headers={"Content-Type": "application/json", "Authorization": f"Bearer {GROQ_API_KEY}"})
 
             if res.status_code == 200:
@@ -79,43 +123,109 @@ async def model_1_route_tools(user_message: str, recent_context: str) -> dict:
                 if "{" in raw_text and "}" in raw_text:
                     raw_text = raw_text[raw_text.find("{"):raw_text.rfind("}")+1]
                     decision = json.loads(raw_text)
-                    tool = decision.get("tool", "NONE")
-                    query = decision.get("query", user_message)
-                    screen_type = decision.get("screen_type", "NONE")
+                    tool = decision.get("tool", "NONE").upper()
+                    query = decision.get("query") or user_message
+                    screen_type = decision.get("screen_type", "NONE").upper()
                     screen_target = decision.get("screen_target", "")
                     reasoning_text = decision.get("reasoning", "Routing ok.")
-
-                    if tool == "SEND_TELEGRAM":
-                        telegram_sent = await send_telegram_message(query)
-                        query_used = f"Telegram Text: '{query}'"
-                    elif tool == "SEND_TELEGRAM_VOICE":
-                        telegram_sent = await send_telegram_voice_note(query)
-                        query_used = f"Telegram Voice: '{query}'"
-                    elif tool == "YOUTUBE":
-                        media_data = search_youtube(query)
-                        query_used = f"YouTube: {query}"
-                        screen_display = {"type": "MEDIA_PLAYER", "title": media_data.get("title", query), "embed_url": media_data.get("embed_url"), "watch_url": media_data.get("watch_url")}
-                    elif tool == "APPLE_MUSIC":
-                        media_data = search_apple_music(query)
-                        query_used = f"Apple Music: {query}"
-                        screen_display = {"type": "MEDIA_PLAYER", "title": media_data.get("title", query), "embed_url": media_data.get("embed_url")}
-                    elif tool == "WEB_SEARCH" and not web_content:
-                        web_content = search_web(query)
-                        query_used = f"Web Search: {query}"
-                        img_url = search_image(query)
-                        safe_web = truncate_text(web_content, 400)
-                        screen_display = {"type": "IMAGE_PREVIEW", "title": query, "image_url": img_url, "content": safe_web} if img_url else {"type": "SEARCH_PREVIEW", "query": query, "content": safe_web}
-
-                    if screen_type == "WEB_BROWSER" and screen_target.startswith("http"):
-                        screen_display = {"type": "WEB_BROWSER", "url": screen_target}
-                    elif screen_type == "PERSON_CARD" and screen_target:
-                        all_contacts = get_contacts()
-                        matched = next((c for c in all_contacts if screen_target.lower() in c['name'].lower()), None)
-                        screen_display = {"type": "PERSON_CARD", "person": matched or {"name": screen_target, "relation_type": "contatto", "notes": ""}}
     except Exception as e:
-        print(f"Errore Router: {e}")
+        print(f"Errore Router LLM: {e}")
 
-    return {"web": web_content, "media": media_data, "screen": screen_display, "query_used": query_used, "telegram_sent": telegram_sent, "reasoning": reasoning_text}
+    # --- FALLBACK DETERMINISTICO SE IL ROUTER NON RICONOSCE RICHIESTE VISIVE/VIDEO ---
+    msg_lower = user_message.lower().strip()
+    if tool == "NONE" and screen_type == "NONE":
+        if any(k in msg_lower for k in ["mostrami", "fammi vedere", "foto di", "immagine di", "immagini di", "com'è fatto", "com'è fatta"]):
+            tool = "IMAGE_SEARCH"
+            screen_type = "IMAGE_PREVIEW"
+            query = re.sub(r'^(mostrami|fammi vedere|cerca foto di|cerca immagini di|foto di|immagine di)\s+', '', msg_lower).strip() or user_message
+            reasoning_text = f"Rilevata richiesta visiva per: {query}"
+        elif any(k in msg_lower for k in ["video di", "su youtube", "metti la canzone", "riproduci", "trailer di"]):
+            tool = "YOUTUBE"
+            screen_type = "MEDIA_PLAYER"
+            reasoning_text = f"Rilevata richiesta video/media per: {query}"
+
+    # --- ESECUZIONE TOOL E PROIEZIONE VISUAL HUD ---
+    try:
+        if tool == "SEND_TELEGRAM":
+            telegram_sent = await send_telegram_message(query)
+            query_used = f"Telegram Text: '{query}'"
+
+        elif tool == "SEND_TELEGRAM_VOICE":
+            telegram_sent = await send_telegram_voice_note(query)
+            query_used = f"Telegram Voice: '{query}'"
+
+        elif tool == "YOUTUBE" or screen_type == "MEDIA_PLAYER":
+            if tool == "APPLE_MUSIC":
+                media_data = search_apple_music(query)
+                query_used = f"Apple Music: {query}"
+                if media_data:
+                    screen_display = {
+                        "type": "MEDIA_PLAYER",
+                        "title": media_data.get("title", query),
+                        "embed_url": media_data.get("embed_url")
+                    }
+            else:
+                media_data = search_youtube(query)
+                query_used = f"YouTube: {query}"
+                if media_data:
+                    screen_display = {
+                        "type": "MEDIA_PLAYER",
+                        "title": media_data.get("title", query),
+                        "embed_url": media_data.get("embed_url"),
+                        "watch_url": media_data.get("watch_url")
+                    }
+
+        elif tool == "IMAGE_SEARCH" or screen_type == "IMAGE_PREVIEW":
+            img_url = search_image(query)
+            query_used = f"Image Search: {query}"
+            if not web_content:
+                web_content = search_web(query)
+            safe_web = truncate_text(web_content, 400)
+            if img_url:
+                screen_display = {
+                    "type": "IMAGE_PREVIEW",
+                    "title": query,
+                    "image_url": img_url,
+                    "content": safe_web
+                }
+            elif safe_web:
+                screen_display = {
+                    "type": "SEARCH_PREVIEW",
+                    "query": query,
+                    "content": safe_web
+                }
+
+        elif tool == "WEB_SEARCH" and not web_content:
+            web_content = search_web(query)
+            query_used = f"Web Search: {query}"
+            img_url = search_image(query)
+            safe_web = truncate_text(web_content, 400)
+            screen_display = (
+                {"type": "IMAGE_PREVIEW", "title": query, "image_url": img_url, "content": safe_web}
+                if img_url else
+                {"type": "SEARCH_PREVIEW", "query": query, "content": safe_web}
+            )
+
+        if screen_type == "WEB_BROWSER" and screen_target.startswith("http"):
+            screen_display = {"type": "WEB_BROWSER", "url": screen_target}
+        elif screen_type == "PERSON_CARD" and screen_target:
+            all_contacts = get_contacts()
+            matched = next((c for c in all_contacts if screen_target.lower() in c['name'].lower()), None)
+            screen_display = {
+                "type": "PERSON_CARD",
+                "person": matched or {"name": screen_target, "relation_type": "contatto", "notes": ""}
+            }
+    except Exception as e:
+        print(f"Errore esecuzione Tool/HUD: {e}")
+
+    return {
+        "web": web_content,
+        "media": media_data,
+        "screen": screen_display,
+        "query_used": query_used,
+        "telegram_sent": telegram_sent,
+        "reasoning": reasoning_text
+    }
 
 
 async def generate_peter_response(user_message: str, recent_context: str, long_term_facts: str, image_data_url: str = None) -> dict:
@@ -147,15 +257,28 @@ async def generate_peter_response(user_message: str, recent_context: str, long_t
     safe_recent_context = truncate_text(recent_context, 1200, from_end=True)
     safe_web_content = truncate_text(tool_exec["web"], 800)
     
+    hud_status_note = ""
+    if tool_exec["screen"]:
+        s_type = tool_exec["screen"].get("type", "")
+        if s_type == "IMAGE_PREVIEW":
+            hud_status_note = "\n[SISTEMA HUD: Hai appena proiettato l'immagine richiesta nel Visual HUD a destra. Non incollare URL o link finti in chat.]"
+        elif s_type == "MEDIA_PLAYER":
+            hud_status_note = "\n[SISTEMA HUD: Hai appena avviato il video/audio nel Visual HUD a destra.]"
+
     system_prompt = (
         f"Sei Peter, l'IA personale di Marco.\n"
         f"DATA/ORA: {now_str}\n"
         f"- Tono: '{current_tone}'\n"
-        "Sii conciso e brillante.\n"
+        "REGOLE DI RISPOSTA OBBLIGATORIE:\n"
+        "1. Sii breve, diretto e intelligente (massimo 3-5 frasi per domande normali, niente muri di testo o chiusure inutili).\n"
+        "2. NON usare MAI tabelle Markdown (niente simboli | o ---), asterischi (**), cancelletti (#) o link [testo](url). Scrivi in testo pulito e scorrevole.\n"
+        "3. Se elenchi opzioni, usa al massimo 3 righe brevi con un semplice trattino (-).\n"
+        "4. NON inventare MAI link di negozi o URL di immagini.\n"
+        f"{hud_status_note}"
     )
 
     if safe_web_content:
-        system_prompt += f"\nWeb Data:\n{safe_web_content}"
+        system_prompt += f"\nWeb Data reali:\n{safe_web_content}"
     if safe_long_term:
         system_prompt += f"\nMemorie Base:\n{safe_long_term}"
     if safe_recent_context:
@@ -180,7 +303,7 @@ async def generate_peter_response(user_message: str, recent_context: str, long_t
             res = await client.post(GROQ_URL, json={
                 "model": model_to_use,
                 "messages": messages,
-                "temperature": 0.5
+                "temperature": 0.4
             }, headers={"Content-Type": "application/json", "Authorization": f"Bearer {GROQ_API_KEY}"})
             
             if res.status_code != 200:
@@ -189,8 +312,11 @@ async def generate_peter_response(user_message: str, recent_context: str, long_t
                     "query_used": "", "media": None, "screen": None, "reasoning": f"> API Error {res.status_code}"
                 }
             
+            raw_reply = res.json()["choices"][0]["message"]["content"]
+            cleaned_reply = clean_reply_text(raw_reply)
+            
             return {
-                "reply": res.json()["choices"][0]["message"]["content"], 
+                "reply": cleaned_reply, 
                 "query_used": tool_exec["query_used"], 
                 "media": tool_exec["media"], 
                 "screen": tool_exec["screen"],
@@ -309,10 +435,4 @@ async def extract_and_save_facts(user_message: str, image_data_url: str = None):
         task = asyncio.create_task(process_chunk(chunk, assigned_model, index, image_data_url))
         tasks.append(task)
         
-        # Aggiunge un delay minimo tra un'assegnazione e l'altra se i chunk sono tantissimi
-        if index > 0 and index % len(WORKER_MODELS) == 0:
-            await asyncio.sleep(2)
-            
-    # Esegue tutti i chunk in background contemporaneamente sui diversi modelli!
-    if tasks:
-        await asyncio.gather(*tasks)
+        # Aggiunge un delay minimo tra un'assegnazione e l'altra se i chunk sono tant
