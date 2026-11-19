@@ -102,8 +102,11 @@ def save_contact_entity(
     notes: str = "",
     gender: str = "sconosciuto",
     birth_year: int = None,
-    relation_type: str = "neutrale"
+    relation_type: str = "neutrale",
+    birthday: str = None,
+    photo_url: str = None
 ):
+    """Salva o aggiorna un contatto in Supabase includendo compleanno, foto e note relazionali."""
     if not supabase or not name:
         return
     if name.upper() in ["NESSUNO", "MARCO", "BARBI", "MARCO BARBIERO TORRES"]:
@@ -112,24 +115,47 @@ def save_contact_entity(
     try:
         res = supabase.table("contacts").select("*").ilike("name", name).execute()
         if not res.data:
-            supabase.table("contacts").insert([{
+            payload = {
                 "name": name,
                 "category": category,
                 "notes": notes,
                 "gender": gender,
                 "birth_year": birth_year,
                 "relation_type": relation_type
-            }]).execute()
+            }
+            if birthday:
+                payload["birthday"] = birthday
+            if photo_url:
+                payload["photo_url"] = photo_url
+            try:
+                supabase.table("contacts").insert([payload]).execute()
+            except Exception:
+                # Fallback resiliente se le colonne opzionali birthday/photo_url non esistono ancora nello schema SQL
+                payload.pop("birthday", None)
+                payload.pop("photo_url", None)
+                supabase.table("contacts").insert([payload]).execute()
         else:
             existing = res.data[0]
             old_notes = existing.get("notes", "")
-            updated_notes = old_notes if notes in old_notes else f"{old_notes} | {notes}".strip(" |")
-            supabase.table("contacts").update({
+            updated_notes = old_notes if (not notes or notes in old_notes) else f"{old_notes} | {notes}".strip(" |")
+            update_payload = {
                 "notes": updated_notes,
                 "gender": gender if gender != "sconosciuto" else existing.get("gender"),
                 "birth_year": birth_year if birth_year else existing.get("birth_year"),
-                "relation_type": relation_type if relation_type != "neutrale" else existing.get("relation_type")
-            }).eq("id", existing["id"]).execute()
+                "relation_type": relation_type if relation_type != "neutrale" else existing.get("relation_type"),
+                "category": category if category != "amicizia" else existing.get("category", category)
+            }
+            if birthday:
+                update_payload["birthday"] = birthday
+            if photo_url:
+                update_payload["photo_url"] = photo_url
+            try:
+                supabase.table("contacts").update(update_payload).eq("id", existing["id"]).execute()
+            except Exception:
+                # Fallback se le colonne opzionali non sono presenti nella tabella contacts
+                update_payload.pop("birthday", None)
+                update_payload.pop("photo_url", None)
+                supabase.table("contacts").update(update_payload).eq("id", existing["id"]).execute()
     except Exception as e:
         print(f"Errore contatto: {e}")
 
@@ -144,8 +170,167 @@ def save_contacts_batch(contacts: list):
             notes=contact.get("notes", ""),
             gender=contact.get("gender", "sconosciuto"),
             birth_year=contact.get("birth_year"),
-            relation_type=contact.get("relation_type", "neutrale")
+            relation_type=contact.get("relation_type", "neutrale"),
+            birthday=contact.get("birthday"),
+            photo_url=contact.get("photo_url")
         )
+
+
+def update_person_card(node_id: str, data: dict) -> dict | None:
+    """Aggiorna la scheda modificabile di una persona (nome, relazione, compleanno, note, foto) su nodes e contacts."""
+    if not supabase or not node_id:
+        return None
+    try:
+        node_res = supabase.table("nodes").select("*").eq("id", node_id).execute()
+        existing_node = node_res.data[0] if node_res.data else {"id": node_id, "type": "person"}
+
+        name = (data.get("name") or existing_node.get("name") or "").strip()
+        relation_type = (data.get("relation_type") or existing_node.get("relation_type") or "neutrale").strip()
+        birthday = (data.get("birthday") if "birthday" in data else existing_node.get("birthday") or "").strip()
+        notes = (data.get("notes") if "notes" in data else existing_node.get("notes") or "").strip()
+        photo_url = (data.get("photo_url") if "photo_url" in data else existing_node.get("photo_url") or "").strip()
+        parent_name = (data.get("parent_name") if "parent_name" in data else existing_node.get("parent_name") or "").strip()
+
+        family_keywords = (
+            "famiglia", "padre", "madre", "genitore", "figlio", "figlia",
+            "fratello", "sorella", "nonno", "nonna", "zio", "zia",
+            "cugino", "cugina", "nipote", "marito", "moglie", "coniuge"
+        )
+        is_family = any(k in relation_type.lower() for k in family_keywords) or existing_node.get("category") == "famiglia"
+        category = "famiglia" if is_family else (existing_node.get("category") or "amicizia")
+
+        # Sincronizza la tabella contacts
+        old_name = existing_node.get("name") or name
+        contact_res = supabase.table("contacts").select("*").ilike("name", old_name).execute()
+        contact_payload = {
+            "name": name,
+            "category": category,
+            "relation_type": relation_type,
+            "notes": notes,
+            "birthday": birthday or None,
+            "photo_url": photo_url or None
+        }
+        if contact_res.data:
+            c_id = contact_res.data[0]["id"]
+            try:
+                supabase.table("contacts").update(contact_payload).eq("id", c_id).execute()
+            except Exception:
+                contact_payload.pop("birthday", None)
+                contact_payload.pop("photo_url", None)
+                supabase.table("contacts").update(contact_payload).eq("id", c_id).execute()
+        elif node_id != "user_self" and name:
+            save_contact_entity(
+                name=name,
+                category=category,
+                notes=notes,
+                relation_type=relation_type,
+                birthday=birthday or None,
+                photo_url=photo_url or None
+            )
+
+        # Sincronizza il nodo nel grafo 3D
+        node_payload = {
+            "id": node_id,
+            "name": name,
+            "type": "core" if node_id == "user_self" else "person",
+            "category": "core" if node_id == "user_self" else category,
+            "relation_type": relation_type,
+            "notes": notes,
+            "birthday": birthday or None,
+            "photo_url": photo_url or None,
+            "parent_name": parent_name or None
+        }
+        try:
+            supabase.table("nodes").upsert(node_payload).execute()
+        except Exception:
+            # Fallback se alcune colonne opzionali non sono ancora state migrate in Supabase
+            safe_node = {
+                "id": node_id,
+                "name": name,
+                "type": "core" if node_id == "user_self" else "person",
+                "category": "core" if node_id == "user_self" else category,
+                "relation_type": relation_type,
+                "notes": notes
+            }
+            supabase.table("nodes").upsert(safe_node).execute()
+
+        # Salva anche un fatto consolidato se è stato aggiunto un compleanno, così Peter lo ha sempre in memoria
+        if birthday and name and node_id != "user_self":
+            save_fact(f"Il compleanno di {name} ({relation_type}) è il {birthday}.")
+
+        return node_payload
+    except Exception as e:
+        print(f"Errore aggiornamento scheda persona: {e}")
+        return None
+
+
+def get_family_and_people_context(limit: int = 50) -> str:
+    """Costruisce un riepilogo strutturato di familiari, relazioni dirette, compleanni e note per il contesto LLM di Peter."""
+    if not supabase:
+        return ""
+    try:
+        nodes = supabase.table("nodes").select("*").eq("type", "person").limit(limit).execute().data or []
+        contacts = supabase.table("contacts").select("*").limit(limit).execute().data or []
+        edges = supabase.table("edges").select("*").limit(120).execute().data or []
+
+        id_to_name = {"user_self": "Marco"}
+        for n in nodes:
+            if n.get("id") and n.get("name"):
+                id_to_name[str(n["id"])] = n["name"]
+
+        contact_by_name = {str(c.get("name", "")).strip().lower(): c for c in contacts}
+        lines = []
+        seen_names = set()
+
+        for n in nodes:
+            name = (n.get("name") or "").strip()
+            if not name:
+                continue
+            seen_names.add(name.lower())
+            c_info = contact_by_name.get(name.lower(), {})
+            rel = n.get("relation_type") or c_info.get("relation_type") or "contatto"
+            bday = n.get("birthday") or c_info.get("birthday") or ""
+            notes = n.get("notes") or c_info.get("notes") or ""
+
+            # Ricostruisce i legami diretti dal grafo (padre/madre/figlio/coniuge)
+            nid = str(n.get("id"))
+            direct_links = []
+            for e in edges:
+                src, tgt = str(e.get("source", "")), str(e.get("target", ""))
+                erel = e.get("relation_type") or ""
+                if src == nid and tgt in id_to_name:
+                    direct_links.append(f"{erel} -> {id_to_name[tgt]}")
+                elif tgt == nid and src in id_to_name:
+                    direct_links.append(f"{id_to_name[src]} -> ({erel})")
+
+            parts = [f"- {name} [{rel}]"]
+            if bday:
+                parts.append(f"Compleanno: {bday}")
+            if direct_links:
+                parts.append(f"Legami diretti: {', '.join(direct_links)}")
+            if notes:
+                parts.append(f"Note: {notes}")
+            lines.append(" | ".join(parts))
+
+        # Aggiunge eventuali contatti non ancora presenti come nodi
+        for c in contacts:
+            name = (c.get("name") or "").strip()
+            if not name or name.lower() in seen_names:
+                continue
+            rel = c.get("relation_type") or c.get("category") or "contatto"
+            bday = c.get("birthday") or ""
+            notes = c.get("notes") or ""
+            parts = [f"- {name} [{rel}]"]
+            if bday:
+                parts.append(f"Compleanno: {bday}")
+            if notes:
+                parts.append(f"Note: {notes}")
+            lines.append(" | ".join(parts))
+
+        return "\n".join(lines)
+    except Exception as e:
+        print(f"Errore lettura contesto persone/famiglia: {e}")
+        return ""
 
 
 def save_event_entity(title: str, description: str = "", start_time: str = None):
