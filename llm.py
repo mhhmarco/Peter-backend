@@ -6,9 +6,10 @@ import httpx
 from fastapi import HTTPException
 from config import GROQ_API_KEY, GROQ_URL
 from database import (
-    save_fact, save_contact_entity, save_event_entity, 
+    save_fact, save_contact_entity, save_event_entity,
     save_interest_entity, get_contacts, get_all_interests,
-    get_personality_settings, make_stable_id, supabase
+    get_personality_settings, get_family_and_people_context,
+    make_stable_id, supabase
 )
 from tools import (
     search_web, search_youtube, search_apple_music,
@@ -291,7 +292,11 @@ async def generate_peter_response(user_message: str, recent_context: str, long_t
     personality = get_personality_settings()
     current_tone = personality.get("tone", "Schietto, empatico, naturale, colto e ironico.")
 
+    # Carica il contesto aggiornato di albero genealogico, compleanni e note delle persone
+    people_context = get_family_and_people_context(limit=50)
+
     safe_long_term = truncate_text(long_term_facts, 2000)
+    safe_people_context = truncate_text(people_context, 2200)
     safe_recent_context = truncate_text(recent_context, 1200, from_end=True)
     safe_web_content = truncate_text(tool_exec["web"], 1400)
 
@@ -317,12 +322,15 @@ async def generate_peter_response(user_message: str, recent_context: str, long_t
         "REGOLE ANTI-ALLUCINAZIONE E STILE:\n"
         "1. Rispondi in modo conciso, chiaro e naturale (massimo 3-4 frasi).\n"
         "2. Usa ESCLUSIVAMENTE i Web Data reali forniti qui sotto per date, biografie, prezzi o fatti recenti. Se un dato non è presente nei Web Data e non ne sei certo al 100%, dichiaralo senza indovinare.\n"
-        "3. NON usare MAI tabelle Markdown (|), asterischi (**), cancelletti (#) o link [testo](url). Scrivi in testo pulito.\n"
+        "3. Conosci l'albero genealogico, i compleanni e le note di familiari e contatti di Marco riportati qui sotto: usali con precisione quando Marco chiede di parenti, amici o ricorrenze.\n"
+        "4. NON usare MAI tabelle Markdown (|), asterischi (**), cancelletti (#) o link [testo](url). Scrivi in testo pulito.\n"
         f"{hud_status_note}"
     )
 
     if safe_web_content:
         system_prompt += f"\nWeb Data reali (FONTE VERIFICATA):\n{safe_web_content}"
+    if safe_people_context:
+        system_prompt += f"\nAlbero Genealogico, Contatti, Compleanni e Note:\n{safe_people_context}"
     if safe_long_term:
         system_prompt += f"\nMemorie Base:\n{safe_long_term}"
     if safe_recent_context:
@@ -371,12 +379,27 @@ async def generate_peter_response(user_message: str, recent_context: str, long_t
         }
 
 
-# --- FUNZIONE WORKER PER IL CHUNKING PARALLELO CON ID DETERMINISTICI ---
+def _resolve_person_node_id(person_name: str) -> str:
+    """Restituisce 'user_self' se il nome indica Marco, altrimenti un ID deterministico contatto."""
+    clean = (person_name or "").strip()
+    if clean.lower() in ["marco", "marco (tu)", "barbi", "marco barbiero", "marco barbiero torres", "io"]:
+        return "user_self"
+    return make_stable_id("contact", clean)
+
+
+# --- FUNZIONE WORKER PER IL CHUNKING PARALLELO CON ID DETERMINISTICI E ALBERO GENEALOGICO ---
 async def process_chunk(chunk: str, model: str, index: int, image_data_url: str = None):
     extraction_prompt = (
-        "Sei l'estrattore dati di Peter. Utente: Marco Barbiero Torres.\n"
-        "Estrai IN MODO SILENZIOSO in JSON le entità che trovi in questo blocco di testo:\n"
-        '{"fact": "...", "people": [{"name": "...", "gender": "M/F", "birth_year": 1975, "relation_type": "...", "notes": "..."}], "event_title": "...", "event_desc": "...", "interest_name": "...", "interest_desc": "..."}'
+        "Sei l'estrattore dati e genealogista di Peter. Utente centrale: Marco (ID 'Marco').\n"
+        "Estrai IN MODO SILENZIOSO in JSON le entità e l'albero genealogico diretto.\n"
+        "REGOLE RIGIDE PER L'ALBERO GENEALOGICO:\n"
+        "- Collega i familiari SOLO con legami diretti: padre, madre, figlio, figlia, marito, moglie.\n"
+        "- Esempio: se 'Mario è il padre di Marco', Mario ha child_name='Marco' e relation_type='padre'.\n"
+        "- Esempio: se 'Giuseppe è il nonno paterno di Marco' (padre di Mario), Giuseppe ha child_name='Mario' e relation_type='nonno' (NON collegarlo direttamente a Marco, ma a suo figlio Mario così la catena risale a Marco!).\n"
+        "- Esempio: se 'Anna è la moglie di Mario', Anna ha spouse_name='Mario' e relation_type='madre/moglie'.\n"
+        "- Inserisci nella chiave 'notes' della persona la descrizione completa dei suoi legami con i parenti fino a Marco (es. 'Padre di Mario, nonno paterno di Marco').\n"
+        "Formato JSON richiesto:\n"
+        '{"fact": "...", "people": [{"name": "...", "gender": "M/F", "birth_year": 1975, "birthday": "12 maggio", "relation_type": "padre/madre/figlio/figlia/marito/moglie/nonno/zio/amico", "parent_name": "nome del padre o madre se noto", "child_name": "nome del figlio o figlia se noto (usa Marco se è genitore di Marco)", "spouse_name": "nome di marito o moglie se noto", "notes": "relazione dettagliata con parenti e Marco"}], "event_title": "...", "event_desc": "...", "interest_name": "...", "interest_desc": "..."}'
     )
 
     messages = [{"role": "system", "content": extraction_prompt}]
@@ -420,27 +443,121 @@ async def process_chunk(chunk: str, model: str, index: int, image_data_url: str 
                     people_list = parsed.get("people", [])
                     for p in people_list:
                         p_name = p.get("name", "").strip()
-                        if p_name and p_name.lower() not in ["marco", "barbi", "marco barbiero", "marco barbiero torres", "nessuno"]:
-                            save_contact_entity(
-                                name=p_name,
-                                category=p.get("relation_type", "amicizia"),
-                                notes=p.get("notes", ""),
-                                gender=p.get("gender", "sconosciuto"),
-                                birth_year=p.get("birth_year"),
-                                relation_type=p.get("relation_type", "neutrale")
-                            )
-                            if supabase:
+                        if not p_name or p_name.lower() in ["marco", "barbi", "marco barbiero", "marco barbiero torres", "nessuno"]:
+                            continue
+
+                        rel_type = (p.get("relation_type") or "neutrale").strip()
+                        notes = (p.get("notes") or "").strip()
+                        birthday = (p.get("birthday") or "").strip() or None
+                        parent_name = (p.get("parent_name") or "").strip()
+                        child_name = (p.get("child_name") or "").strip()
+                        spouse_name = (p.get("spouse_name") or "").strip()
+
+                        family_terms = ("famiglia", "padre", "madre", "figlio", "figlia", "marito", "moglie", "coniuge", "nonno", "nonna", "zio", "zia", "cugino", "cugina", "fratello", "sorella", "nipote")
+                        is_family = any(t in rel_type.lower() for t in family_terms) or bool(parent_name or child_name or spouse_name)
+                        category = "famiglia" if is_family else rel_type
+
+                        save_contact_entity(
+                            name=p_name,
+                            category=category,
+                            notes=notes,
+                            gender=p.get("gender", "sconosciuto"),
+                            birth_year=p.get("birth_year"),
+                            relation_type=rel_type,
+                            birthday=birthday
+                        )
+
+                        if supabase:
+                            try:
+                                node_id = make_stable_id("contact", p_name)
+                                node_record = {
+                                    "id": node_id,
+                                    "name": p_name,
+                                    "type": "person",
+                                    "category": category,
+                                    "notes": notes,
+                                    "gender": p.get("gender", "sconosciuto"),
+                                    "birth_year": p.get("birth_year"),
+                                    "relation_type": rel_type,
+                                }
+                                if birthday:
+                                    node_record["birthday"] = birthday
+                                if parent_name:
+                                    node_record["parent_name"] = parent_name
+                                    node_record["parent_node_id"] = _resolve_person_node_id(parent_name)
+
                                 try:
-                                    node_id = make_stable_id("contact", p_name)
-                                    supabase.table("nodes").upsert({
-                                        "id": node_id, "name": p_name, "type": "person",
-                                        "category": p.get("relation_type", "amicizia"),
-                                        "notes": p.get("notes", ""), "gender": p.get("gender", "sconosciuto"),
-                                        "birth_year": p.get("birth_year"), "relation_type": p.get("relation_type", "neutrale")
-                                    }).execute()
-                                    supabase.table("edges").upsert({"source": "user_self", "target": node_id, "relation_type": p.get("relation_type", "neutrale")}).execute()
+                                    supabase.table("nodes").upsert(node_record).execute()
                                 except Exception:
-                                    pass
+                                    # Fallback resiliente se le colonne extra non esistono ancora in Supabase
+                                    node_record.pop("birthday", None)
+                                    node_record.pop("parent_name", None)
+                                    node_record.pop("parent_node_id", None)
+                                    supabase.table("nodes").upsert(node_record).execute()
+
+                                # Costruisce SOLO archi genealogici diretti (genitore -> figlio, marito <-> moglie)
+                                linked = False
+                                if parent_name:
+                                    parent_id = _resolve_person_node_id(parent_name)
+                                    if parent_id != node_id:
+                                        supabase.table("edges").upsert({
+                                            "source": parent_id,
+                                            "target": node_id,
+                                            "relation_type": "figlio/a" if p.get("gender") not in ("M", "F") else ("figlio" if p.get("gender") == "M" else "figlia"),
+                                            "category": "famiglia"
+                                        }).execute()
+                                        linked = True
+
+                                if child_name:
+                                    child_id = _resolve_person_node_id(child_name)
+                                    if child_id != node_id:
+                                        parent_label = "padre" if p.get("gender") == "M" else ("madre" if p.get("gender") == "F" else "genitore")
+                                        supabase.table("edges").upsert({
+                                            "source": node_id,
+                                            "target": child_id,
+                                            "relation_type": parent_label,
+                                            "category": "famiglia"
+                                        }).execute()
+                                        linked = True
+
+                                if spouse_name:
+                                    spouse_id = _resolve_person_node_id(spouse_name)
+                                    if spouse_id != node_id:
+                                        spouse_label = "marito" if p.get("gender") == "M" else ("moglie" if p.get("gender") == "F" else "coniuge")
+                                        supabase.table("edges").upsert({
+                                            "source": node_id,
+                                            "target": spouse_id,
+                                            "relation_type": spouse_label,
+                                            "category": "famiglia"
+                                        }).execute()
+                                        linked = True
+
+                                # Se non è un familiare o non ha ancora un ponte diretto, collegalo a Marco solo se non familiare indiretto
+                                if not linked and not is_family:
+                                    supabase.table("edges").upsert({
+                                        "source": "user_self",
+                                        "target": node_id,
+                                        "relation_type": rel_type,
+                                        "category": "relazione"
+                                    }).execute()
+                                elif not linked and is_family and any(k in rel_type.lower() for k in ("padre", "madre", "figlio", "figlia", "marito", "moglie")):
+                                    # Collega direttamente a Marco solo i parenti di primo grado (genitori, figli, coniuge)
+                                    if any(k in rel_type.lower() for k in ("padre", "madre")):
+                                        supabase.table("edges").upsert({
+                                            "source": node_id,
+                                            "target": "user_self",
+                                            "relation_type": rel_type.lower(),
+                                            "category": "famiglia"
+                                        }).execute()
+                                    else:
+                                        supabase.table("edges").upsert({
+                                            "source": "user_self",
+                                            "target": node_id,
+                                            "relation_type": rel_type.lower(),
+                                            "category": "famiglia"
+                                        }).execute()
+                            except Exception:
+                                pass
 
                     if parsed.get("event_title") and parsed.get("event_title") != "NESSUNO":
                         ev_title = parsed.get("event_title")
