@@ -145,7 +145,7 @@
     }
     .ios-mini-btn.danger{color:#fda4af;border-color:rgba(253,164,175,.3);}
 
-    /* NEXUS 3D CENTRATO + SCHEDA NODO MODIFICABILE IOS 27 */
+    /* NEXUS 3D CENTRATO + ALBERO GENEALOGICO DAG + SCHEDA NODO MODIFICABILE IOS 27 */
     .nexus-multi-graphs{margin:10px 0 14px;position:relative;}
     .nexus-graph-tabs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;align-items:center;}
     .nexus-graph-tab{border:1px solid var(--glass-border);border-radius:14px;background:rgba(14,24,38,.75);color:#d8eaff;padding:10px 14px;font:600 11px ui-monospace,monospace;letter-spacing:.05em;cursor:pointer}
@@ -161,11 +161,11 @@
 
     /* SCHEDA INTERATTIVA DETTAGLIO & MODIFICA NODO */
     .nexus-node-sheet{
-      position:absolute;top:14px;right:14px;width:min(360px,calc(100% - 28px));max-height:calc(100% - 28px);
+      position:absolute;top:14px;right:14px;width:min(365px,calc(100% - 28px));max-height:calc(100% - 28px);
       overflow-y:auto;padding:18px;border-radius:22px;z-index:25;
-      background:rgba(14,21,34,.88);backdrop-filter:blur(28px) saturate(180%);-webkit-backdrop-filter:blur(28px) saturate(180%);
+      background:rgba(14,21,34,.9);backdrop-filter:blur(28px) saturate(180%);-webkit-backdrop-filter:blur(28px) saturate(180%);
       border:1px solid rgba(108,229,255,.32);box-shadow:0 24px 60px rgba(0,0,0,.6);
-      display:none;flex-direction:column;gap:12px;color:var(--text);
+      display:none;flex-direction:column;gap:11px;color:var(--text);
     }
     .nexus-node-sheet.open{display:flex;}
     .nexus-sheet-top{display:flex;align-items:center;justify-content:space-between;gap:10px;}
@@ -173,30 +173,35 @@
     .nexus-sheet-close{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:#fff;border-radius:10px;width:28px;height:28px;cursor:pointer;font-size:14px;}
     .nexus-avatar-row{display:flex;align-items:center;gap:12px;}
     .nexus-avatar-preview{
-      width:64px;height:64px;border-radius:18px;object-fit:cover;flex-shrink:0;
+      width:62px;height:62px;border-radius:18px;object-fit:cover;flex-shrink:0;
       background:linear-gradient(135deg,rgba(94,158,255,.28),rgba(184,156,255,.28));
       border:1px solid rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;
       font-size:22px;font-weight:700;color:#fff;overflow:hidden;
     }
     .nexus-avatar-preview img{width:100%;height:100%;object-fit:cover;}
-    .nexus-field{display:flex;flex-direction:column;gap:5px;}
-    .nexus-field label{font:600 10.5px ui-monospace,monospace;color:var(--muted);letter-spacing:.05em;}
+    .nexus-field{display:flex;flex-direction:column;gap:4px;}
+    .nexus-field label{font:600 10px ui-monospace,monospace;color:var(--muted);letter-spacing:.05em;}
     .nexus-input,.nexus-textarea{
-      width:100%;box-sizing:border-box;padding:9px 12px;border-radius:12px;
+      width:100%;box-sizing:border-box;padding:8px 11px;border-radius:12px;
       background:rgba(6,10,18,.72);border:1px solid rgba(255,255,255,.15);
-      color:#fff;font-size:13px;font-family:inherit;outline:none;
+      color:#fff;font-size:12.5px;font-family:inherit;outline:none;
     }
     .nexus-input:focus,.nexus-textarea:focus{border-color:var(--cyan);}
-    .nexus-textarea{min-height:84px;resize:vertical;line-height:1.45;}
+    .nexus-textarea{min-height:74px;resize:vertical;line-height:1.45;}
     .nexus-photo-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
     .nexus-upload-lbl{
-      padding:6px 11px;border-radius:10px;background:rgba(108,229,255,.14);
+      padding:6px 10px;border-radius:10px;background:rgba(108,229,255,.14);
       border:1px solid rgba(108,229,255,.35);color:var(--cyan);font-size:11px;font-weight:600;cursor:pointer;
     }
+    .nexus-sheet-btn-row{display:flex;gap:8px;align-items:center;}
     .nexus-save-btn{
-      padding:10px 14px;border-radius:14px;border:none;cursor:pointer;font-weight:700;font-size:13px;
+      flex:1;padding:10px 14px;border-radius:14px;border:none;cursor:pointer;font-weight:700;font-size:12.5px;
       background:linear-gradient(135deg,#5e9eff,#38bdf8);color:#04101f;
       box-shadow:0 8px 20px rgba(56,189,248,.28);
+    }
+    .nexus-del-btn{
+      padding:10px 12px;border-radius:14px;cursor:pointer;font-weight:600;font-size:12px;
+      background:rgba(244,63,94,.14);border:1px solid rgba(244,63,94,.38);color:#fda4af;
     }
     .nexus-save-status{font-size:11.5px;color:var(--green);min-height:16px;}
 
@@ -513,7 +518,7 @@
   }
   initMemoryCoreUI();
 
-  // --- NEURAL NEXUS 3D (CENTRATO, SENZA SEZIONE CHAT, CON SCHEDA NODO MODIFICABILE) ---
+  // --- NEURAL NEXUS 3D (CENTRATO, ALBERO GENEALOGICO DAG, SENZA CHAT, CON SCHEDA MODIFICABILE) ---
   const graphView = document.getElementById('view-nexus');
   if (graphView) {
     const legacy = graphView.querySelector('.graph-view');
@@ -550,7 +555,7 @@
 
     // Sezione "TUTTE LE CHAT" rimossa dal grafo 3D
     const views = [
-      { id: 'family', label: 'ALBERO FAMILIARE', caption: 'Albero genealogico diretto (genitori, figli, coniugi) collegato a Marco.' },
+      { id: 'family', label: 'ALBERO FAMILIARE', caption: 'Albero genealogico gerarchico (genitori, figli, coniugi) che risale a Marco.' },
       { id: 'people', label: 'PERSONE E RELAZIONI', caption: 'Amici, colleghi e conoscenti collegati per relazione.' },
       { id: 'facts', label: 'RICORDI A LUNGO TERMINE', caption: 'Mappa radiale dei fatti consolidati nella memoria semantica.' },
     ];
@@ -562,7 +567,7 @@
     const color = node => node.type === 'core' ? '#32e6ac' : node.type === 'person' ? (node.relationship_group === 'family' ? '#ff6fbe' : '#5e9eff') : '#b89cff';
     function disposeGraph() { if (graph) { graph._destructor?.(); graph = null; } }
 
-    // Funzione di centraggio camera che mantiene il nodo centrale Marco (0,0,0) sempre al centro del canvas
+    // Centra sempre il baricentro del grafo rispetto al viewport
     function centerGraphCamera(duration = 450) {
       if (!graph) return;
       const w = stageWrap.clientWidth || canvas.clientWidth || 800;
@@ -572,7 +577,7 @@
       if (nodes.length <= 1) {
         graph.cameraPosition({ x: 0, y: 0, z: 220 }, { x: 0, y: 0, z: 0 }, duration);
       } else {
-        graph.zoomToFit(duration, 85);
+        graph.zoomToFit(duration, 80);
       }
     }
 
@@ -602,7 +607,7 @@
       });
     }
 
-    // Apre la scheda dettagliata al click su un nodo (modificabile per persone, memoria dettagliata per fatti)
+    // Apre la scheda dettagliata al click su un nodo (modificabile/eliminabile per persone, memoria dettagliata per fatti)
     function openNodeSheet(node) {
       if (!node || !sheet || !sheetBody) return;
       const isPerson = node.type === 'person' || node.type === 'core';
@@ -611,7 +616,6 @@
         : `MEMORIA DETTAGLIATA // ${(node.type || 'NODO').toUpperCase()}`;
 
       if (!isPerson) {
-        // Scheda dettagliata per nodi di memoria / fatti
         sheetBody.innerHTML = `
           <div style="font-size:15px;font-weight:700;color:#fff;margin-bottom:8px;">${node.name || 'Ricordo'}</div>
           <div style="font-size:13px;line-height:1.55;color:#dbe8fa;white-space:pre-wrap;background:rgba(255,255,255,.04);padding:12px;border-radius:14px;border:1px solid rgba(255,255,255,.09);">
@@ -623,9 +627,9 @@
         return;
       }
 
-      // Scheda modificabile per Marco e per ogni persona dell'albero familiare o delle relazioni
       let currentPhoto = node.photo_url || '';
       const initialLetter = (node.name || '?').trim().charAt(0).toUpperCase();
+      const canDelete = node.id !== 'user_self';
 
       sheetBody.innerHTML = `
         <div class="nexus-avatar-row">
@@ -644,7 +648,7 @@
               📷 Scegli Foto
               <input type="file" accept="image/*" id="nexus-photo-file" style="display:none;">
             </label>
-            <input type="text" class="nexus-input" id="nexus-photo-url" placeholder="https://... oppure carica file" value="${currentPhoto.startsWith('data:') ? '' : currentPhoto}" style="flex:1;min-width:140px;">
+            <input type="text" class="nexus-input" id="nexus-photo-url" placeholder="https://... oppure carica file" value="${currentPhoto.startsWith('data:') ? '' : currentPhoto}" style="flex:1;min-width:130px;">
           </div>
         </div>
         <div class="nexus-field">
@@ -656,6 +660,10 @@
           <input type="text" class="nexus-input" id="nexus-edit-rel" value="${node.relation_type || ''}">
         </div>
         <div class="nexus-field">
+          <label>COLLEGATO A (NOME GENITORE O CONIUGE NELL'ALBERO)</label>
+          <input type="text" class="nexus-input" id="nexus-edit-parent" placeholder="Es. Marco, oppure nome del padre/madre" value="${node.parent_name || ''}">
+        </div>
+        <div class="nexus-field">
           <label>COMPLEANNO</label>
           <input type="text" class="nexus-input" id="nexus-edit-bday" placeholder="Es. 12 agosto 1975" value="${node.birthday || ''}">
         </div>
@@ -663,7 +671,10 @@
           <label>NOTE E MEMORIA RELAZIONI (USATE DA PETER)</label>
           <textarea class="nexus-textarea" id="nexus-edit-notes" placeholder="Inserisci legami familiari, dettagli, ricordi...">${node.notes || ''}</textarea>
         </div>
-        <button type="button" class="nexus-save-btn" id="nexus-save-person">Salva nella Memoria di Peter</button>
+        <div class="nexus-sheet-btn-row">
+          <button type="button" class="nexus-save-btn" id="nexus-save-person">Salva nella Memoria</button>
+          ${canDelete ? '<button type="button" class="nexus-del-btn" id="nexus-del-person" title="Rimuovi persona dal grafo">Elimina</button>' : ''}
+        </div>
         <div class="nexus-save-status" id="nexus-save-status"></div>
       `;
 
@@ -671,6 +682,7 @@
       const fileInput = sheetBody.querySelector('#nexus-photo-file');
       const urlInput = sheetBody.querySelector('#nexus-photo-url');
       const saveBtn = sheetBody.querySelector('#nexus-save-person');
+      const delBtn = sheetBody.querySelector('#nexus-del-person');
       const statusEl = sheetBody.querySelector('#nexus-save-status');
 
       fileInput?.addEventListener('change', async (e) => {
@@ -697,6 +709,7 @@
         const payload = {
           name: sheetBody.querySelector('#nexus-edit-name')?.value.trim() || node.name,
           relation_type: sheetBody.querySelector('#nexus-edit-rel')?.value.trim() || node.relation_type,
+          parent_name: sheetBody.querySelector('#nexus-edit-parent')?.value.trim() || '',
           birthday: sheetBody.querySelector('#nexus-edit-bday')?.value.trim() || '',
           notes: sheetBody.querySelector('#nexus-edit-notes')?.value.trim() || '',
           photo_url: currentPhoto || ''
@@ -712,12 +725,26 @@
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           Object.assign(node, payload);
           statusEl.textContent = 'Salvato! Peter ora userà questi dati nel suo contesto.';
-          // Ricarica il grafo corrente mantenendo la vista centrata
           await renderView(activeViewObj, true);
         } catch (err) {
           statusEl.textContent = `Errore salvataggio: ${err.message || err}`;
         } finally {
           saveBtn.disabled = false;
+        }
+      });
+
+      delBtn?.addEventListener('click', async () => {
+        if (!confirm(`Vuoi eliminare "${node.name}" dal grafo e dalla memoria di Peter?`)) return;
+        delBtn.disabled = true;
+        statusEl.textContent = 'Eliminazione in corso...';
+        try {
+          const res = await fetch(`/api/nexus/person/${encodeURIComponent(node.id)}`, { method: 'DELETE' });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          sheet.classList.remove('open');
+          await renderView(activeViewObj, false);
+        } catch (err) {
+          statusEl.textContent = `Errore eliminazione: ${err.message || err}`;
+          delBtn.disabled = false;
         }
       });
 
@@ -760,12 +787,21 @@
           return;
         }
 
-        // Fissa sempre il nodo centrale Marco a (0,0,0) per centrare perfettamente l'intera rete
+        const isFamilyTree = view.id === 'family';
+
+        // Nell'albero genealogico DAG lasciamo che il motore disponga le generazioni dall'alto verso il basso (Nonni -> Genitori -> Marco -> Figli);
+        // nelle viste radiali fissiamo Marco al centro (0,0,0).
         nodes.forEach(n => {
           if (n.id === 'user_self' || n.type === 'core') {
-            n.fx = 0;
-            n.fy = 0;
-            n.fz = 0;
+            if (isFamilyTree) {
+              delete n.fx;
+              delete n.fy;
+              delete n.fz;
+            } else {
+              n.fx = 0;
+              n.fy = 0;
+              n.fz = 0;
+            }
           }
         });
 
@@ -783,12 +819,13 @@
           .nodeVal(n => n.type === 'core' ? 13 : 8)
           .linkLabel(l => l.relation_type || '')
           .linkColor(l => String(l.category || '').includes('famiglia') ? '#32e6ac' : '#7c95b4')
-          .linkOpacity(.72)
+          .linkOpacity(.78)
+          .linkDirectionalArrowLength(isFamilyTree ? 5 : 0)
+          .linkDirectionalArrowRelPos(1)
           .linkDirectionalParticles(2)
           .linkDirectionalParticleWidth(2)
           .onNodeClick(node => {
             openNodeSheet(node);
-            // Aggiorna anche l'eventuale inspector legacy se presente nel DOM
             const inspector = document.getElementById('nexus-inspector');
             const title = document.getElementById('inspector-title');
             const meta = document.getElementById('inspector-meta');
@@ -802,12 +839,18 @@
             if (token === loadToken) centerGraphCamera(400);
           });
 
-        graph.d3Force('charge')?.strength(-150);
-        graph.d3Force('link')?.distance(view.id === 'family' ? 95 : 75);
+        // Attiva disposizione gerarchica ad albero (Top-Down) per la vista genealogica
+        if (isFamilyTree) {
+          graph.dagMode('td').dagLevelDistance(75);
+          graph.d3Force('charge')?.strength(-220);
+        } else {
+          graph.dagMode(null);
+          graph.d3Force('charge')?.strength(-150);
+          graph.d3Force('link')?.distance(75);
+        }
 
-        // Doppio step di centraggio (immediato + post-layout) per garantire che il grafo non finisca mai fuori asse
         requestAnimationFrame(() => { if (token === loadToken) centerGraphCamera(0); });
-        setTimeout(() => { if (token === loadToken) centerGraphCamera(450); }, 320);
+        setTimeout(() => { if (token === loadToken) centerGraphCamera(450); }, 350);
       } catch (err) {
         if (token === loadToken) canvas.innerHTML = `<div class="nexus-graph-error">Errore grafo: ${String(err.message || err)}</div>`;
       }
