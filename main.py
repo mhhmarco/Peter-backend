@@ -19,7 +19,7 @@ try:
     from database import (
         supabase, supabase_error_log, get_recent_memories,
         get_long_term_facts, get_structured_memory_overview, delete_fact_by_id, update_fact_by_id,
-        save_episodic_memory, save_contacts_batch, get_contacts,
+        save_episodic_memory, save_contacts_batch, get_contacts, update_person_card,
         save_calendar_events_batch, get_personality_settings, save_personality_settings,
         get_nexus_graph_data, wipe_table_data
     )
@@ -67,6 +67,15 @@ class TTSRequest(BaseModel):
 
 class FactUpdateRequest(BaseModel):
     fact: str
+
+
+class PersonCardUpdateRequest(BaseModel):
+    name: str | None = None
+    relation_type: str | None = None
+    birthday: str | None = None
+    notes: str | None = None
+    photo_url: str | None = None
+    parent_name: str | None = None
 
 
 class ICalRequest(BaseModel):
@@ -147,6 +156,15 @@ def api_structured_memories():
 @app.get("/api/nexus")
 def api_get_nexus():
     return get_nexus_graph_data()
+
+
+@app.put("/api/nexus/person/{node_id}")
+def api_update_nexus_person(node_id: str, req: PersonCardUpdateRequest):
+    """Salva le modifiche alla scheda persona (compleanno, note, foto, relazione) e le sincronizza con la memoria di Peter."""
+    updated = update_person_card(node_id, req.model_dump(exclude_unset=True))
+    if not updated:
+        raise HTTPException(status_code=500, detail="Impossibile aggiornare la scheda della persona")
+    return {"status": "updated", "person": updated}
 
 
 @app.get("/api/contacts")
