@@ -145,8 +145,60 @@
     }
     .ios-mini-btn.danger{color:#fda4af;border-color:rgba(253,164,175,.3);}
 
-    /* NEXUS 3D */
-    .nexus-multi-graphs{margin:10px 0 14px}.nexus-graph-tabs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}.nexus-graph-tab{border:1px solid var(--glass-border);border-radius:14px;background:rgba(14,24,38,.75);color:#d8eaff;padding:10px 14px;font:600 11px ui-monospace,monospace;letter-spacing:.05em;cursor:pointer}.nexus-graph-tab.active{background:rgba(108,229,255,.18);border-color:rgba(108,229,255,.5);color:#fff}.nexus-graph-caption{color:#aabbd0;font-size:12px;margin:0 0 9px}.nexus-graph-count{float:right;color:#9eb4cb;font:10px ui-monospace,monospace}.nexus-graph-canvas{height:min(68vh,720px);min-height:390px;border:1px solid var(--glass-border);border-radius:20px;overflow:hidden;background:radial-gradient(ellipse at center,rgba(54,91,130,.18),rgba(4,8,15,.96) 70%)}.nexus-graph-error{padding:24px;color:#e6b5b5;font-size:13px}.graph-view.peter-legacy-hidden{display:none!important}
+    /* NEXUS 3D CENTRATO + SCHEDA NODO MODIFICABILE IOS 27 */
+    .nexus-multi-graphs{margin:10px 0 14px;position:relative;}
+    .nexus-graph-tabs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;align-items:center;}
+    .nexus-graph-tab{border:1px solid var(--glass-border);border-radius:14px;background:rgba(14,24,38,.75);color:#d8eaff;padding:10px 14px;font:600 11px ui-monospace,monospace;letter-spacing:.05em;cursor:pointer}
+    .nexus-graph-tab.active{background:rgba(108,229,255,.18);border-color:rgba(108,229,255,.5);color:#fff}
+    .nexus-center-btn{margin-left:auto;border:1px solid rgba(108,229,255,.35);border-radius:14px;background:rgba(108,229,255,.12);color:var(--cyan);padding:9px 13px;font:600 11px ui-monospace,monospace;cursor:pointer;}
+    .nexus-graph-caption{color:#aabbd0;font-size:12px;margin:0 0 9px}
+    .nexus-graph-count{float:right;color:#9eb4cb;font:10px ui-monospace,monospace}
+    .nexus-stage-wrap{position:relative;width:100%;height:min(68vh,720px);min-height:420px;border:1px solid var(--glass-border);border-radius:20px;overflow:hidden;background:radial-gradient(ellipse at center,rgba(54,91,130,.22),rgba(4,8,15,.96) 72%);display:flex;align-items:center;justify-content:center;}
+    .nexus-graph-canvas{width:100%;height:100%;display:block;}
+    .nexus-graph-canvas canvas{display:block;margin:0 auto;}
+    .nexus-graph-error{padding:24px;color:#e6b5b5;font-size:13px;text-align:center;}
+    .graph-view.peter-legacy-hidden{display:none!important}
+
+    /* SCHEDA INTERATTIVA DETTAGLIO & MODIFICA NODO */
+    .nexus-node-sheet{
+      position:absolute;top:14px;right:14px;width:min(360px,calc(100% - 28px));max-height:calc(100% - 28px);
+      overflow-y:auto;padding:18px;border-radius:22px;z-index:25;
+      background:rgba(14,21,34,.88);backdrop-filter:blur(28px) saturate(180%);-webkit-backdrop-filter:blur(28px) saturate(180%);
+      border:1px solid rgba(108,229,255,.32);box-shadow:0 24px 60px rgba(0,0,0,.6);
+      display:none;flex-direction:column;gap:12px;color:var(--text);
+    }
+    .nexus-node-sheet.open{display:flex;}
+    .nexus-sheet-top{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+    .nexus-sheet-kicker{font:700 10px ui-monospace,monospace;letter-spacing:.12em;color:var(--cyan);}
+    .nexus-sheet-close{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:#fff;border-radius:10px;width:28px;height:28px;cursor:pointer;font-size:14px;}
+    .nexus-avatar-row{display:flex;align-items:center;gap:12px;}
+    .nexus-avatar-preview{
+      width:64px;height:64px;border-radius:18px;object-fit:cover;flex-shrink:0;
+      background:linear-gradient(135deg,rgba(94,158,255,.28),rgba(184,156,255,.28));
+      border:1px solid rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;
+      font-size:22px;font-weight:700;color:#fff;overflow:hidden;
+    }
+    .nexus-avatar-preview img{width:100%;height:100%;object-fit:cover;}
+    .nexus-field{display:flex;flex-direction:column;gap:5px;}
+    .nexus-field label{font:600 10.5px ui-monospace,monospace;color:var(--muted);letter-spacing:.05em;}
+    .nexus-input,.nexus-textarea{
+      width:100%;box-sizing:border-box;padding:9px 12px;border-radius:12px;
+      background:rgba(6,10,18,.72);border:1px solid rgba(255,255,255,.15);
+      color:#fff;font-size:13px;font-family:inherit;outline:none;
+    }
+    .nexus-input:focus,.nexus-textarea:focus{border-color:var(--cyan);}
+    .nexus-textarea{min-height:84px;resize:vertical;line-height:1.45;}
+    .nexus-photo-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+    .nexus-upload-lbl{
+      padding:6px 11px;border-radius:10px;background:rgba(108,229,255,.14);
+      border:1px solid rgba(108,229,255,.35);color:var(--cyan);font-size:11px;font-weight:600;cursor:pointer;
+    }
+    .nexus-save-btn{
+      padding:10px 14px;border-radius:14px;border:none;cursor:pointer;font-weight:700;font-size:13px;
+      background:linear-gradient(135deg,#5e9eff,#38bdf8);color:#04101f;
+      box-shadow:0 8px 20px rgba(56,189,248,.28);
+    }
+    .nexus-save-status{font-size:11.5px;color:var(--green);min-height:16px;}
 
     @media(max-width:1100px){.dashboard-grid{grid-template-columns:1fr !important;}}
     @media(max-width:760px){
@@ -406,8 +458,9 @@
           actions.append(editBtn, delBtn);
           card.append(actions);
         } else if (activeDomain === 'social') {
+          const bdayTag = item.birthday ? ` · 🎂 ${item.birthday}` : '';
           card.innerHTML = `
-            <span class="ios-mem-badge">${(item.relation_type || item.category || 'CONTATTO').toUpperCase()}</span>
+            <span class="ios-mem-badge">${(item.relation_type || item.category || 'CONTATTO').toUpperCase()}${bdayTag}</span>
             <div style="font-weight:700;font-size:14px;color:#fff;">${item.name || ''}</div>
             <div class="ios-mem-text">${item.notes || 'Nessuna nota aggiuntiva.'}</div>
           `;
@@ -460,71 +513,282 @@
   }
   initMemoryCoreUI();
 
-  // --- NEURAL NEXUS 3D (MANTIENE TUTTE LE 4 VISTE) ---
+  // --- NEURAL NEXUS 3D (CENTRATO, SENZA SEZIONE CHAT, CON SCHEDA NODO MODIFICABILE) ---
   const graphView = document.getElementById('view-nexus');
   if (graphView) {
     const legacy = graphView.querySelector('.graph-view');
     const multi = document.createElement('section');
     multi.className = 'nexus-multi-graphs';
-    multi.innerHTML = '<div class="nexus-graph-tabs" role="tablist"></div><p class="nexus-graph-caption"></p><div class="nexus-graph-canvas"></div>';
+    multi.innerHTML = `
+      <div class="nexus-graph-tabs" role="tablist">
+        <button type="button" class="nexus-center-btn" id="nexus-recenter-btn" title="Centra il grafo al centro dello schermo">⌖ CENTRA GRAFO</button>
+      </div>
+      <p class="nexus-graph-caption"></p>
+      <div class="nexus-stage-wrap">
+        <div class="nexus-graph-canvas"></div>
+        <aside class="nexus-node-sheet" id="nexus-node-sheet" aria-label="Scheda dettaglio nodo">
+          <div class="nexus-sheet-top">
+            <span class="nexus-sheet-kicker" id="nexus-sheet-kicker">NODE // INSPECTOR</span>
+            <button type="button" class="nexus-sheet-close" id="nexus-sheet-close" title="Chiudi scheda">✕</button>
+          </div>
+          <div id="nexus-sheet-body"></div>
+        </aside>
+      </div>
+    `;
     if (legacy) { legacy.classList.add('peter-legacy-hidden'); legacy.insertAdjacentElement('beforebegin', multi); }
     else graphView.append(multi);
 
     const tabs = multi.querySelector('.nexus-graph-tabs');
+    const recenterBtn = multi.querySelector('#nexus-recenter-btn');
     const caption = multi.querySelector('.nexus-graph-caption');
+    const stageWrap = multi.querySelector('.nexus-stage-wrap');
     const canvas = multi.querySelector('.nexus-graph-canvas');
+    const sheet = multi.querySelector('#nexus-node-sheet');
+    const sheetKicker = multi.querySelector('#nexus-sheet-kicker');
+    const sheetBody = multi.querySelector('#nexus-sheet-body');
+    const sheetClose = multi.querySelector('#nexus-sheet-close');
+
+    // Sezione "TUTTE LE CHAT" rimossa dal grafo 3D
     const views = [
-      { id: 'family', label: 'ALBERO FAMILIARE', caption: 'Legami familiari espliciti tra genitori e figli.' },
+      { id: 'family', label: 'ALBERO FAMILIARE', caption: 'Albero genealogico diretto (genitori, figli, coniugi) collegato a Marco.' },
       { id: 'people', label: 'PERSONE E RELAZIONI', caption: 'Amici, colleghi e conoscenti collegati per relazione.' },
-      { id: 'chats', label: 'TUTTE LE CHAT', caption: 'Sequenza cronologica delle conversazioni.' },
-      { id: 'facts', label: 'RICORDI A LUNGO TERMINE', caption: 'Mappa radiale dei fatti consolidati.' },
+      { id: 'facts', label: 'RICORDI A LUNGO TERMINE', caption: 'Mappa radiale dei fatti consolidati nella memoria semantica.' },
     ];
     let graph = null;
+    let activeViewObj = views[0];
     let activeView = null;
     let loadToken = 0;
-    const color = node => node.type === 'core' ? '#32e6ac' : node.type === 'person' ? (node.relationship_group === 'family' ? '#ff6fbe' : '#5e9eff') : node.type === 'chat' ? '#6ce5ff' : '#b89cff';
+
+    const color = node => node.type === 'core' ? '#32e6ac' : node.type === 'person' ? (node.relationship_group === 'family' ? '#ff6fbe' : '#5e9eff') : '#b89cff';
     function disposeGraph() { if (graph) { graph._destructor?.(); graph = null; } }
 
-    async function renderView(view) {
+    // Funzione di centraggio camera che mantiene il nodo centrale Marco (0,0,0) sempre al centro del canvas
+    function centerGraphCamera(duration = 450) {
+      if (!graph) return;
+      const w = stageWrap.clientWidth || canvas.clientWidth || 800;
+      const h = stageWrap.clientHeight || canvas.clientHeight || 520;
+      graph.width(w).height(h);
+      const nodes = graph.graphData()?.nodes || [];
+      if (nodes.length <= 1) {
+        graph.cameraPosition({ x: 0, y: 0, z: 220 }, { x: 0, y: 0, z: 0 }, duration);
+      } else {
+        graph.zoomToFit(duration, 85);
+      }
+    }
+
+    sheetClose?.addEventListener('click', () => sheet.classList.remove('open'));
+    recenterBtn?.addEventListener('click', () => centerGraphCamera(400));
+
+    // Ridimensiona un'immagine caricata dall'utente in Base64 compatto per salvarla istantaneamente
+    function fileToCompressedDataUrl(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = reject;
+        reader.onload = () => {
+          const img = new Image();
+          img.onerror = reject;
+          img.onload = () => {
+            const maxDim = 256;
+            const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+            const c = document.createElement('canvas');
+            c.width = Math.round(img.width * scale);
+            c.height = Math.round(img.height * scale);
+            c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+            resolve(c.toDataURL('image/jpeg', 0.82));
+          };
+          img.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    // Apre la scheda dettagliata al click su un nodo (modificabile per persone, memoria dettagliata per fatti)
+    function openNodeSheet(node) {
+      if (!node || !sheet || !sheetBody) return;
+      const isPerson = node.type === 'person' || node.type === 'core';
+      sheetKicker.textContent = isPerson
+        ? `SCHEDA PERSONA // ${(node.relationship_group || node.category || 'PERSONA').toUpperCase()}`
+        : `MEMORIA DETTAGLIATA // ${(node.type || 'NODO').toUpperCase()}`;
+
+      if (!isPerson) {
+        // Scheda dettagliata per nodi di memoria / fatti
+        sheetBody.innerHTML = `
+          <div style="font-size:15px;font-weight:700;color:#fff;margin-bottom:8px;">${node.name || 'Ricordo'}</div>
+          <div style="font-size:13px;line-height:1.55;color:#dbe8fa;white-space:pre-wrap;background:rgba(255,255,255,.04);padding:12px;border-radius:14px;border:1px solid rgba(255,255,255,.09);">
+            ${node.notes || node.name || 'Nessun dettaglio disponibile.'}
+          </div>
+          ${node.created_at ? `<div style="margin-top:8px;font:11px ui-monospace,monospace;color:#96a8c2;">Registrato: ${node.created_at}</div>` : ''}
+        `;
+        sheet.classList.add('open');
+        return;
+      }
+
+      // Scheda modificabile per Marco e per ogni persona dell'albero familiare o delle relazioni
+      let currentPhoto = node.photo_url || '';
+      const initialLetter = (node.name || '?').trim().charAt(0).toUpperCase();
+
+      sheetBody.innerHTML = `
+        <div class="nexus-avatar-row">
+          <div class="nexus-avatar-preview" id="nexus-avatar-box">
+            ${currentPhoto ? `<img src="${currentPhoto}" alt="${node.name || ''}">` : initialLetter}
+          </div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:15px;font-weight:700;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${node.name || ''}</div>
+            <div style="font-size:11.5px;color:#96a8c2;">${node.relation_type || 'Centro Neurale'}</div>
+          </div>
+        </div>
+        <div class="nexus-field">
+          <label>FOTO PROFILO (CARICA O INCOLLA URL)</label>
+          <div class="nexus-photo-actions">
+            <label class="nexus-upload-lbl">
+              📷 Scegli Foto
+              <input type="file" accept="image/*" id="nexus-photo-file" style="display:none;">
+            </label>
+            <input type="text" class="nexus-input" id="nexus-photo-url" placeholder="https://... oppure carica file" value="${currentPhoto.startsWith('data:') ? '' : currentPhoto}" style="flex:1;min-width:140px;">
+          </div>
+        </div>
+        <div class="nexus-field">
+          <label>NOME</label>
+          <input type="text" class="nexus-input" id="nexus-edit-name" value="${node.name || ''}">
+        </div>
+        <div class="nexus-field">
+          <label>RELAZIONE (ES. PADRE, MADRE, FIGLIO, MOGLIE, AMICO)</label>
+          <input type="text" class="nexus-input" id="nexus-edit-rel" value="${node.relation_type || ''}">
+        </div>
+        <div class="nexus-field">
+          <label>COMPLEANNO</label>
+          <input type="text" class="nexus-input" id="nexus-edit-bday" placeholder="Es. 12 agosto 1975" value="${node.birthday || ''}">
+        </div>
+        <div class="nexus-field">
+          <label>NOTE E MEMORIA RELAZIONI (USATE DA PETER)</label>
+          <textarea class="nexus-textarea" id="nexus-edit-notes" placeholder="Inserisci legami familiari, dettagli, ricordi...">${node.notes || ''}</textarea>
+        </div>
+        <button type="button" class="nexus-save-btn" id="nexus-save-person">Salva nella Memoria di Peter</button>
+        <div class="nexus-save-status" id="nexus-save-status"></div>
+      `;
+
+      const avatarBox = sheetBody.querySelector('#nexus-avatar-box');
+      const fileInput = sheetBody.querySelector('#nexus-photo-file');
+      const urlInput = sheetBody.querySelector('#nexus-photo-url');
+      const saveBtn = sheetBody.querySelector('#nexus-save-person');
+      const statusEl = sheetBody.querySelector('#nexus-save-status');
+
+      fileInput?.addEventListener('change', async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        try {
+          currentPhoto = await fileToCompressedDataUrl(file);
+          avatarBox.innerHTML = `<img src="${currentPhoto}" alt="Foto">`;
+          if (urlInput) urlInput.value = '';
+        } catch (_) {
+          statusEl.textContent = 'Errore lettura immagine.';
+        }
+      });
+
+      urlInput?.addEventListener('input', () => {
+        const val = urlInput.value.trim();
+        if (val) {
+          currentPhoto = val;
+          avatarBox.innerHTML = `<img src="${val}" alt="Foto">`;
+        }
+      });
+
+      saveBtn?.addEventListener('click', async () => {
+        const payload = {
+          name: sheetBody.querySelector('#nexus-edit-name')?.value.trim() || node.name,
+          relation_type: sheetBody.querySelector('#nexus-edit-rel')?.value.trim() || node.relation_type,
+          birthday: sheetBody.querySelector('#nexus-edit-bday')?.value.trim() || '',
+          notes: sheetBody.querySelector('#nexus-edit-notes')?.value.trim() || '',
+          photo_url: currentPhoto || ''
+        };
+        saveBtn.disabled = true;
+        statusEl.textContent = 'Salvataggio in corso...';
+        try {
+          const res = await fetch(`/api/nexus/person/${encodeURIComponent(node.id)}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          Object.assign(node, payload);
+          statusEl.textContent = 'Salvato! Peter ora userà questi dati nel suo contesto.';
+          // Ricarica il grafo corrente mantenendo la vista centrata
+          await renderView(activeViewObj, true);
+        } catch (err) {
+          statusEl.textContent = `Errore salvataggio: ${err.message || err}`;
+        } finally {
+          saveBtn.disabled = false;
+        }
+      });
+
+      sheet.classList.add('open');
+    }
+
+    async function renderView(view, keepSheetOpen = false) {
+      activeViewObj = view;
       activeView = view.id;
       const token = ++loadToken;
+      if (!keepSheetOpen) sheet?.classList.remove('open');
       caption.textContent = view.caption;
-      tabs.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.view === view.id));
+      tabs.querySelectorAll('button.nexus-graph-tab').forEach(b => b.classList.toggle('active', b.dataset.view === view.id));
       canvas.replaceChildren();
       disposeGraph();
+
       if (typeof ForceGraph3D !== 'function') {
         canvas.innerHTML = '<div class="nexus-graph-error">Libreria 3D non disponibile.</div>';
         return;
       }
       canvas.innerHTML = '<div class="nexus-graph-error">Caricamento grafo 3D…</div>';
+
       try {
         const response = await fetch(`/api/nexus/${view.id}`, { cache: 'no-store' });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data = await response.json();
         if (token !== loadToken || activeView !== view.id) return;
+
         const nodes = Array.isArray(data.nodes) ? data.nodes : [];
         const nodeIds = new Set(nodes.map(n => String(n.id)));
         const links = (Array.isArray(data.edges) ? data.edges : [])
           .filter(e => nodeIds.has(String(e.source?.id ?? e.source)) && nodeIds.has(String(e.target?.id ?? e.target)))
           .map(e => ({ ...e, source: String(e.source?.id ?? e.source), target: String(e.target?.id ?? e.target) }));
+
         caption.innerHTML = `${view.caption}<span class="nexus-graph-count">${nodes.length} NODI · ${links.length} LEGAMI</span>`;
         canvas.replaceChildren();
+
         if (!nodes.length) {
           canvas.innerHTML = '<div class="nexus-graph-error">Nessun dato salvato per questa vista.</div>';
           return;
         }
+
+        // Fissa sempre il nodo centrale Marco a (0,0,0) per centrare perfettamente l'intera rete
+        nodes.forEach(n => {
+          if (n.id === 'user_self' || n.type === 'core') {
+            n.fx = 0;
+            n.fy = 0;
+            n.fz = 0;
+          }
+        });
+
+        const initW = stageWrap.clientWidth || canvas.clientWidth || 800;
+        const initH = stageWrap.clientHeight || canvas.clientHeight || 520;
+
         graph = ForceGraph3D()(canvas)
+          .width(initW)
+          .height(initH)
           .backgroundColor('rgba(3,7,13,0)')
           .graphData({ nodes, links })
           .nodeId('id')
-          .nodeLabel(n => `${n.name || n.id}${n.relation_type ? ` · ${n.relation_type}` : ''}`)
+          .nodeLabel(n => `${n.name || n.id}${n.relation_type ? ` · ${n.relation_type}` : ''}${n.birthday ? ` · 🎂 ${n.birthday}` : ''}`)
           .nodeColor(color)
-          .nodeVal(n => n.type === 'core' ? 12 : view.id === 'chats' ? 4 : 7)
+          .nodeVal(n => n.type === 'core' ? 13 : 8)
+          .linkLabel(l => l.relation_type || '')
           .linkColor(l => String(l.category || '').includes('famiglia') ? '#32e6ac' : '#7c95b4')
-          .linkOpacity(.65)
+          .linkOpacity(.72)
           .linkDirectionalParticles(2)
           .linkDirectionalParticleWidth(2)
           .onNodeClick(node => {
+            openNodeSheet(node);
+            // Aggiorna anche l'eventuale inspector legacy se presente nel DOM
             const inspector = document.getElementById('nexus-inspector');
             const title = document.getElementById('inspector-title');
             const meta = document.getElementById('inspector-meta');
@@ -533,10 +797,17 @@
             if (meta) meta.textContent = node.notes || node.relation_type || node.created_at || '';
             if (type) type.textContent = `NODE // ${(node.type || 'unknown').toUpperCase()}`;
             if (inspector) inspector.classList.add('open');
+          })
+          .onEngineStop(() => {
+            if (token === loadToken) centerGraphCamera(400);
           });
-        graph.d3Force('charge')?.strength(-160);
-        graph.d3Force('link')?.distance(view.id === 'family' ? 100 : 75);
-        setTimeout(() => { if (token === loadToken) graph?.zoomToFit(500, 60); }, 250);
+
+        graph.d3Force('charge')?.strength(-150);
+        graph.d3Force('link')?.distance(view.id === 'family' ? 95 : 75);
+
+        // Doppio step di centraggio (immediato + post-layout) per garantire che il grafo non finisca mai fuori asse
+        requestAnimationFrame(() => { if (token === loadToken) centerGraphCamera(0); });
+        setTimeout(() => { if (token === loadToken) centerGraphCamera(450); }, 320);
       } catch (err) {
         if (token === loadToken) canvas.innerHTML = `<div class="nexus-graph-error">Errore grafo: ${String(err.message || err)}</div>`;
       }
@@ -549,12 +820,23 @@
       btn.dataset.view = view.id;
       btn.textContent = view.label;
       btn.addEventListener('click', () => renderView(view));
-      tabs.append(btn);
+      tabs.insertBefore(btn, recenterBtn);
     });
 
-    const resizeObserver = new ResizeObserver(() => graph?.width(canvas.clientWidth).height(canvas.clientHeight));
-    resizeObserver.observe(canvas);
-    document.querySelector('.nav-btn[data-view="nexus"]')?.addEventListener('click', () => { if (!activeView) renderView(views[0]); }, { once: true });
+    const resizeObserver = new ResizeObserver(() => {
+      if (graph && stageWrap.clientWidth > 0 && stageWrap.clientHeight > 0) {
+        graph.width(stageWrap.clientWidth).height(stageWrap.clientHeight);
+        centerGraphCamera(250);
+      }
+    });
+    resizeObserver.observe(stageWrap);
+
+    document.querySelector('.nav-btn[data-view="nexus"]')?.addEventListener('click', () => {
+      setTimeout(() => {
+        if (!activeView) renderView(views[0]);
+        else centerGraphCamera(300);
+      }, 60);
+    });
     if (graphView.classList.contains('active')) renderView(views[0]);
   }
 })();
