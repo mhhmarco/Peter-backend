@@ -380,26 +380,36 @@ async def generate_peter_response(user_message: str, recent_context: str, long_t
 
 
 def _resolve_person_node_id(person_name: str) -> str:
-    """Restituisce 'user_self' se il nome indica Marco, altrimenti un ID deterministico contatto."""
+    """Restituisce 'user_self' se il nome indica Marco, altrimenti cerca un nodo esistente per nome o crea un ID deterministico."""
     clean = (person_name or "").strip()
     if clean.lower() in ["marco", "marco (tu)", "barbi", "marco barbiero", "marco barbiero torres", "io"]:
         return "user_self"
+    if supabase and clean:
+        try:
+            res = supabase.table("nodes").select("id").ilike("name", clean).execute()
+            if res.data:
+                return str(res.data[0]["id"])
+        except Exception:
+            pass
     return make_stable_id("contact", clean)
 
 
 # --- FUNZIONE WORKER PER IL CHUNKING PARALLELO CON ID DETERMINISTICI E ALBERO GENEALOGICO ---
 async def process_chunk(chunk: str, model: str, index: int, image_data_url: str = None):
+    existing_people_summary = get_family_and_people_context(limit=40)
     extraction_prompt = (
-        "Sei l'estrattore dati e genealogista di Peter. Utente centrale: Marco (ID 'Marco').\n"
+        "Sei l'estrattore dati e genealogista di Peter. Utente centrale: Marco (usa 'Marco' per collegare a lui).\n"
         "Estrai IN MODO SILENZIOSO in JSON le entità e l'albero genealogico diretto.\n"
-        "REGOLE RIGIDE PER L'ALBERO GENEALOGICO:\n"
-        "- Collega i familiari SOLO con legami diretti: padre, madre, figlio, figlia, marito, moglie.\n"
-        "- Esempio: se 'Mario è il padre di Marco', Mario ha child_name='Marco' e relation_type='padre'.\n"
-        "- Esempio: se 'Giuseppe è il nonno paterno di Marco' (padre di Mario), Giuseppe ha child_name='Mario' e relation_type='nonno' (NON collegarlo direttamente a Marco, ma a suo figlio Mario così la catena risale a Marco!).\n"
-        "- Esempio: se 'Anna è la moglie di Mario', Anna ha spouse_name='Mario' e relation_type='madre/moglie'.\n"
-        "- Inserisci nella chiave 'notes' della persona la descrizione completa dei suoi legami con i parenti fino a Marco (es. 'Padre di Mario, nonno paterno di Marco').\n"
+        "REGOLE RIGIDE PER EVITARE PERSONE IN PIÙ E COLLEGARE L'ALBERO:\n"
+        "1. Estrai SOLO nomi propri di persone reali citate esplicitamente (MAI parole generiche, luoghi o frasi).\n"
+        "2. Collega i familiari SOLO con legami diretti: padre, madre, figlio, figlia, marito, moglie.\n"
+        "3. Esempio: se 'Mario è il padre di Marco', Mario ha child_name='Marco' e relation_type='padre'.\n"
+        "4. Esempio: se 'Nadia Rizzuti è la nonna materna di Marco' (madre della madre di Marco), collegala con child_name='<nome della madre di Marco>' e relation_type='nonna materna' (NON direttamente a Marco!).\n"
+        "5. Esempio: se 'Anna è la moglie di Mario', Anna ha spouse_name='Mario' e relation_type='moglie'.\n"
+        "6. Scrivi in 'notes' la catena completa dei legami con i parenti fino a Marco (es. 'Madre di Laura, nonna materna di Marco').\n"
+        f"Persone già presenti in memoria (usa esattamente questi nomi se coincidono):\n{existing_people_summary}\n"
         "Formato JSON richiesto:\n"
-        '{"fact": "...", "people": [{"name": "...", "gender": "M/F", "birth_year": 1975, "birthday": "12 maggio", "relation_type": "padre/madre/figlio/figlia/marito/moglie/nonno/zio/amico", "parent_name": "nome del padre o madre se noto", "child_name": "nome del figlio o figlia se noto (usa Marco se è genitore di Marco)", "spouse_name": "nome di marito o moglie se noto", "notes": "relazione dettagliata con parenti e Marco"}], "event_title": "...", "event_desc": "...", "interest_name": "...", "interest_desc": "..."}'
+        '{"fact": "...", "people": [{"name": "...", "gender": "M/F", "birth_year": 1975, "birthday": "12 maggio", "relation_type": "padre/madre/figlio/figlia/marito/moglie/nonna materna/nonno paterno/zio/amico", "parent_name": "nome del padre o madre se noto", "child_name": "nome del figlio o figlia se noto (usa Marco se è genitore di Marco)", "spouse_name": "nome di marito o moglie se noto", "notes": "relazione dettagliata con parenti e Marco"}], "event_title": "...", "event_desc": "...", "interest_name": "...", "interest_desc": "..."}'
     )
 
     messages = [{"role": "system", "content": extraction_prompt}]
@@ -443,7 +453,7 @@ async def process_chunk(chunk: str, model: str, index: int, image_data_url: str 
                     people_list = parsed.get("people", [])
                     for p in people_list:
                         p_name = p.get("name", "").strip()
-                        if not p_name or p_name.lower() in ["marco", "barbi", "marco barbiero", "marco barbiero torres", "nessuno"]:
+                        if not p_name or len(p_name) > 45 or p_name.lower() in ["marco", "barbi", "marco barbiero", "marco barbiero torres", "nessuno", "utente", "sconosciuto"]:
                             continue
 
                         rel_type = (p.get("relation_type") or "neutrale").strip()
@@ -469,7 +479,7 @@ async def process_chunk(chunk: str, model: str, index: int, image_data_url: str 
 
                         if supabase:
                             try:
-                                node_id = make_stable_id("contact", p_name)
+                                node_id = _resolve_person_node_id(p_name)
                                 node_record = {
                                     "id": node_id,
                                     "name": p_name,
@@ -532,7 +542,7 @@ async def process_chunk(chunk: str, model: str, index: int, image_data_url: str 
                                         }).execute()
                                         linked = True
 
-                                # Se non è un familiare o non ha ancora un ponte diretto, collegalo a Marco solo se non familiare indiretto
+                                # Se non è un familiare, collegalo a Marco come contatto; se è familiare di primo grado collegalo direttamente a Marco
                                 if not linked and not is_family:
                                     supabase.table("edges").upsert({
                                         "source": "user_self",
@@ -540,8 +550,7 @@ async def process_chunk(chunk: str, model: str, index: int, image_data_url: str 
                                         "relation_type": rel_type,
                                         "category": "relazione"
                                     }).execute()
-                                elif not linked and is_family and any(k in rel_type.lower() for k in ("padre", "madre", "figlio", "figlia", "marito", "moglie")):
-                                    # Collega direttamente a Marco solo i parenti di primo grado (genitori, figli, coniuge)
+                                elif not linked and is_family and any(k in rel_type.lower() for k in ("padre", "madre", "figlio", "figlia", "marito", "moglie")) and not any(k in rel_type.lower() for k in ("nonn", "zi", "cugin", "suocer", "cognat")):
                                     if any(k in rel_type.lower() for k in ("padre", "madre")):
                                         supabase.table("edges").upsert({
                                             "source": node_id,
@@ -590,13 +599,23 @@ async def extract_and_save_facts(user_message: str, image_data_url: str = None):
     if not GROQ_API_KEY:
         return
 
-    chunk_size = 2500
+    # Se il messaggio riguarda famiglia o albero genealogico, elabora in un unico blocco olistico
+    # per non spezzare i legami tra nonni, genitori e Marco.
+    low = (user_message or "").lower()
+    is_family_input = any(k in low for k in (
+        "albero", "genealog", "famiglia", "padre", "madre", "papà", "mamma",
+        "nonno", "nonna", "fratello", "sorella", "zio", "zia", "cugino", "cugina",
+        "moglie", "marito", "figlio", "figlia"
+    ))
+    chunk_size = 7500 if is_family_input else 2500
     chunks = [user_message[i:i+chunk_size] for i in range(0, len(user_message), chunk_size)]
 
     tasks = []
     for index, chunk in enumerate(chunks):
         if image_data_url and index == 0:
             assigned_model = MODEL_VISION
+        elif is_family_input:
+            assigned_model = MODEL_CHAT
         else:
             assigned_model = WORKER_MODELS[index % len(WORKER_MODELS)]
 
