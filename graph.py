@@ -6,7 +6,7 @@ from typing import Any
 _FAMILY_TERMS = (
     "famiglia", "familiare", "padre", "madre", "genitore", "figlio", "figlia",
     "fratello", "sorella", "nonno", "nonna", "zio", "zia", "cugino", "cugina",
-    "nipote", "marito", "moglie", "partner", "suocero", "suocera", "cognato", "cognata",
+    "nipote", "marito", "moglie", "coniuge", "partner", "suocero", "suocera", "cognato", "cognata",
 )
 
 
@@ -23,18 +23,20 @@ def _is_family(node: dict) -> bool:
 
 
 def _core_node() -> dict:
+    # Ancora il nodo centrale Marco alle coordinate (0, 0, 0) per mantenere sempre centrato il grafo 3D
     return {
         "id": "user_self", "name": "Marco (Tu)", "type": "core",
         "category": "core", "notes": "Admin & Core Neural Center",
         "gender": "M", "birth_year": 2006,
+        "fx": 0, "fy": 0, "fz": 0,
     }
 
 
 def calculate_galaxy_layout(supabase_client) -> dict:
-    """Return Nexus nodes/links, including explicit family-tree parent links.
+    """Return Nexus nodes/links, including explicit family-tree parent and spouse links.
 
-    Family edges are directed from parent to child and are only synthesized when
-    a node has a parent_node_id/parent_id field. No family relationship is guessed.
+    Family edges are directed from parent to child (or between spouses) and trace
+    genealogically back to Marco (user_self). No family relationship is guessed.
     """
     if not supabase_client:
         return {"nodes": [_core_node()], "edges": []}
@@ -51,7 +53,9 @@ def calculate_galaxy_layout(supabase_client) -> dict:
 
     normalized_nodes = []
     ids = set()
-    name_to_id = {}
+    name_to_id = {"marco": "user_self", "marco (tu)": "user_self", "io": "user_self"}
+    has_core = False
+
     for original in nodes:
         node = dict(original)
         node_id = str(node.get("id", ""))
@@ -59,12 +63,22 @@ def calculate_galaxy_layout(supabase_client) -> dict:
             continue
         node["id"] = node_id
         ids.add(node_id)
+        if node_id == "user_self" or node.get("type") == "core":
+            has_core = True
+            # Fissa il nodo centrale all'origine 3D in ogni vista
+            node["fx"] = 0
+            node["fy"] = 0
+            node["fz"] = 0
         if node.get("type") == "person":
             family = _is_family(node)
             node["category"] = "famiglia" if family else "amicizia"
             node["relationship_group"] = "family" if family else "friend"
             name_to_id[_text(node.get("name"))] = node_id
         normalized_nodes.append(node)
+
+    if not has_core:
+        normalized_nodes.insert(0, _core_node())
+        ids.add("user_self")
 
     try:
         result = supabase_client.table("edges").select("*").execute()
@@ -81,8 +95,8 @@ def calculate_galaxy_layout(supabase_client) -> dict:
         edge["category"] = "famiglia" if any(term in relation for term in _FAMILY_TERMS) else edge.get("category", "relazione")
         edge_keys.add((source, target))
 
-    # The migration adds parent_node_id. parent_id is also accepted for older
-    # deployments that already use that field name.
+    # The migration adds parent_node_id. parent_id and parent_name are also accepted
+    # so parent-child edges always point directly from parent to child.
     for node in normalized_nodes:
         if node.get("type") != "person":
             continue
@@ -97,5 +111,6 @@ def calculate_galaxy_layout(supabase_client) -> dict:
                     "relation_type": node.get("family_relation") or "genitore-figlio",
                     "category": "famiglia", "family_tree": True,
                 })
+                edge_keys.add((parent, node["id"]))
 
     return {"nodes": normalized_nodes, "edges": edges}
