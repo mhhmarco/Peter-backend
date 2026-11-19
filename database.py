@@ -109,14 +109,15 @@ def save_contact_entity(
     """Salva o aggiorna un contatto in Supabase includendo compleanno, foto e note relazionali."""
     if not supabase or not name:
         return
-    if name.upper() in ["NESSUNO", "MARCO", "BARBI", "MARCO BARBIERO TORRES"]:
+    clean_name = name.strip()
+    if len(clean_name) > 45 or clean_name.upper() in ["NESSUNO", "MARCO", "BARBI", "MARCO BARBIERO TORRES", "UTENTE", "SCONOSCIUTO"]:
         return
 
     try:
-        res = supabase.table("contacts").select("*").ilike("name", name).execute()
+        res = supabase.table("contacts").select("*").ilike("name", clean_name).execute()
         if not res.data:
             payload = {
-                "name": name,
+                "name": clean_name,
                 "category": category,
                 "notes": notes,
                 "gender": gender,
@@ -176,8 +177,38 @@ def save_contacts_batch(contacts: list):
         )
 
 
+def delete_person_node(node_id: str) -> bool:
+    """Elimina un nodo persona (e eventuali duplicati con lo stesso nome) da nodes, edges e contacts."""
+    if not supabase or not node_id or node_id == "user_self":
+        return False
+    try:
+        node_res = supabase.table("nodes").select("*").eq("id", node_id).execute()
+        target_name = node_res.data[0].get("name") if node_res.data else None
+
+        # Rimuove il nodo e tutti i suoi archi associati
+        supabase.table("edges").delete().eq("source", node_id).execute()
+        supabase.table("edges").delete().eq("target", node_id).execute()
+        supabase.table("nodes").delete().eq("id", node_id).execute()
+
+        # Rimuove anche eventuali duplicati con lo stesso nome e il record in contacts
+        if target_name:
+            dups = supabase.table("nodes").select("id").ilike("name", target_name).execute().data or []
+            for d in dups:
+                did = d.get("id")
+                if did and did != "user_self":
+                    supabase.table("edges").delete().eq("source", did).execute()
+                    supabase.table("edges").delete().eq("target", did).execute()
+                    supabase.table("nodes").delete().eq("id", did).execute()
+            supabase.table("contacts").delete().ilike("name", target_name).execute()
+
+        return True
+    except Exception as e:
+        print(f"Errore eliminazione nodo persona: {e}")
+        return False
+
+
 def update_person_card(node_id: str, data: dict) -> dict | None:
-    """Aggiorna la scheda modificabile di una persona (nome, relazione, compleanno, note, foto) su nodes e contacts."""
+    """Aggiorna la scheda modificabile di una persona (nome, relazione, compleanno, note, foto, parente diretto) su nodes e contacts."""
     if not supabase or not node_id:
         return None
     try:
@@ -196,7 +227,7 @@ def update_person_card(node_id: str, data: dict) -> dict | None:
             "fratello", "sorella", "nonno", "nonna", "zio", "zia",
             "cugino", "cugina", "nipote", "marito", "moglie", "coniuge"
         )
-        is_family = any(k in relation_type.lower() for k in family_keywords) or existing_node.get("category") == "famiglia"
+        is_family = any(k in relation_type.lower() for k in family_keywords) or existing_node.get("category") == "famiglia" or bool(parent_name)
         category = "famiglia" if is_family else (existing_node.get("category") or "amicizia")
 
         # Sincronizza la tabella contacts
@@ -228,6 +259,15 @@ def update_person_card(node_id: str, data: dict) -> dict | None:
                 photo_url=photo_url or None
             )
 
+        # Risolve l'eventuale collegamento diretto impostato manualmente nella scheda
+        parent_node_id = None
+        if parent_name:
+            if parent_name.lower() in ("marco", "marco (tu)", "io"):
+                parent_node_id = "user_self"
+            else:
+                p_match = supabase.table("nodes").select("id").ilike("name", parent_name).execute().data or []
+                parent_node_id = p_match[0]["id"] if p_match else make_stable_id("contact", parent_name)
+
         # Sincronizza il nodo nel grafo 3D
         node_payload = {
             "id": node_id,
@@ -238,7 +278,8 @@ def update_person_card(node_id: str, data: dict) -> dict | None:
             "notes": notes,
             "birthday": birthday or None,
             "photo_url": photo_url or None,
-            "parent_name": parent_name or None
+            "parent_name": parent_name or None,
+            "parent_node_id": parent_node_id
         }
         try:
             supabase.table("nodes").upsert(node_payload).execute()
@@ -253,6 +294,18 @@ def update_person_card(node_id: str, data: dict) -> dict | None:
                 "notes": notes
             }
             supabase.table("nodes").upsert(safe_node).execute()
+
+        # Crea o aggiorna l'arco diretto nel database se è stato indicato un parente/collegamento
+        if parent_node_id and parent_node_id != node_id:
+            try:
+                supabase.table("edges").upsert({
+                    "source": parent_node_id,
+                    "target": node_id,
+                    "relation_type": relation_type or "genitore-figlio",
+                    "category": "famiglia" if is_family else "relazione"
+                }).execute()
+            except Exception:
+                pass
 
         # Salva anche un fatto consolidato se è stato aggiunto un compleanno, così Peter lo ha sempre in memoria
         if birthday and name and node_id != "user_self":
@@ -284,7 +337,7 @@ def get_family_and_people_context(limit: int = 50) -> str:
 
         for n in nodes:
             name = (n.get("name") or "").strip()
-            if not name:
+            if not name or name.lower() in seen_names:
                 continue
             seen_names.add(name.lower())
             c_info = contact_by_name.get(name.lower(), {})
@@ -317,6 +370,7 @@ def get_family_and_people_context(limit: int = 50) -> str:
             name = (c.get("name") or "").strip()
             if not name or name.lower() in seen_names:
                 continue
+            seen_names.add(name.lower())
             rel = c.get("relation_type") or c.get("category") or "contatto"
             bday = c.get("birthday") or ""
             notes = c.get("notes") or ""
